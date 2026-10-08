@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LA 0-1 마이크 테스트 v4</title>
+<style>
+:root{
+  --bg:#EEF2F5; --panel:#FFFFFF; --ink:#1C2A36; --sub:#5B6B78; --line:#D3DCE3;
+  --accent:#1F6F8B; --rec:#C8372D; --ok:#2E7D4F; --warn:#A86A00; --meter:#2E9E8F;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121A21; --panel:#1B252E; --ink:#E4ECF1; --sub:#93A3AF; --line:#2C3A45;
+    --accent:#5DB3D0; --rec:#F06A5E; --ok:#5CC48A; --warn:#E3A83B; --meter:#4FC7B6;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121A21; --panel:#1B252E; --ink:#E4ECF1; --sub:#93A3AF; --line:#2C3A45;
+  --accent:#5DB3D0; --rec:#F06A5E; --ok:#5CC48A; --warn:#E3A83B; --meter:#4FC7B6;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.35rem;margin:0 0 4px;letter-spacing:-.01em}
+.lead{color:var(--sub);margin:0 0 20px;font-size:.95rem}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:1.02rem;margin:0 0 10px;display:flex;gap:10px;align-items:center}
+.n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;
+  border:2px solid var(--accent);color:var(--accent);font-size:.85rem;font-weight:700;flex:none}
+.n.done{background:var(--ok);border-color:var(--ok);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{color:var(--sub);width:42%}
+.y{color:var(--ok);font-weight:600}.x{color:var(--rec);font-weight:600}.w{color:var(--warn);font-weight:600}
+label.opt{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.93rem}
+select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:.95rem}
+.small{font-size:.85rem;color:var(--sub);margin:6px 0 0}
+/* 녹음 버튼 */
+.recwrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:8px 0}
+#recBtn{width:132px;height:132px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--rec);color:#fff;font-size:1.05rem;font-weight:700;
+  box-shadow:0 0 0 calc(6px + var(--lv,0) * 26px) color-mix(in srgb,var(--rec) 22%,transparent);
+  transition:box-shadow .08s linear}
+#recBtn.on{border-radius:34px}
+#recBtn:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+#timer{font-size:1.6rem;font-variant-numeric:tabular-nums;font-weight:600}
+.meter{width:100%;height:12px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--meter)}
+#sound{font-size:.9rem;color:var(--sub)}
+button.b{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:.93rem;cursor:pointer}
+button.b.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* 녹음 목록 */
+.item{border-top:1px solid var(--line);padding:12px 0}
+.item:first-child{border-top:none;padding-top:0}
+.item .meta{font-size:.85rem;color:var(--sub);margin-bottom:6px}
+.item audio{width:100%;margin:4px 0}
+.played{color:var(--ok);font-weight:600;font-size:.85rem}
+.empty{color:var(--sub);font-size:.93rem}
+textarea{width:100%;min-height:220px;padding:10px;border-radius:10px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);font-size:.82rem;line-height:1.45;font-family:inherit}
+#log{font-size:.8rem;color:var(--sub);max-height:140px;overflow:auto;white-space:pre-wrap;margin:0}
+@media (prefers-reduced-motion:reduce){#recBtn{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>마이크 녹음·재생 테스트</h1>
+  <p class="lead">LA 0-1 · 주 사용 기기에서 녹음이 저장되고 다시 재생되는지 확인합니다. 위에서부터 순서대로 진행하세요.</p>
+
+  <section>
+    <h2><span class="n" id="s1">1</span>기기 환경</h2>
+    <table id="env"></table>
+  </section>
+
+  <section>
+    <h2><span class="n" id="s2">2</span>녹음하기</h2>
+    <select id="dev" aria-label="마이크 선택"><option value="">기본 마이크</option></select>
+    <p class="small" id="curMic" style="color:var(--ink);font-weight:600">지금 쓰는 마이크: 첫 녹음 후 표시</p>
+    <p class="small">마이크 이름은 첫 녹음 후 목록에 나타납니다. "가상 마이크"는 실제 마이크가 아니므로 고르지 마세요.</p>
+    <div style="margin-top:8px">
+      <label class="opt"><input type="checkbox" id="ec" checked> 에코 제거</label>
+      <label class="opt"><input type="checkbox" id="ns" checked> 소음 억제</label>
+      <label class="opt"><input type="checkbox" id="agc" checked> 자동 음량 조절</label>
+      <p class="small">처음엔 모두 켠 채로 한 번, 모두 끈 채로 한 번 녹음해서 비교해 보세요. (나중에 음높이 분석은 끈 상태가 유리할 수 있습니다)</p>
+    </div>
+    <div class="recwrap">
+      <button id="recBtn" type="button">녹음 시작</button>
+      <div id="timer">0.0초</div>
+      <div class="meter" aria-hidden="true"><i id="bar"></i></div>
+      <div id="sound">녹음 중 말하면 막대가 움직입니다. 최대 60초.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n" id="s3">3</span>저장된 녹음 재생</h2>
+    <div id="list"><p class="empty">아직 녹음이 없습니다. 2번에서 "녹음 시작"을 누르고 일본어 한 문장을 말해 보세요.</p></div>
+    <div class="row" style="margin-top:10px"><button class="b" id="clearAll" type="button">녹음 모두 삭제</button></div>
+  </section>
+
+  <section>
+    <h2><span class="n" id="s4">4</span>새로고침 후 남아 있는지</h2>
+    <p id="persist" class="small" style="margin:0">녹음을 1개 이상 만든 뒤 페이지를 새로고침(또는 닫았다 다시 열기)하세요. 녹음이 남아 있으면 여기에 표시됩니다.</p>
+  </section>
+
+  <section>
+    <h2><span class="n" id="s5">5</span>결과 보내기</h2>
+    <p class="small" style="margin:0 0 8px">아래 내용을 복사해서 Claude 대화에 붙여 넣어 주세요.</p>
+    <textarea id="report" readonly></textarea>
+    <div class="row" style="margin-top:8px"><button class="b p" id="copy" type="button">결과 복사</button><span id="copied" class="small"></span></div>
+  </section>
+
+  <section>
+    <h2 style="font-size:.9rem;color:var(--sub)">기록</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const S={permQ:'확인 전',micOk:null,micRes:{},mime:'',micLabel:'',settings:'',recOk:0,played:false,persisted:null,peakDb:null,heard:false,dbOk:true,errors:[]};
+let mem=[]; // IndexedDB를 못 쓸 때 대신 쓰는 임시 목록
+const urls=[];
+
+function log(m,err){const t=new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  $('#log').textContent=`[${t}] ${m}\n`+$('#log').textContent; if(err)S.errors.push(m); report();}
+
+/* ---------- 1. 환경 ---------- */
+const MIMES=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus','audio/aac'];
+function supported(){if(!window.MediaRecorder||!MediaRecorder.isTypeSupported)return[];return MIMES.filter(m=>{try{return MediaRecorder.isTypeSupported(m)}catch(e){return false}})}
+function inFrame(){try{return window.self!==window.top}catch(e){return true}}
+function yn(v){return v?'<span class="y">예</span>':'<span class="x">아니오</span>'}
+function env(){
+  const rows=[
+    ['보안 연결(https)',yn(window.isSecureContext)],
+    ['마이크 기능(getUserMedia)',yn(!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia))],
+    ['녹음 기능(MediaRecorder)',yn(!!window.MediaRecorder)],
+    ['녹음 가능 형식',supported().join(', ')||'<span class="x">없음</span>'],
+    ['기기 저장(IndexedDB)',yn(!!window.indexedDB&&S.dbOk)],
+    ['다른 페이지 안에서 실행',inFrame()?'<span class="w">예 (아티팩트 화면)</span>':'아니오'],
+    ['실제 마이크 열기',Object.keys(S.micRes).length?Object.entries(S.micRes).map(([k,v])=>`${k}: ${v==='성공'?'<span class="y">성공</span>':'<span class="x">'+v+'</span>'}${VIRT.test(k)&&v!=='성공'?' <span class="small">(가상 마이크라 정상)</span>':''}`).join('<br>'):'"녹음 시작"을 누르면 확인'],
+    ['브라우저가 알려 준 권한',S.permQ+(S.micOk===true&&S.permQ!=='허용'?' <span class="small">(참고용, 실제 녹음이 되면 무시해도 됨)</span>':'')],
+    ['브라우저 정보',`<span style="font-size:.8rem;word-break:break-all">${navigator.userAgent}</span>`]
+  ];
+  $('#env').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('');
+  const ok=window.isSecureContext&&navigator.mediaDevices&&window.MediaRecorder;
+  $('#s1').classList.toggle('done',!!ok);
+}
+async function checkPerm(){
+  try{const p=await navigator.permissions.query({name:'microphone'});
+    const map={granted:'허용',denied:'거부',prompt:'아직 묻지 않음'};S.permQ=map[p.state]||p.state;
+    p.onchange=()=>{S.permQ=map[p.state]||p.state;env();report()};}catch(e){/* 지원 안 하는 브라우저 */}
+  env();
+}
+const VIRT=/steam streaming|virtual|cable|voicemeeter|stereo mix|스테레오 믹스/i;
+function micName(l){return (l||'').replace(/^(Default|기본값|Communications|통신)\s*-\s*/i,'')}
+async function listDevices(){
+  try{const d=(await navigator.mediaDevices.enumerateDevices()).filter(x=>x.kind==='audioinput');
+    const cur=$('#dev').value;
+    const def=d.find(x=>x.deviceId==='default');
+    const defName=def&&def.label?micName(def.label):'';
+    $('#dev').innerHTML=`<option value="">${defName?'시스템 기본값: '+defName:'시스템 기본 마이크'}</option>`+
+      d.filter(x=>x.deviceId&&x.deviceId!=='default'&&x.deviceId!=='communications')
+      .map((x,i)=>{const n=micName(x.label)||('마이크 '+(i+1));return `<option value="${x.deviceId}">${n}${VIRT.test(n)?' (가상 마이크)':''}</option>`}).join('');
+    $('#dev').value=cur;
+    if(defName&&VIRT.test(defName))log('시스템 기본 마이크가 가상 마이크입니다. 목록에서 실제 마이크를 골라 주세요.',1);
+  }catch(e){}
+}
+
+/* ---------- 저장소 ---------- */
+function openDb(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('IndexedDB 없음'));
+  const r=indexedDB.open('la_0-1_mic',1);r.onupgradeneeded=()=>r.result.createObjectStore('rec',{keyPath:'id'});
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function dbDo(mode,fn){const db=await openDb();return new Promise((res,rej)=>{
+  const t=db.transaction('rec',mode);const q=fn(t.objectStore('rec'));
+  t.oncomplete=()=>res(q&&'result'in q?q.result:undefined);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});}
+async function getAll(){if(!S.dbOk)return mem.slice();try{return await dbDo('readonly',s=>s.getAll())}catch(e){S.dbOk=false;log('기기 저장 읽기 실패: '+e.message,1);env();return mem.slice()}}
+async function put(r){if(S.dbOk){try{await dbDo('readwrite',s=>s.put(r));return true}catch(e){S.dbOk=false;log('기기 저장 실패: '+e.message+' (임시 저장으로 전환)',1);env()}}mem.push(r);return false}
+async function del(id){if(S.dbOk){try{await dbDo('readwrite',s=>s.delete(id))}catch(e){}}mem=mem.filter(x=>x.id!==id)}
+async function clearAll(){if(S.dbOk){try{await dbDo('readwrite',s=>s.clear())}catch(e){}}mem=[]}
+
+/* ---------- 2. 녹음 ---------- */
+let stream,rec,chunks,ac,an,src,raf,t0,tick,peak,stopTimer;
+const btn=$('#recBtn');
+btn.onclick=()=>rec&&rec.state==='recording'?stop():start();
+
+async function start(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){log('이 브라우저는 마이크 기능을 지원하지 않습니다.',1);return}
+  const c={echoCancellation:$('#ec').checked,noiseSuppression:$('#ns').checked,autoGainControl:$('#agc').checked};
+  if($('#dev').value)c.deviceId={exact:$('#dev').value};
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:c})}
+  catch(e){
+    const hint={NotAllowedError:'마이크 권한이 거부되었습니다. 주소창 왼쪽 자물쇠(또는 브라우저 설정)에서 마이크를 허용한 뒤 새로고침하세요.',
+      NotFoundError:'연결된 마이크를 찾지 못했습니다.',NotReadableError:'다른 앱이 마이크를 쓰고 있습니다. 통화·녹음 앱을 닫고 다시 시도하세요.',
+      OverconstrainedError:'선택한 마이크를 쓸 수 없습니다. "기본 마이크"로 바꿔 보세요.',SecurityError:'보안 설정 때문에 마이크가 막혔습니다.'}[e.name];
+    const nm=micName(($('#dev').selectedOptions[0]||{}).text||'기본 마이크').replace(/^시스템 기본값: /,'');
+    S.micRes[nm]='실패 ('+e.name+')';S.micOk=Object.values(S.micRes).includes('성공');env();
+    log(`마이크 열기 실패 (${e.name}): ${hint||e.message}`,1);return}
+  S.micOk=true;env();listDevices();
+  const tr=stream.getAudioTracks()[0];S.micLabel=micName(tr.label)||'(이름 없음)';
+  S.micRes[S.micLabel]='성공';env();
+  $('#curMic').textContent='지금 쓰는 마이크: '+S.micLabel+(VIRT.test(S.micLabel)?' (가상 마이크라 소리가 안 들어올 수 있음)':'');
+  try{const g=tr.getSettings();S.settings=`에코제거 ${g.echoCancellation?'켬':'끔'}, 소음억제 ${g.noiseSuppression?'켬':'끔'}, 자동음량 ${g.autoGainControl?'켬':'끔'}${g.sampleRate?', '+g.sampleRate+'Hz':''}`}catch(e){}
+  const types=supported();S.mime=types[0]||'';
+  try{rec=new MediaRecorder(stream,S.mime?{mimeType:S.mime}:undefined)}
+  catch(e){log('녹음기 만들기 실패: '+e.message,1);release();return}
+  chunks=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=finish;rec.onerror=e=>log('녹음 중 오류: '+(e.error&&e.error.name),1);
+  rec.start(250);
+  peak=0;S.heard=false;t0=performance.now();
+  // 음량 막대
+  try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();await ac.resume();
+    src=ac.createMediaStreamSource(stream);an=ac.createAnalyser();an.fftSize=1024;src.connect(an);
+    const buf=new Float32Array(an.fftSize);
+    const loop=()=>{an.getFloatTimeDomainData(buf);let s=0,m=0;for(const v of buf){s+=v*v;const a=Math.abs(v);if(a>m)m=a}
+      if(m>peak)peak=m;const db=20*Math.log10(Math.sqrt(s/buf.length)+1e-9);const lv=Math.max(0,Math.min(1,(db+60)/50));
+      $('#bar').style.width=(lv*100)+'%';btn.style.setProperty('--lv',lv);
+      if(m>0.05&&!S.heard){S.heard=true;$('#sound').textContent='소리가 들어오고 있습니다.'}
+      raf=requestAnimationFrame(loop)};loop();
+  }catch(e){log('음량 표시를 못 띄웠습니다(녹음은 계속됨): '+e.message)}
+  tick=setInterval(()=>{$('#timer').textContent=((performance.now()-t0)/1000).toFixed(1)+'초'},100);
+  stopTimer=setTimeout(stop,60000);
+  btn.textContent='녹음 멈춤';btn.classList.add('on');
+  log(`녹음 시작 · 마이크: ${S.micLabel} · 형식: ${rec.mimeType||S.mime||'기본값'}`);
+}
+function stop(){if(rec&&rec.state==='recording')rec.stop()}
+function release(){cancelAnimationFrame(raf);clearInterval(tick);clearTimeout(stopTimer);
+  try{src&&src.disconnect()}catch(e){} if(stream)stream.getTracks().forEach(t=>t.stop());
+  $('#bar').style.width='0';btn.style.setProperty('--lv',0);btn.textContent='녹음 시작';btn.classList.remove('on')}
+async function finish(){
+  const dur=(performance.now()-t0)/1000;const type=rec.mimeType||S.mime||'audio/webm';release();
+  const blob=new Blob(chunks,{type});
+  if(!blob.size){log('녹음 데이터가 비어 있습니다. 다시 시도해 보세요.',1);return}
+  S.peakDb=peak>0?Math.round(20*Math.log10(peak)):null;
+  if(!S.heard)log('녹음은 됐지만 소리가 거의 들어오지 않았습니다. 마이크 선택과 이어폰 연결을 확인하세요.',1);
+  const r={id:Date.now(),created:new Date().toISOString(),dur:+dur.toFixed(1),mime:type,size:blob.size,
+    data:await blob.arrayBuffer(),mic:S.micLabel,opts:S.settings,peakDb:S.peakDb};
+  const saved=await put(r);S.recOk++;
+  log(`녹음 완료 · ${r.dur}초 · ${Math.round(r.size/1024)}KB · ${saved?'기기에 저장됨':'임시 저장(새로고침하면 사라짐)'}`);
+  $('#s2').classList.add('done');$('#sound').textContent='녹음 중 말하면 막대가 움직입니다. 최대 60초.';
+  $('#timer').textContent='0.0초';render();
+}
+
+/* ---------- 3. 목록·재생 ---------- */
+async function render(){
+  urls.splice(0).forEach(u=>URL.revokeObjectURL(u));
+  const all=(await getAll()).sort((a,b)=>b.id-a.id);const box=$('#list');
+  if(!all.length){box.innerHTML='<p class="empty">아직 녹음이 없습니다. 2번에서 "녹음 시작"을 누르고 일본어 한 문장을 말해 보세요.</p>';report();return}
+  box.innerHTML='';
+  all.forEach((r,i)=>{
+    const u=URL.createObjectURL(new Blob([r.data],{type:r.mime}));urls.push(u);
+    const d=document.createElement('div');d.className='item';
+    const t=new Date(r.created).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    d.innerHTML=`<div class="meta"><b style="color:var(--ink)">녹음 ${all.length-i}</b> · ${t} · ${r.dur}초 · ${Math.round(r.size/1024)}KB<br>${r.mic||''}${r.opts?' · '+r.opts:''}${r.peakDb!=null?' · 최대 음량 '+r.peakDb+'dB':''}</div>
+      <audio controls preload="metadata" src="${u}"></audio>
+      <div class="row"><span class="played" hidden>끝까지 재생됨</span><button class="b" type="button" style="margin-left:auto">삭제</button></div>`;
+    const a=d.querySelector('audio');
+    a.onended=()=>{d.querySelector('.played').hidden=false;if(!S.played){S.played=true;log('재생 끝까지 확인');}$('#s3').classList.add('done');report()};
+    a.onerror=()=>log(`녹음 ${all.length-i} 재생 실패 (형식 ${r.mime})`,1);
+    d.querySelector('button').onclick=async()=>{await del(r.id);log(`녹음 ${all.length-i} 삭제`);render()};
+    box.appendChild(d);
+  });
+  report();
+}
+$('#clearAll').onclick=async()=>{if(!confirm('저장된 녹음을 모두 지울까요?'))return;await clearAll();log('녹음 모두 삭제');render()};
+
+/* ---------- 5. 결과 ---------- */
+async function report(){
+  const n=(await getAll()).length;
+  const L=[
+    '[LA-T0-1] 마이크 테스트 결과',
+    '날짜: '+new Date().toLocaleString('ko-KR',{hour12:false}),
+    '브라우저: '+navigator.userAgent,
+    '보안 연결: '+(window.isSecureContext?'예':'아니오')+' / 아티팩트 화면 안: '+(inFrame()?'예':'아니오'),
+    '마이크 기능: '+(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia?'있음':'없음')+' / 녹음 기능: '+(window.MediaRecorder?'있음':'없음'),
+    '녹음 가능 형식: '+(supported().join(', ')||'없음'),
+    '실제 마이크 열기: '+(Object.keys(S.micRes).length?Object.entries(S.micRes).map(([k,v])=>k+'='+v).join(' / '):'미확인'),
+    '브라우저가 알려 준 권한: '+S.permQ,
+    '사용한 마이크: '+(S.micLabel||'-'),
+    '마이크 설정: '+(S.settings||'-'),
+    '소리 들어옴: '+(S.recOk?(S.heard?'예':'아니오'):'-')+(S.peakDb!=null?` (최대 ${S.peakDb}dB)`:''),
+    '이번 접속 녹음 성공: '+S.recOk+'회',
+    '끝까지 재생: '+(S.played?'예':'아직'),
+    '기기 저장: '+(S.dbOk?'가능':'불가(임시 저장만)'),
+    '새로고침 후 유지: '+(S.persisted===true?'확인됨':S.persisted===false?'저장된 녹음 없음':'미확인'),
+    '저장된 녹음 수: '+n,
+    '오류: '+(S.errors.length?S.errors.slice(-5).join(' | '):'없음'),
+    '사용 환경(직접 적기): 이어폰 종류=  / 주변 소음=  / 들어 본 음질='
+  ];
+  $('#report').value=L.join('\n');
+  $('#s5').classList.toggle('done',S.recOk>0||S.persisted===true);
+}
+$('#copy').onclick=async()=>{const t=$('#report');let ok=false;
+  try{await navigator.clipboard.writeText(t.value);ok=true}catch(e){try{t.select();ok=document.execCommand('copy')}catch(e2){}}
+  $('#copied').textContent=ok?'복사했습니다.':'자동 복사가 막혔습니다. 글상자를 길게 눌러 전체 선택 후 복사하세요.';};
+
+/* ---------- 시작 ---------- */
+(async()=>{
+  await checkPerm();
+  try{await openDb()}catch(e){S.dbOk=false;log('기기 저장을 쓸 수 없습니다: '+e.message,1)}
+  env();
+  const prev=await getAll();
+  if(prev.length){S.persisted=true;$('#s4').classList.add('done');
+    $('#persist').innerHTML=`<span class="y">확인됨</span> · 이전에 저장한 녹음 ${prev.length}개를 다시 불러왔습니다. 3번에서 재생해 보세요.`;
+    log(`이전 녹음 ${prev.length}개 불러옴 (새로고침 후 유지 확인)`);}
+  else S.persisted=false;
+  listDevices();
+  render();
+})();
+</script>
+</body>
+</html>
