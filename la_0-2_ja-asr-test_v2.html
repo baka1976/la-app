@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LA 0-2 일본어 음성 인식 연속 테스트</title>
+<!--
+  la_0-2_ja-asr-test_v1.html
+  v1: 연속 인식 + 자동 재시작, 화면 꺼짐/숨김 기록, 화면 꺼짐 방지, 문장 대조, 결과 리포트 복사
+  v2: 빈 인식 결과 무시, 판정은 1순위 후보만(2·3순위는 참고), 문장별 첫 시도·시도 수 리포트,
+      한 바퀴 끝나면 멈춤, 테스트 중 숨김만 따로 집계, PC용 숨김 테스트 안내
+-->
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#1d2330;--sub:#667085;--line:#e3e6eb;--acc:#2f6fdf;--ok:#1f9d55;--bad:#d64545;--warn:#c98a00}
+  @media (prefers-color-scheme: dark){:root{--bg:#14171c;--card:#1d2128;--ink:#e8ebf0;--sub:#9aa3b2;--line:#2c323b;--acc:#5b8ff0;--ok:#3cc47a;--bad:#ef6b6b;--warn:#e5b13a}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  main{max-width:720px;margin:0 auto;padding:12px 16px 60px}
+  h1{font-size:18px;margin:6px 0 2px}
+  .sub{color:var(--sub);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:12px 0}
+  .card h2{font-size:15px;margin:0 0 8px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  label.opt{display:flex;gap:6px;align-items:center;padding:4px 0;width:100%}
+  select,button{font:inherit}
+  button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px;cursor:pointer}
+  button.big{width:100%;padding:16px;font-size:18px;font-weight:700;border:none;color:#fff;background:var(--acc)}
+  button.big.stop{background:var(--bad)}
+  .state{font-weight:700;font-size:16px;margin:10px 0 4px}
+  .state.on{color:var(--ok)} .state.off{color:var(--sub)} .state.wait{color:var(--warn)} .state.err{color:var(--bad)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .stat{border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+  .stat b{display:block;font-size:17px}
+  .stat span{font-size:12px;color:var(--sub)}
+  .target{font-size:22px;font-weight:700;margin:6px 0}
+  .heard{min-height:28px;font-size:18px}
+  .interim{color:var(--sub)}
+  .judge.ok{color:var(--ok);font-weight:700} .judge.bad{color:var(--bad);font-weight:700}
+  #log{font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;max-height:260px;overflow:auto;white-space:pre-wrap;background:var(--bg);border-radius:8px;padding:8px}
+  .lines div{padding:4px 0;border-bottom:1px solid var(--line)}
+  .lines small{color:var(--sub)}
+  .tag{font-size:11px;border-radius:4px;padding:0 4px;margin-left:4px;background:var(--warn);color:#000}
+  .warnbox{border-left:4px solid var(--warn);padding:6px 10px;background:var(--bg);border-radius:6px;font-size:13px}
+  #resume{display:none;background:var(--warn);color:#000}
+  ol.items{padding-left:22px;margin:6px 0} ol.items li.cur{font-weight:700}
+  ol.items li.ok::after{content:" ✓";color:var(--ok)} ol.items li.bad::after{content:" ✗";color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+  <h1>LA 0-2 일본어 음성 인식 연속 테스트</h1>
+  <div class="sub">la_0-2_ja-asr-test_v2 ·연속 듣기, 자동 재시작, 화면 꺼짐 상황을 기록합니다.</div>
+
+  <div class="card">
+    <h2>1. 이 기기 지원 여부</h2>
+    <div id="env" class="sub"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. 설정</h2>
+    <div class="row" style="margin-bottom:6px">언어
+      <select id="lang">
+        <option value="ja-JP" selected>일본어 (ja-JP)</option>
+        <option value="zh-CN">중국어 (zh-CN)</option>
+        <option value="en-US">영어 (en-US)</option>
+      </select>
+    </div>
+    <label class="opt"><input type="checkbox" id="optRestart" checked> 끊기면 자동으로 다시 듣기</label>
+    <label class="opt"><input type="checkbox" id="optWake" checked> 화면 꺼짐 방지 (테스트 중에만)</label>
+    <label class="opt"><input type="checkbox" id="optDetail"> 상세 이벤트도 기록 (소리 감지 등)</label>
+  </div>
+
+  <div class="card">
+    <button id="btnMain" class="big">테스트 시작</button>
+    <button id="resume" class="big" style="margin-top:8px">듣기가 멈췄습니다 · 눌러서 다시 시작</button>
+    <div id="state" class="state off">정지</div>
+    <div class="grid">
+      <div class="stat"><b id="sTotal">0:00</b><span>테스트 경과</span></div>
+      <div class="stat"><b id="sCur">0:00</b><span>지금 연속 듣기</span></div>
+      <div class="stat"><b id="sLongest">0:00</b><span>최장 연속 듣기</span></div>
+      <div class="stat"><b id="sRestart">0</b><span>자동 재시작</span></div>
+      <div class="stat"><b id="sGap">-</b><span>평균 끊김(초)</span></div>
+      <div class="stat"><b id="sErr">0</b><span>오류</span></div>
+      <div class="stat"><b id="sFinal">0</b><span>인식된 문장</span></div>
+      <div class="stat"><b id="sHidden">0</b><span>화면 숨김 횟수</span></div>
+      <div class="stat"><b id="sHiddenRes">0</b><span>숨김 중 인식</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. 문장 읽기 (인식 정확도 확인)</h2>
+    <div class="sub">아래 문장을 읽으세요. 맞으면 자동으로 다음 문장으로 넘어갑니다.</div>
+    <div class="target" id="target"></div>
+    <div class="heard"><span id="heardFinal"></span><span id="heardInterim" class="interim"></span></div>
+    <div id="judge" class="judge"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnPrev">이전</button><button id="btnNext">다음 문장</button>
+    </div>
+    <ol class="items" id="items"></ol>
+  </div>
+
+  <div class="card">
+    <h2>4. 화면 꺼짐 테스트 방법</h2>
+    <div class="warnbox">
+      <b>반드시 "테스트 중지"를 누르기 전에</b> 아래를 하세요. 테스트가 멈춘 상태의 숨김은 집계되지 않습니다.<br><br>
+      <b>PC (Chrome)</b><br>
+      ① 테스트 시작 → 문장 1~2개 읽기<br>
+      ② 다른 탭으로 바꾸고 20초 동안 일본어로 말하기 → 돌아오기<br>
+      ③ 창을 최소화하고 20초 말하기 → 돌아오기<br>
+      ④ Win+L로 화면 잠금, 20초 말하기 → 잠금 풀고 돌아오기<br><br>
+      <b>아이폰 (Safari)</b><br>
+      ① 화면 꺼짐 방지를 <b>끈</b> 상태로 전원 버튼을 눌러 화면 끄고 30초 말하기 → 켜고 돌아오기<br>
+      ② 다른 앱에 갔다 오기, 이어폰(P31i) 연결 상태로도 반복<br><br>
+      마지막에 "결과 리포트 복사"를 눌러 Claude 대화에 붙여 넣기
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>5. 인식 기록</h2>
+    <div class="lines" id="lines"><div class="sub">아직 없음</div></div>
+  </div>
+
+  <div class="card">
+    <h2>6. 이벤트 로그</h2>
+    <div id="log"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnReport">결과 리포트 복사</button>
+      <button id="btnDownload">리포트 파일 받기</button>
+      <button id="btnReset">기록 초기화</button>
+    </div>
+    <div id="copyMsg" class="sub"></div>
+  </div>
+</main>
+
+<script>
+// ===== 테스트 문장 (언어팩처럼 언어별로 분리) =====
+const PACKS = {
+  'ja-JP': [
+    {show:'おばあさんが来ました。', alts:['おばあさんが来ました','お婆さんが来ました','おばあさんがきました']},
+    {show:'おばさんが来ました。', alts:['おばさんが来ました','叔母さんが来ました','伯母さんが来ました','おばさんがきました']},
+    {show:'ちょっと来てください。', alts:['ちょっと来てください','ちょっと来て下さい','ちょっときてください']},
+    {show:'ちょっと切ってください。', alts:['ちょっと切ってください','ちょっと切って下さい','ちょっときってください']},
+    {show:'雑誌を三冊注文しました。', alts:['雑誌を三冊注文しました','雑誌を3冊注文しました']},
+    {show:'机の上に辞書があります。', alts:['机の上に辞書があります','机の上に辞書がある']},
+    {show:'少々お待ちください。', alts:['少々お待ちください','少々お待ち下さい']},
+    {show:'先方には私から連絡いたします。', alts:['先方には私から連絡いたします','先方には私から連絡致します']},
+    {show:'納期を一週間延ばしていただけないでしょうか。', alts:['納期を一週間延ばしていただけないでしょうか','納期を1週間延ばしていただけないでしょうか','納期を一週間伸ばしていただけないでしょうか']}
+  ],
+  'zh-CN': [
+    {show:'你好。', alts:['你好']},
+    {show:'我想买这个。', alts:['我想买这个']},
+    {show:'谢谢你。', alts:['谢谢你']}
+  ],
+  'en-US': [
+    {show:'I think it\'s three thirty.', alts:['i think it\'s three thirty','i think it\'s 3:30','i think its 330']},
+    {show:'Thank you very much.', alts:['thank you very much']},
+    {show:'Can I get a coffee?', alts:['can i get a coffee']}
+  ]
+};
+
+// ===== 상태 =====
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const $ = id => document.getElementById(id);
+const S = {
+  testing:false, listening:false, rec:null, t0:0, curStart:0, longest:0, listenTotal:0,
+  restarts:0, gaps:[], lastEnd:0, errors:{}, errCount:0, finals:0,
+  hiddenCount:0, hiddenStart:0, hiddenTotal:0, hiddenRes:0, recentRestarts:[],
+  idx:0, itemState:{}, tries:{}, first:{}, last:{}, empty:0, hiddenTesting:0, roundDone:false, processed:0, pendingInterim:'', wake:null, logLines:[], lineRows:[]
+};
+
+const fmt = ms => { const s=Math.floor(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
+const clock = () => { const d=new Date(); return d.toTimeString().slice(0,8); };
+function log(msg){
+  const line = clock()+'  '+msg + (document.hidden ? '  [화면숨김]' : '');
+  S.logLines.push(line); if (S.logLines.length>400) S.logLines.shift();
+  const el=$('log'); el.textContent=S.logLines.join('\n'); el.scrollTop=el.scrollHeight;
+}
+function setState(text, cls){ const e=$('state'); e.textContent=text; e.className='state '+cls; }
+
+// ===== 환경 표시 =====
+function envInfo(){
+  const ua=navigator.userAgent;
+  const os = /iPhone|iPad/.test(ua)?'iOS':/Android/.test(ua)?'Android':/Windows/.test(ua)?'Windows':/Mac/.test(ua)?'Mac':'기타';
+  const br = /CriOS/.test(ua)?'Chrome(iOS)':/Edg\//.test(ua)?'Edge':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'기타';
+  return {os, br, sr:!!SR, wake:('wakeLock' in navigator), secure:window.isSecureContext};
+}
+function showEnv(){
+  const e=envInfo();
+  const yes=v=>v?'<b style="color:var(--ok)">지원</b>':'<b style="color:var(--bad)">미지원</b>';
+  $('env').innerHTML = `기기·브라우저: <b>${e.os} / ${e.br}</b><br>음성 인식: ${yes(e.sr)} · 화면 꺼짐 방지: ${yes(e.wake)} · 보안 연결(https): ${yes(e.secure)}`+
+    (!e.sr?'<br><span style="color:var(--bad)">이 브라우저는 음성 인식을 지원하지 않습니다. PC는 Chrome, 아이폰은 Safari로 열어 주세요.</span>':'')+
+    (e.os==='iOS'?'<br>아이폰: 설정 → 일반 → 키보드 → "받아쓰기 활성화"가 켜져 있어야 합니다.':'')+
+    (e.br==='Chrome'||e.br==='Edge'?'<br>Chrome·Edge의 음성 인식은 인터넷 연결이 필요합니다(음성이 구글/MS 서버로 전송됨).':'');
+}
+
+// ===== 문장 목록 =====
+function items(){ return PACKS[$('lang').value]; }
+function renderItems(){
+  const list=items(); if (S.idx>=list.length) S.idx=0;
+  $('target').textContent=list[S.idx].show;
+  $('items').innerHTML=list.map((it,i)=>`<li class="${i===S.idx?'cur ':''}${S.itemState[i]||''}">${it.show}</li>`).join('');
+}
+const norm = s => s.toLowerCase().replace(/[\s　。、．，,.!！?？「」『』・…"'’]/g,'');
+function similarity(a,b){
+  if(!a||!b) return 0;
+  const m=a.length,n=b.length, dp=Array(n+1).fill(0);
+  for(let i=1;i<=m;i++){ let prev=0; for(let j=1;j<=n;j++){ const t=dp[j]; dp[j]= a[i-1]===b[j-1]? prev+1 : Math.max(dp[j],dp[j-1]); prev=t; } }
+  return Math.round(dp[n]*2/(m+n)*100);
+}
+// 판정은 1순위 후보만 사용. 2·3순위에 정답이 있으면 참고로만 표시 (발음 판정을 느슨하게 만들지 않기 위해)
+function judge(cands){
+  if(S.roundDone){ log('한 바퀴 완료 상태 · 판정 안 함 ("다음 문장"을 누르면 처음부터)'); return; }
+  const i=S.idx, it=items()[i]; const alts=it.alts.map(norm);
+  const top=cands[0]; const ok=alts.includes(norm(top));
+  const altHit=!ok && cands.slice(1).some(c=>alts.includes(norm(c)));
+  S.tries[i]=(S.tries[i]||0)+1; if(S.first[i]===undefined) S.first[i]=ok; S.last[i]=top;
+  const j=$('judge');
+  if(ok){
+    j.className='judge ok'; j.textContent='일치 ✓ ('+top+')'; S.itemState[i]='ok';
+    log('문장 '+(i+1)+' 일치 (시도 '+S.tries[i]+'회)');
+    if(i===items().length-1){ S.roundDone=true; setTimeout(()=>{ j.textContent='한 바퀴 완료 ✓ · 결과 리포트를 복사하거나 "다음 문장"으로 다시 시작'; },800); }
+    else S.idx=i+1;
+    setTimeout(renderItems,800);
+  } else {
+    const sim=similarity(norm(top),alts[0]); j.className='judge bad';
+    j.textContent='불일치 ✗ 비슷한 정도 '+sim+'% · 인식: '+top+(altHit?' (2·3순위 후보에는 정답 있음)':'');
+    if(S.itemState[i]!=='ok') S.itemState[i]='bad';
+    log('문장 '+(i+1)+' 불일치 ('+sim+'%)'+(altHit?' [하위 후보에 정답]':'')+': '+cands.join(' / '));
+    renderItems();
+  }
+}
+
+// ===== 인식 결과 처리 =====
+function addLine(text, conf, hidden, note){
+  S.finals++; if(hidden) S.hiddenRes++;
+  S.lineRows.unshift(`<div>${text}${hidden?'<span class="tag">화면 숨김 중</span>':''}${note?'<span class="tag">'+note+'</span>':''}<br><small>${clock()}${conf!=null?' · 확신도 '+Math.round(conf*100)+'%':''}</small></div>`);
+  if(S.lineRows.length>100) S.lineRows.pop();
+  $('lines').innerHTML=S.lineRows.join('');
+}
+function onResult(e){
+  let interim='';
+  for(let i=e.resultIndex;i<e.results.length;i++){
+    const r=e.results[i];
+    if(r.isFinal){
+      if(i<S.processed) continue; // 사파리 중복 방지
+      S.processed=i+1;
+      const cands=[]; for(let k=0;k<r.length;k++){ const t=r[k].transcript.trim(); if(t) cands.push(t); }
+      if(!cands.length){ S.empty++; log('빈 인식 결과 (무시)'); S.pendingInterim=''; continue; }
+      $('heardFinal').textContent=cands[0]; $('heardInterim').textContent='';
+      addLine(cands[0], r[0].confidence||null, document.hidden);
+      log('인식: '+cands[0]);
+      judge(cands);
+      S.pendingInterim='';
+    } else interim+=r[0].transcript;
+  }
+  if(interim){ S.pendingInterim=interim; $('heardInterim').textContent=interim; if(!$('heardFinal').textContent) $('heardFinal').textContent=''; }
+}
+
+// ===== 시작 / 종료 =====
+function createRec(){
+  const r=new SR();
+  r.lang=$('lang').value; r.continuous=true; r.interimResults=true; r.maxAlternatives=3;
+  r.onstart=()=>{
+    S.listening=true; S.curStart=Date.now(); S.processed=0;
+    if(S.lastEnd){ const g=(Date.now()-S.lastEnd)/1000; S.gaps.push(g); log('듣기 재개 (끊김 '+g.toFixed(1)+'초)'); }
+    else log('듣기 시작 ('+r.lang+')');
+    setState('듣는 중','on'); $('resume').style.display='none';
+  };
+  r.onresult=onResult;
+  r.onerror=e=>{
+    S.errCount++; S.errors[e.error]=(S.errors[e.error]||0)+1;
+    log('오류: '+e.error+(e.message?' - '+e.message:''));
+    if(['not-allowed','service-not-allowed','audio-capture','language-not-supported'].includes(e.error)){
+      setState('오류로 중지: '+e.error,'err'); stopTest(true);
+    }
+  };
+  r.onend=()=>{
+    if(S.listening){ const d=Date.now()-S.curStart; S.listenTotal+=d; S.longest=Math.max(S.longest,d); }
+    S.listening=false; S.lastEnd=Date.now();
+    if(S.pendingInterim){ // 확정 없이 끝난 문장 보존 (아이폰 대비)
+      addLine(S.pendingInterim,null,document.hidden,'종료 시 확정'); log('종료 시 확정: '+S.pendingInterim);
+      judge([S.pendingInterim]); S.pendingInterim='';
+    }
+    log('듣기 종료');
+    if(S.testing && $('optRestart').checked) scheduleRestart();
+    else if(S.testing){ setState('멈춤 (자동 재시작 꺼짐)','wait'); $('resume').style.display='block'; }
+  };
+  if($('optDetail').checked){
+    ['audiostart','audioend','soundstart','soundend','speechstart','speechend','nomatch'].forEach(ev=>r.addEventListener(ev,()=>log('· '+ev)));
+  }
+  return r;
+}
+function scheduleRestart(){
+  const now=Date.now(); S.recentRestarts=S.recentRestarts.filter(t=>now-t<10000); S.recentRestarts.push(now);
+  const delay = S.recentRestarts.length>5 ? 2000 : 250; // 너무 자주 끊기면 잠시 쉼
+  setState('다시 듣는 중…','wait');
+  setTimeout(()=>{ if(!S.testing||S.listening) return; tryStart(true); }, delay);
+}
+function tryStart(isRestart){
+  try{
+    S.rec=createRec(); S.rec.start();
+    if(isRestart) S.restarts++;
+  }catch(err){
+    log('시작 실패: '+err.message);
+    setState('자동 재시작 실패 · 버튼을 눌러 주세요','err'); $('resume').style.display='block';
+  }
+}
+async function wakeOn(){
+  if(!$('optWake').checked||!('wakeLock' in navigator)) return;
+  try{ S.wake=await navigator.wakeLock.request('screen'); log('화면 꺼짐 방지 켜짐'); S.wake.addEventListener('release',()=>log('화면 꺼짐 방지 해제됨')); }
+  catch(e){ log('화면 꺼짐 방지 실패: '+e.message); }
+}
+function wakeOff(){ if(S.wake){ S.wake.release().catch(()=>{}); S.wake=null; } }
+
+function startTest(){
+  if(!SR){ alertBox('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
+  S.testing=true; if(!S.t0) S.t0=Date.now(); S.lastEnd=0;
+  $('btnMain').textContent='테스트 중지'; $('btnMain').classList.add('stop');
+  log('=== 테스트 시작 · 자동재시작 '+($('optRestart').checked?'켬':'끔')+' · 화면꺼짐방지 '+($('optWake').checked?'켬':'끔')+' ===');
+  wakeOn(); tryStart(false);
+}
+function stopTest(byError){
+  S.testing=false; wakeOff();
+  try{ S.rec&&S.rec.stop(); }catch(e){}
+  $('btnMain').textContent='테스트 시작'; $('btnMain').classList.remove('stop'); $('resume').style.display='none';
+  if(!byError) setState('정지','off');
+  log('=== 테스트 중지 ===');
+}
+function alertBox(m){ $('copyMsg').textContent=m; log(m); }
+
+// ===== 화면 숨김 / 복귀 =====
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    S.hiddenCount++; S.hiddenStart=Date.now(); if(S.testing) S.hiddenTesting++;
+    log('화면 숨김 (꺼짐 또는 다른 앱) · 듣는 중='+S.listening+(S.testing?'':' · 테스트 중 아님(집계 제외)'));
+  } else {
+    const d=S.hiddenStart?Date.now()-S.hiddenStart:0; S.hiddenTotal+=d; S.hiddenStart=0;
+    log('화면 복귀 · 숨김 '+(d/1000).toFixed(0)+'초 · 듣는 중='+S.listening);
+    if(S.testing){
+      if($('optWake').checked) wakeOn(); // 숨김 시 자동 해제되므로 다시 요청
+      if(!S.listening && $('optRestart').checked) setTimeout(()=>{ if(S.testing&&!S.listening){ log('복귀 후 재시작 시도'); tryStart(true);} },300);
+    }
+  }
+});
+window.addEventListener('pagehide',()=>log('페이지 숨김(pagehide)'));
+
+// ===== 화면 갱신 =====
+setInterval(()=>{
+  if(!S.t0) return;
+  const now=Date.now();
+  $('sTotal').textContent=fmt(now-S.t0);
+  const cur=S.listening?now-S.curStart:0;
+  $('sCur').textContent=fmt(cur);
+  $('sLongest').textContent=fmt(Math.max(S.longest,cur));
+  $('sRestart').textContent=S.restarts;
+  $('sGap').textContent=S.gaps.length?(S.gaps.reduce((a,b)=>a+b,0)/S.gaps.length).toFixed(1):'-';
+  $('sErr').textContent=S.errCount;
+  $('sFinal').textContent=S.finals;
+  $('sHidden').textContent=S.hiddenCount;
+  $('sHiddenRes').textContent=S.hiddenRes;
+},500);
+
+// ===== 리포트 =====
+function report(){
+  const e=envInfo(), now=Date.now();
+  const total=S.t0?now-S.t0:0, listen=S.listenTotal+(S.listening?now-S.curStart:0);
+  const list=items(); const ok=list.filter((_,i)=>S.itemState[i]==='ok').length, tried=list.filter((_,i)=>S.itemState[i]).length;
+  const gapAvg=S.gaps.length?(S.gaps.reduce((a,b)=>a+b,0)/S.gaps.length).toFixed(1):'-';
+  const gapMax=S.gaps.length?Math.max(...S.gaps).toFixed(1):'-';
+  return [
+    '[LA-T0-2 일본어 음성 인식 연속 테스트 결과] la_0-2_ja-asr-test_v2',
+    '날짜: '+new Date().toLocaleString('ko-KR'),
+    '기기: '+e.os+' / '+e.br+' · 음성인식 '+(e.sr?'지원':'미지원')+' · 화면꺼짐방지 '+(e.wake?'지원':'미지원'),
+    'UA: '+navigator.userAgent,
+    '언어: '+$('lang').value+' · 자동재시작 '+($('optRestart').checked?'켬':'끔')+' · 화면꺼짐방지 '+($('optWake').checked?'켬':'끔'),
+    '테스트 시간: '+fmt(total)+' · 실제 듣기 시간: '+fmt(listen)+' ('+(total?Math.round(listen/total*100):0)+'%)',
+    '최장 연속 듣기: '+fmt(S.longest)+' · 자동 재시작: '+S.restarts+'회 · 끊김 평균 '+gapAvg+'초 / 최대 '+gapMax+'초',
+    '오류: '+(S.errCount?Object.entries(S.errors).map(([k,v])=>k+' '+v+'회').join(', '):'없음'),
+    '인식 문장: '+S.finals+'개 · 빈 결과(무시) '+S.empty+'개',
+    '화면 숨김: 전체 '+S.hiddenCount+'회 / 테스트 중 '+S.hiddenTesting+'회 (총 '+fmt(S.hiddenTotal)+') · 숨김 중 인식 '+S.hiddenRes+'개',
+    '문장 대조(1순위 기준): '+ok+' 일치 / '+tried+' 시도 (전체 '+list.length+') · 첫 시도 일치 '+list.filter((_,i)=>S.first[i]===true).length+'개',
+    '--- 문장별 ---',
+    ...list.map((it,i)=>(i+1)+'. '+it.show+' → '+(S.tries[i]?('첫 시도 '+(S.first[i]?'○':'×')+' · '+S.tries[i]+'회 · 마지막 인식: '+S.last[i]):'시도 안 함')),
+    '--- 최근 로그 ---',
+    ...S.logLines.slice(-40)
+  ].join('\n');
+}
+$('btnReport').onclick=async()=>{
+  const t=report();
+  try{ await navigator.clipboard.writeText(t); $('copyMsg').textContent='복사했습니다. Claude 대화에 붙여 넣어 주세요.'; }
+  catch(e){ $('copyMsg').textContent='자동 복사가 안 됩니다. "리포트 파일 받기"를 써 주세요.'; }
+};
+$('btnDownload').onclick=()=>{
+  const blob=new Blob([report()],{type:'text/plain'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='LA-T0-2_result_'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.txt'; a.click();
+};
+$('btnReset').onclick=()=>{
+  if(S.testing) stopTest();
+  Object.assign(S,{t0:0,longest:0,listenTotal:0,restarts:0,gaps:[],lastEnd:0,errors:{},errCount:0,finals:0,hiddenCount:0,hiddenTotal:0,hiddenRes:0,idx:0,itemState:{},tries:{},first:{},last:{},empty:0,hiddenTesting:0,roundDone:false,logLines:[],lineRows:[]});
+  $('log').textContent=''; $('lines').innerHTML='<div class="sub">아직 없음</div>'; $('judge').textContent=''; $('heardFinal').textContent=''; $('heardInterim').textContent='';
+  ['sTotal','sCur','sLongest'].forEach(id=>$(id).textContent='0:00'); ['sRestart','sErr','sFinal','sHidden','sHiddenRes'].forEach(id=>$(id).textContent='0'); $('sGap').textContent='-';
+  renderItems();
+};
+
+// ===== 버튼 =====
+$('btnMain').onclick=()=> S.testing?stopTest():startTest();
+$('resume').onclick=()=>{ if(!S.testing) startTest(); else tryStart(true); };
+$('btnNext').onclick=()=>{ S.idx=S.roundDone?0:(S.idx+1)%items().length; S.roundDone=false; $('judge').textContent=''; renderItems(); };
+$('btnPrev').onclick=()=>{ S.idx=(S.idx-1+items().length)%items().length; S.roundDone=false; $('judge').textContent=''; renderItems(); };
+$('lang').onchange=()=>{ S.idx=0; S.itemState={}; S.tries={}; S.first={}; S.last={}; S.roundDone=false; renderItems(); if(S.testing){ log('언어 변경 → 다시 시작'); try{S.rec.stop();}catch(e){} } };
+$('optWake').onchange=()=>{ if(!S.testing) return; $('optWake').checked?wakeOn():wakeOff(); };
+
+showEnv(); renderItems(); log('페이지 열림');
+</script>
+</body>
+</html>
