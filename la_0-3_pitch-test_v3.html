@@ -1,0 +1,801 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LA 0-3 음높이 곡선 테스트 v3</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--fg:#1d2330;--mut:#6b7385;--line:#e0e4ec;--acc:#2f6fed;--ok:#1f9d55;--mid:#d98b00;--bad:#d93a3a;--curve:#2f6fed;--raw:rgba(47,111,237,.28);--seg:rgba(47,111,237,.08);--guide:#d98b00}
+@media (prefers-color-scheme:dark){:root{--bg:#14171d;--card:#1d2129;--fg:#e8ebf1;--mut:#99a1b3;--line:#2d333f;--acc:#6d9bff;--curve:#7aa5ff;--raw:rgba(122,165,255,.33);--seg:rgba(122,165,255,.1);--guide:#f0a830}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+main{max-width:900px;margin:0 auto;padding:12px 16px 60px}
+h1{font-size:19px;margin:6px 0 2px}
+.sub{color:var(--mut);font-size:13px;margin-bottom:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.card h2{font-size:15px;margin:0 0 8px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);max-width:100%}
+label{font-size:14px}
+canvas{width:100%;display:block;border-radius:8px;background:var(--bg)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.stat{background:var(--bg);border-radius:8px;padding:6px 8px}
+.stat b{display:block;font-size:17px}
+.stat span{font-size:12px;color:var(--mut)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 10px;border-radius:999px;font-size:14px}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.target{font-size:34px;font-weight:700;margin:8px 0 0}
+.target small{font-size:16px;color:var(--mut);font-weight:400;margin-left:8px}
+.cue{margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--bg);font-weight:700;font-size:17px}
+.cue.go{background:var(--ok);color:#fff}.cue.wait{background:var(--mid);color:#fff}
+.res{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px}
+.resTxt{font-size:18px;font-weight:700;margin-bottom:6px}
+.ok{color:var(--ok)}.ng{color:var(--bad)}.na{color:var(--mut)}
+.seg{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0}
+.seg .hd{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px;margin-bottom:4px}
+.badge{padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
+.g-good{background:var(--ok)}.g-mid{background:var(--mid)}.g-bad{background:var(--bad)}.g-na{background:var(--mut)}
+.rate{margin-top:6px}
+.rate button{padding:4px 10px;font-size:13px}
+.rate button.sel{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.mut{color:var(--mut);font-size:13px}
+.msg{padding:8px 10px;border-radius:8px;background:var(--bg);font-size:14px;margin-top:8px}
+.warn{background:#fff3d6;color:#6b4a00}
+@media (prefers-color-scheme:dark){.warn{background:#3a2e10;color:#ffd98a}}
+audio{height:32px;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left}
+.tw{overflow-x:auto}
+textarea{width:100%;height:170px;font:12px/1.4 ui-monospace,Consolas,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px}
+@media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}.target{font-size:26px}}
+</style>
+</head>
+<body>
+<main>
+<h1>LA 0-3 음높이 곡선 테스트</h1>
+<div class="sub">la_0-3_pitch-test_v3 · 말하면 높낮이 곡선이 그려집니다. 소음 속에서도 곡선을 읽을 수 있는지 확인하는 페이지입니다.</div>
+
+<div class="card">
+  <div class="row">
+    <button class="pri" id="bStart">🎤 마이크 시작</button>
+    <button id="bStop" disabled>정지</button>
+    <button id="bCalib" disabled>소음 다시 측정</button>
+    <button id="bPause" disabled>기록 멈춤</button>
+  </div>
+  <div class="msg" id="msg">‘마이크 시작’을 누르면 주변 소음을 잽니다. ‘말하세요’가 나올 때까지 말하지 마세요.</div>
+  <div class="msg warn" id="warn" hidden></div>
+</div>
+
+<div class="card">
+  <h2>말할 단어</h2>
+  <div class="chips" id="chips"></div>
+  <div class="target" id="target"></div>
+  <div class="mut" id="targetNote"></div>
+  <div class="cue" id="cue">마이크를 켜면 시작합니다</div>
+  <div class="row" style="margin-top:8px">
+    <button class="pri" id="bHum">♪ 높낮이 들어 보기</button>
+    <button id="bSay">🔊 기기 음성</button>
+    <button id="bNext">다음 단어 →</button>
+  </div>
+  <div class="res" id="res" hidden>
+    <div class="resTxt" id="resTxt"></div>
+    <canvas id="resCv" height="140"></canvas>
+    <div class="mut">주황 점선 = 기대하는 높낮이 모양 · 파란 선 = 내 곡선(옥타브 오류 보정 후)</div>
+    <div class="row rate" id="resRate"><button id="bPlayLast">▶ 내 녹음</button><span class="mut">귀로 들은 것과 곡선이</span>
+      <button data-rr="맞음">맞음</button><button data-rr="애매">애매</button><button data-rr="틀림">틀림</button></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label>결과 보는 시간 <select id="hold"><option value="2">2초</option><option value="3" selected>3초</option><option value="5">5초</option><option value="0">수동(다음 버튼)</option></select></label>
+    <label><input type="checkbox" id="autoNext" checked> 잘 읽히면 다음 단어로</label>
+    <label><input type="checkbox" id="autoHum" checked> 말하기 전 높낮이 자동 재생</label>
+    <label><input type="checkbox" id="sndRes" checked> 결과를 소리로 알림</label>
+  </div>
+  <div class="mut" style="margin-top:6px">순서: ♪높낮이 → ‘삑’ → 말하기 → 결과 소리(딩동 = 기대와 같음, 뚜뚜 = 다름, 낮은 뚜— = 곡선을 못 읽음) → 결과 보는 시간 → 다음 단어. 곡선을 못 읽으면 같은 단어를 다시 냅니다.<br>‘♪높낮이’는 규칙으로 만든 허밍 소리라 고저 모양이 정확합니다. 기기 음성은 악센트가 틀릴 수 있어 참고만 하세요.</div>
+</div>
+
+<div class="card">
+  <h2>실시간 곡선 (최근 6초)</h2>
+  <canvas id="live" height="230"></canvas>
+  <div class="mut" style="margin-top:4px">위: 음높이(옅은 점 = 원래 값, 진한 선 = 다듬은 곡선) · 아래: 소리 크기, 빨간 점선 = 소리 문턱</div>
+  <div class="stats">
+    <div class="stat"><span>현재 음높이</span><b id="sHz">–</b></div>
+    <div class="stat"><span>소리 크기</span><b id="sDb">–</b></div>
+    <div class="stat"><span>소음 바닥</span><b id="sFloor">–</b></div>
+    <div class="stat"><span>내 기준 음높이</span><b id="sAnchor">–</b></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>설정</h2>
+  <div class="row" style="margin-bottom:8px">
+    <label>지금 환경 <select id="env">
+      <option>조용한 곳</option><option>생활 소음(TV·대화)</option><option>작업장 소음</option><option>소음 재생(다른 기기로 틀기)</option><option>기타</option>
+    </select></label>
+    <label>마이크 <select id="dev"><option value="">기본 마이크</option></select></label>
+  </div>
+  <div class="row" style="margin-bottom:8px">
+    <label><input type="checkbox" id="ns" checked> 소음 억제</label>
+    <label><input type="checkbox" id="ec" checked> 에코 제거</label>
+    <label><input type="checkbox" id="agc"> 자동 음량</label>
+    <span class="mut">(바꾸면 마이크가 자동으로 다시 켜집니다)</span>
+  </div>
+  <div class="row">
+    <label>목소리 범위 <select id="range">
+      <option value="70,300">낮은 목소리 70–300Hz</option><option value="140,500">높은 목소리 140–500Hz</option><option value="60,500">넓게 60–500Hz</option>
+    </select></label>
+    <label>소리 문턱 <input type="range" id="margin" min="4" max="24" value="10"> <b id="marginV">+10dB</b></label>
+  </div>
+  <div class="mut" style="margin-top:6px">소리 문턱: 소음보다 이만큼 커야 ‘말소리’로 봅니다. 말을 멈춰도 발화가 끝나지 않으면 올리고, 말해도 기록되지 않으면 내리세요.</div>
+</div>
+
+<div class="card">
+  <h2>환경별 요약</h2>
+  <div class="tw"><table id="sum"><tr><td class="mut">아직 기록이 없습니다.</td></tr></table></div>
+  <div class="row" style="margin-top:8px">
+    <button id="bCopy">리포트 복사</button>
+    <button id="bDown">리포트 파일 저장</button>
+    <button id="bWav">녹음 모두 저장(WAV)</button>
+    <button id="bClear">기록 모두 지우기</button>
+  </div>
+  <textarea id="report" readonly placeholder="리포트가 여기에 만들어집니다."></textarea>
+</div>
+
+<div class="card">
+  <h2>발화 기록 <span class="mut" id="segCount"></span></h2>
+  <div class="mut">각 발화를 들어 보고, 곡선의 오르내림이 귀로 들은 높낮이와 맞는지 눌러 주세요.</div>
+  <div id="segs"></div>
+</div>
+</main>
+
+<script>
+// CORE-START (분석 함수: 화면과 상관없는 계산)
+function yinPitch(b, W, tMin, tMax, d){
+  let cum = 0; d[0] = 1;
+  for (let tau = 1; tau <= tMax; tau++){
+    let s = 0;
+    for (let i = 0; i < W; i++){ const v = b[i] - b[i + tau]; s += v * v; }
+    cum += s; d[tau] = cum > 0 ? s * tau / cum : 1;
+  }
+  let tau = -1;
+  for (let t = Math.max(2, tMin); t <= tMax; t++){
+    if (d[t] < 0.15){ while (t + 1 <= tMax && d[t + 1] < d[t]) t++; tau = t; break; }
+  }
+  if (tau < 0){ let m = 1e9; for (let t = Math.max(2, tMin); t <= tMax; t++) if (d[t] < m){ m = d[t]; tau = t; } }
+  // 2배 오인식 검사: 주기를 2배로 늘린 자리가 확실히 더 잘 맞으면 그쪽(한 옥타브 아래)이 진짜 음높이
+  const t2 = tau * 2;
+  if (t2 + 3 <= tMax){
+    let m2 = t2; for (let t = t2 - 3; t <= t2 + 3; t++) if (d[t] < d[m2]) m2 = t;
+    if (d[m2] < d[tau] * OCT_RATIO) tau = m2;
+  }
+  const cl = 1 - d[tau];
+  let tf = tau;
+  if (tau > 2 && tau < tMax){
+    const a = d[tau - 1], c0 = d[tau], c = d[tau + 1], den = a - 2 * c0 + c;
+    if (den > 0) tf = tau + 0.5 * (a - c) / den;
+  }
+  return { tau: tf, cl };
+}
+var OCT_RATIO = 0.6;
+function median(a){ if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+function pct(a, p){ if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.max(0, Math.round(p * (s.length - 1))))]; }
+function mean(a){ return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }
+function hzToSt(f){ return 12 * Math.log2(f / 100); }
+function stToHz(s){ return 100 * Math.pow(2, s / 12); }
+
+// 발화 안에서 한 덩어리가 통째로 한 옥타브(12반음) 튀어 있으면 이어지도록 되돌림
+function octaveRepair(pts, anchor){
+  if (pts.length < 2) return pts.map(p => ({ t: p.t, v: p.v }));
+  const runs = []; let cur = [pts[0]];
+  for (let i = 1; i < pts.length; i++){
+    const a = pts[i - 1], b = pts[i];
+    if (b.t - a.t <= 0.07 && Math.abs(b.v - a.v) < 5) cur.push(b); else { runs.push(cur); cur = [b]; }
+  }
+  runs.push(cur);
+  let ref = 0; runs.forEach((r, i) => { if (r.length > runs[ref].length) ref = i; });
+  const sh = new Array(runs.length).fill(0);
+  const med = r => median(r.map(p => p.v));
+  // 덩어리 사이 점프가 8반음 이상이면 옥타브 오류로 본다.
+  // 5~8반음이면 애매하므로, 덩어리 높이가 내 기준 음높이에서 6반음 넘게 위(또는 9반음 넘게 아래)일 때만 옥타브 오류로 본다.
+  const pick = (from, to, lvl) => {
+    const g = to - from, k = g > 0 ? -12 : 12;
+    if (Math.abs(g) >= 8) return Math.abs(g + k) < Math.abs(g) - 3 ? k : 0;
+    if (Math.abs(g) >= 5 && anchor !== null && anchor !== undefined){
+      if (g > 0 && lvl - anchor > 6) return -12;
+      if (g < 0 && anchor - lvl > 9) return 12;
+    }
+    return 0;
+  };
+  for (let i = ref + 1; i < runs.length; i++){ const prev = runs[i - 1][runs[i - 1].length - 1].v + sh[i - 1]; sh[i] = sh[i - 1] + pick(prev, runs[i][0].v + sh[i - 1], med(runs[i]) + sh[i - 1]); }
+  for (let i = ref - 1; i >= 0; i--){ const nxt = runs[i + 1][0].v + sh[i + 1]; sh[i] = sh[i + 1] + pick(nxt, runs[i][runs[i].length - 1].v + sh[i + 1], med(runs[i]) + sh[i + 1]); }
+  return runs.flatMap((r, i) => r.map(p => ({ t: p.t, v: p.v + sh[i] })));
+}
+function smooth5(pts){
+  return pts.map((p, i) => { const w = []; for (let j = i - 2; j <= i + 2; j++) if (pts[j] && Math.abs(pts[j].t - p.t) <= 0.065) w.push(pts[j].v); return { t: p.t, v: median(w) }; });
+}
+
+function makeSmoother(){
+  const st = { hist: [], last: null, gap: 99 };
+  return function(raw){
+    if (raw === null){ st.gap++; if (st.gap > 5){ st.last = null; st.hist = []; } return { stc: null, sm: null }; }
+    let stc = raw;
+    if (st.last !== null && st.gap <= 5){ const dl = raw - st.last; if (Math.abs(Math.abs(dl) - 12) < 2) stc = raw - 12 * Math.sign(dl); }
+    else st.hist = [];
+    st.hist.push(stc); if (st.hist.length > 5) st.hist.shift();
+    const sm = median(st.hist); st.last = sm; st.gap = 0;
+    return { stc, sm };
+  };
+}
+
+// 기대 높낮이 모양 (반음, x: 0~1). step = 일본어 2박 단어(고저/저고), slide = 미끄러지는 소리
+function guideAt(ex, kind, x){
+  if (!ex) return null;
+  if (kind === 'step'){
+    const s = Math.tanh((x - 0.5) * 12) * 2;
+    return ex === 'fall' ? -s : ex === 'rise' ? s : 0;
+  }
+  if (ex === 'rise') return -3 + 6 * x;
+  if (ex === 'fall') return 3 - 6 * x;
+  if (ex === 'flat') return 0;
+  if (ex === 'dip') return x < 0.6 ? -(x / 0.6) * 4 : -4 + ((x - 0.6) / 0.4) * 6;
+  return null;
+}
+
+// 발화 하나 분석
+function analyzeSegment(frames, anchor){
+  const dbs = frames.filter(f => f.loud).map(f => f.db);
+  const peak = dbs.length ? pct(dbs, 0.95) : -999;
+  const thr = peak - 20;                      // 가장 큰 소리보다 20dB 이상 작은 꼬리·숨소리는 뺀다
+  const loud = frames.filter(f => f.loud && f.db >= thr);
+  const voiced = loud.filter(f => f.st !== null);
+  const out = { loudN: loud.length, voicedN: voiced.length, voicedRatio: loud.length ? voiced.length / loud.length : 0,
+    jumps: 0, jumpRate: 0, range: null, medHz: null, dir: 'na', sigDb: median(loud.map(f => f.db)), grade: 'na', t0v: null, t1v: null };
+  for (let i = 1; i < frames.length; i++){
+    const a = frames[i - 1], b = frames[i];
+    if (a.loud && b.loud && a.db >= thr && b.db >= thr && a.st !== null && b.st !== null && Math.abs(b.st - a.st) > 3) out.jumps++;
+  }
+  out.jumpRate = voiced.length ? out.jumps / voiced.length : 0;
+  let pts = smooth5(octaveRepair(voiced.map(f => ({ t: f.t, v: f.st })), anchor));
+  out.curve = pts;
+  if (pts.length >= 3){
+    const md = median(pts.map(p => p.v));
+    pts = pts.filter(p => Math.abs(p.v - md) <= 7);  // 튀는 점 제거
+  }
+  const sm = pts.map(p => p.v);
+  if (sm.length >= 3){ out.range = pct(sm, 0.9) - pct(sm, 0.1); out.medSt = median(sm); out.medHz = stToHz(out.medSt); out.t0v = pts[0].t; out.t1v = pts[pts.length - 1].t; }
+  if (sm.length >= 6){
+    const n = sm.length, k = Math.max(2, Math.round(n * 0.35));
+    const a = mean(sm.slice(0, k)), b = mean(sm.slice(n - k));
+    const midPart = sm.slice(Math.floor(n * 0.3), Math.ceil(n * 0.7));
+    const mid = midPart.length ? Math.min(...midPart) : Math.min(a, b);
+    const diff = b - a;
+    if (mid < a - 2 && mid < b - 2) out.dir = 'dip';
+    else if (diff > 1) out.dir = 'rise';
+    else if (diff < -1) out.dir = 'fall';
+    else out.dir = 'flat';
+    out.diff = diff;
+  }
+  if (sm.length < 6) out.grade = 'bad';
+  else if (out.voicedRatio >= 0.6 && out.jumpRate <= 0.05) out.grade = 'good';
+  else if (out.voicedRatio >= 0.4 && out.jumpRate <= 0.15) out.grade = 'mid';
+  else out.grade = 'bad';
+  return out;
+}
+// CORE-END
+
+const DIR = { rise: '올라감 ↗', fall: '내려감 ↘', flat: '평평 →', dip: '꺾임 ↘↗', na: '판단 불가' };
+const GRADE = { good: '읽기 쉬움', mid: '애매함', bad: '읽기 어려움', na: '판단 불가' };
+const TARGETS = [
+  { w: '雨', k: 'あめ', note: '비 · 高低(あ가 높음)', ex: 'fall', kind: 'step', say: '雨', lang: 'ja-JP' },
+  { w: '飴', k: 'あめ', note: '사탕 · 低高(め가 높음)', ex: 'rise', kind: 'step', say: '飴', lang: 'ja-JP' },
+  { w: '箸', k: 'はし', note: '젓가락 · 高低', ex: 'fall', kind: 'step', say: '箸', lang: 'ja-JP' },
+  { w: '橋', k: 'はし', note: '다리 · 低高', ex: 'rise', kind: 'step', say: '橋', lang: 'ja-JP' },
+  { w: '神', k: 'かみ', note: '신 · 高低', ex: 'fall', kind: 'step', say: '神', lang: 'ja-JP' },
+  { w: '紙', k: 'かみ', note: '종이 · 低高', ex: 'rise', kind: 'step', say: '紙', lang: 'ja-JP' },
+  { w: '牡蠣', k: 'かき', note: '굴 · 高低', ex: 'fall', kind: 'step', say: '牡蠣', lang: 'ja-JP' },
+  { w: '柿', k: 'かき', note: '감 · 低高', ex: 'rise', kind: 'step', say: '柿', lang: 'ja-JP' },
+  { w: 'あー →', k: '', note: '같은 높이로 1초 끌기 (기준 확인용)', ex: 'flat', kind: 'slide', say: '', lang: 'ja-JP' },
+  { w: 'あー ↗', k: '', note: '낮게 시작해 높게 올리기', ex: 'rise', kind: 'slide', say: '', lang: 'ja-JP' },
+  { w: 'あー ↘', k: '', note: '높게 시작해 낮게 내리기', ex: 'fall', kind: 'slide', say: '', lang: 'ja-JP' },
+  { w: '妈 mā', k: '', note: '중국어 1성 · 높고 평평 (3단계 참고용)', ex: 'flat', kind: 'slide', say: '妈', lang: 'zh-CN' },
+  { w: '麻 má', k: '', note: '중국어 2성 · 올라감', ex: 'rise', kind: 'slide', say: '麻', lang: 'zh-CN' },
+  { w: '马 mǎ', k: '', note: '중국어 3성 · 내려갔다 올라감', ex: 'dip', kind: 'slide', say: '马', lang: 'zh-CN' },
+  { w: '骂 mà', k: '', note: '중국어 4성 · 내려감', ex: 'fall', kind: 'slide', say: '骂', lang: 'zh-CN' },
+  { w: '자유 발화', k: '', note: '목표 없이 아무 말이나', ex: null, kind: null, say: '', lang: '' }
+];
+const ANCHOR0 = { '70,300': 120, '140,500': 220, '60,500': null };
+
+const $ = s => document.querySelector(s);
+const S = { ctx: null, stream: null, running: false, paused: false, block: false, sr: 48000, ring: null, ringLen: 0, total: 0, lastAna: 0,
+  frames: [], floor: null, calib: null, seg: null, loudRun: 0, quietRun: 0, segs: [], ti: 0, segNo: 0, tries: 0, smooth: null,
+  mic: '', bt: false, set: {}, wake: null, anchorList: [], anchor: null, timer: null, cdTimer: null };
+const P = { fmin: 70, fmax: 300, margin: 10, clMin: 0.65 };
+
+function msg(t){ $('#msg').textContent = t; }
+function warn(t){ const w = $('#warn'); w.hidden = !t; w.textContent = t || ''; }
+function cue(t, cls){ const c = $('#cue'); c.textContent = t; c.className = 'cue' + (cls ? ' ' + cls : ''); }
+function now(){ return S.lastAna / S.sr; }
+function resetAnchor(){ const a = ANCHOR0[$('#range').value]; S.anchorList = []; S.anchor = a ? hzToSt(a) : null; }
+
+function setupAnalysis(){
+  S.tauMax = Math.ceil(S.sr / P.fmin);
+  S.tauMin = Math.floor(S.sr / P.fmax);
+  S.W = Math.max(S.tauMax, Math.round(S.sr * 0.025));
+  S.N = S.W + S.tauMax + 2;
+  S.fbuf = new Float32Array(S.N);
+  S.d = new Float32Array(S.tauMax + 2);
+  S.hop = Math.round(S.sr * 0.02);
+}
+
+async function start(){
+  if (S.running) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  S.ctx = new AC();
+  const dev = $('#dev').value;
+  const a = { noiseSuppression: $('#ns').checked, echoCancellation: $('#ec').checked, autoGainControl: $('#agc').checked, channelCount: 1 };
+  if (dev) a.deviceId = { exact: dev };
+  try { S.stream = await navigator.mediaDevices.getUserMedia({ audio: a }); }
+  catch (e){ msg('마이크를 열 수 없습니다 (' + e.name + '). 주소창 왼쪽 자물쇠에서 마이크 허용을 확인하세요.'); S.ctx.close(); S.ctx = null; return; }
+  await S.ctx.resume();
+  S.sr = S.ctx.sampleRate;
+  S.ringLen = Math.round(S.sr * 60); S.ring = new Float32Array(S.ringLen); S.total = 0; S.lastAna = 0; S.frames = [];
+  S.seg = null; S.loudRun = 0; S.quietRun = 0; S.smooth = makeSmoother(); S.block = true;
+  setupAnalysis();
+  const tr = S.stream.getAudioTracks()[0];
+  S.mic = tr.label || '알 수 없음';
+  S.bt = /bluetooth|hands-?free|수화기|headset|airpods|buds/i.test(S.mic);
+  const g = tr.getSettings ? tr.getSettings() : {};
+  S.set = { ns: g.noiseSuppression ?? a.noiseSuppression, ec: g.echoCancellation ?? a.echoCancellation, agc: g.autoGainControl ?? a.autoGainControl };
+  S.src = S.ctx.createMediaStreamSource(S.stream);
+  S.proc = S.ctx.createScriptProcessor(1024, 1, 1);
+  S.proc.onaudioprocess = onAudio;
+  S.mute = S.ctx.createGain(); S.mute.gain.value = 0;
+  S.src.connect(S.proc); S.proc.connect(S.mute); S.mute.connect(S.ctx.destination);
+  S.running = true;
+  $('#bStart').disabled = true; $('#bStop').disabled = false; $('#bCalib').disabled = false; $('#bPause').disabled = false;
+  warn(S.bt ? '블루투스 이어폰 마이크로 연결됐습니다. 블루투스 마이크는 통화용 좁은 음질이라 낮은 목소리의 음높이가 잘 안 잡히거나 2배로 잡힐 수 있습니다. 같은 단어를 PC 내장 마이크(또는 유선 마이크)로도 해 보고 비교해 주세요.' : '');
+  startCalib();
+  listDevices();
+  await getWake();
+  requestAnimationFrame(draw);
+}
+
+function stop(){
+  if (!S.running) return;
+  clearTimeout(S.timer); clearInterval(S.cdTimer);
+  S.running = false; S.seg = null;
+  try { S.proc.disconnect(); S.src.disconnect(); S.mute.disconnect(); } catch (e) {}
+  S.stream.getTracks().forEach(t => t.stop());
+  S.ctx.close(); S.ctx = null;
+  try { S.wake && S.wake.release(); } catch (e) {} S.wake = null;
+  $('#bStart').disabled = false; $('#bStop').disabled = true; $('#bCalib').disabled = true; $('#bPause').disabled = true;
+  msg('정지했습니다. 기록은 그대로 남아 있습니다.'); cue('정지됨');
+}
+async function restart(){ if (S.running){ stop(); await start(); } }
+
+async function listDevices(){
+  try {
+    const list = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+    const sel = $('#dev'), cur = sel.value;
+    sel.innerHTML = '<option value="">기본 마이크</option>' + list.filter(d => d.deviceId && d.deviceId !== 'default')
+      .map((d, i) => `<option value="${d.deviceId}">${(d.label || '마이크 ' + (i + 1)).replace(/</g, '&lt;')}</option>`).join('');
+    sel.value = cur;
+  } catch (e) {}
+}
+
+// 소음 측정: 완전한 무음(블루투스 연결 직후 등)은 빼고, 실제 신호가 1.5초 쌓일 때까지 잰다
+function startCalib(){
+  clearTimeout(S.timer); clearInterval(S.cdTimer);
+  S.floor = null; S.seg = null; S.block = true;
+  S.calib = { start: now(), dbs: [] };
+  msg('소음 측정 중… 말하지 마세요.'); cue('잠깐 조용히 (소음 측정 중)', 'wait');
+}
+function endCalib(c){
+  if (!S.running) return;
+  let f;
+  if (c.dbs.length < 20){ f = -70; warn('마이크 신호가 거의 0입니다(블루투스 연결 직후이거나 소음 억제가 소리를 다 지움). 소음 바닥을 -70dB로 가정했습니다. 이상하면 ‘소음 다시 측정’을 누르세요.'); }
+  else f = median(c.dbs);
+  S.floor = Math.max(-75, Math.min(-20, f));
+  msg('소음 측정 완료: ' + S.floor.toFixed(0) + 'dB' + (f < -75 ? ' (너무 조용해서 -75dB로 맞춤)' : ''));
+  readyNext(true);
+}
+
+function onAudio(e){
+  const x = e.inputBuffer.getChannelData(0);
+  for (let i = 0; i < x.length; i++) S.ring[(S.total + i) % S.ringLen] = x[i];
+  S.total += x.length;
+  while (S.total - S.lastAna >= S.hop){
+    S.lastAna += S.hop;
+    if (S.lastAna >= S.N) analyzeFrame(S.lastAna);
+  }
+}
+
+function analyzeFrame(end){
+  const N = S.N, b = S.fbuf, start = end - N;
+  let sum = 0;
+  for (let i = 0; i < N; i++){ const v = S.ring[(start + i) % S.ringLen]; b[i] = v; sum += v; }
+  const m = sum / N; let e2 = 0;
+  for (let i = 0; i < N; i++){ b[i] -= m; e2 += b[i] * b[i]; }
+  const db = 10 * Math.log10(e2 / N + 1e-12);
+  const t = end / S.sr;
+  if (S.calib){
+    if (db > -95) S.calib.dbs.push(db);
+    if (S.calib.dbs.length >= 75 || t - S.calib.start > 5){ const c = S.calib; S.calib = null; setTimeout(() => endCalib(c), 0); }
+  }
+  const gate = S.floor === null ? Infinity : S.floor + P.margin;
+  const loud = db >= gate;
+  let f = null, cl = 0;
+  if (db > -85){
+    const r = yinPitch(b, S.W, S.tauMin, S.tauMax, S.d);
+    cl = r.cl; const hz = S.sr / r.tau;
+    if (cl >= P.clMin && hz >= P.fmin * 0.95 && hz <= P.fmax * 1.05) f = hz;
+  }
+  const st = f ? hzToSt(f) : null;
+  const sm = S.smooth(loud ? st : null);
+  const fr = { t, db, f, cl, loud, st: loud ? st : null, stc: sm.stc, sm: sm.sm };
+  S.frames.push(fr);
+  if (S.frames.length > 3500) S.frames.splice(0, 500);
+  vad(fr);
+}
+
+function vad(fr){
+  if (S.floor === null || S.paused || S.block){ S.loudRun = 0; return; }
+  if (fr.loud){ S.loudRun++; S.quietRun = 0; } else { S.quietRun++; S.loudRun = 0; }
+  if (!S.seg){
+    if (S.loudRun >= 3){ S.seg = { start: fr.t - 0.16, lastLoud: fr.t }; cue('듣는 중…', 'go'); }
+  } else {
+    if (fr.loud) S.seg.lastLoud = fr.t;
+    if (S.quietRun >= 25 || fr.t - S.seg.start > 8){
+      const sg = S.seg; S.seg = null; S.block = true;
+      setTimeout(() => finishSeg(sg.start, sg.lastLoud + 0.1), 0);
+    }
+  }
+}
+
+function finishSeg(t0, t1){
+  const frames = S.frames.filter(f => f.t >= t0 && f.t <= t1);
+  const r = analyzeSegment(frames, S.anchor);
+  if (t1 - t0 < 0.25 || r.loudN < 5 || (r.voicedN < 3 && t1 - t0 < 0.6)){ readyNext(false, true); return; }   // 짧은 잡음·삑 새어듦은 무시   // 너무 짧은 소리(기침 등)는 무시
+  const tg = TARGETS[S.ti];
+  S.tries++;
+  const seg = Object.assign(r, {
+    no: ++S.segNo, t0, t1, dur: t1 - t0, frames, target: tg.w, kana: tg.k, ex: tg.ex, kind: tg.kind, tries: S.tries,
+    env: $('#env').value, mic: S.mic, set: { ...S.set }, floor: S.floor, margin: P.margin, range0: P.fmin + '–' + P.fmax,
+    anchorHz: S.anchor !== null ? stToHz(S.anchor) : null, rate: null, pcm: makePcm(t0, t1), time: new Date()
+  });
+  seg.url = URL.createObjectURL(wavBlob([seg.pcm]));
+  seg.match = seg.ex && seg.dir !== 'na' ? seg.dir === seg.ex : null;
+  // 잘 읽힌 발화로 내 기준 음높이를 갱신 (옥타브 오인식 보정에 사용)
+  if (seg.grade !== 'bad' && seg.medSt !== undefined){
+    S.anchorList.push(seg.medSt); if (S.anchorList.length > 15) S.anchorList.shift();
+    if (S.anchorList.length >= 2) S.anchor = median(S.anchorList);
+  }
+  S.segs.unshift(seg);
+  renderSeg(seg, true);
+  showResult(seg);
+  updateSummary();
+  afterSeg(seg);
+}
+
+// ---------- 진행 흐름 ----------
+function afterSeg(seg){
+  const readable = seg.grade !== 'bad' && seg.dir !== 'na';
+  if ($('#sndRes').checked) resultSound(seg.match === true ? 'ok' : seg.match === false ? 'ng' : readable ? 'ok' : 'na');
+  const hold = +$('#hold').value;
+  const goNext = readable && $('#autoNext').checked && TARGETS[S.ti].ex !== null;
+  if (!readable) seg.note = '다시';
+  if (hold === 0){ cue(readable ? '결과 확인 후 ‘다음 단어’ 또는 ♪를 누르세요' : '곡선을 못 읽었습니다. 다시 말하려면 ♪ 또는 다음 단어를 누르세요', 'wait'); S.manualNext = goNext; return; }
+  let left = hold;
+  const label = () => cue((readable ? (goNext ? '다음 단어까지 ' : '같은 단어 다시까지 ') : '곡선을 못 읽음 · 같은 단어 다시까지 ') + left + '초', 'wait');
+  label();
+  clearInterval(S.cdTimer);
+  S.cdTimer = setInterval(() => { left--; if (left > 0) label(); }, 1000);
+  clearTimeout(S.timer);
+  S.timer = setTimeout(() => { clearInterval(S.cdTimer); if (goNext) setTarget(nextIdx(), true); readyNext(true); }, hold * 1000);
+}
+function nextIdx(){ return (S.ti + 1) % (TARGETS.length - 1); }
+
+// 말하기 직전 준비: (높낮이 허밍) → 삑 → 듣기 시작
+async function readyNext(withHum, quiet){
+  if (!S.running) return;
+  S.block = true; S.seg = null;
+  if (!quiet && withHum && $('#autoHum').checked && TARGETS[S.ti].ex){ cue('♪ 높낮이 듣기', 'wait'); await playGuide(); await sleep(250); }
+  if (!quiet) await beep(880, 0.09, 0.12);
+  await sleep(quiet ? 150 : 550);   // 블루투스 이어폰은 소리가 0.2초쯤 늦게 나와서, 삑이 마이크로 새어 드는 시간까지 기다린다
+  S.loudRun = 0; S.quietRun = 0; S.block = false;
+  cue('말하세요: ' + TARGETS[S.ti].w + (TARGETS[S.ti].k ? ' (' + TARGETS[S.ti].k + ')' : ''), 'go');
+}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+// ---------- 소리 ----------
+function outCtx(){
+  if (S.ctx) return S.ctx;
+  if (!S.octx) S.octx = new (window.AudioContext || window.webkitAudioContext)();
+  S.octx.resume(); return S.octx;
+}
+function beep(freq, dur, vol, at){
+  const c = outCtx(), t = c.currentTime + (at || 0) + 0.02;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.setValueAtTime(vol, t + dur - 0.02); g.gain.linearRampToValueAtTime(0, t + dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  return sleep(((at || 0) + dur) * 1000 + 40);
+}
+function resultSound(kind){
+  if (kind === 'ok'){ beep(784, 0.12, 0.18); beep(1047, 0.18, 0.18, 0.13); }
+  else if (kind === 'ng'){ beep(330, 0.12, 0.2); beep(330, 0.12, 0.2, 0.18); }
+  else beep(220, 0.4, 0.2);
+}
+// 규칙으로 만든 높낮이 허밍 (내 기준 음높이에서 재생)
+function playGuide(){
+  const tg = TARGETS[S.ti]; if (!tg.ex) return Promise.resolve();
+  const c = outCtx(), t0 = c.currentTime + 0.03;
+  const dur = tg.kind === 'step' ? 0.7 : 0.9;
+  const base = (S.anchor !== null ? stToHz(S.anchor) : 130) * 1.0;
+  const o = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+  o.type = 'sawtooth'; lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.7;
+  const n = 40;
+  for (let i = 0; i <= n; i++){ const x = i / n; o.frequency[i ? 'linearRampToValueAtTime' : 'setValueAtTime'](base * Math.pow(2, guideAt(tg.ex, tg.kind, x) / 12), t0 + x * dur); }
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.22, t0 + 0.04);
+  if (tg.kind === 'step'){ g.gain.setValueAtTime(0.22, t0 + dur * 0.46); g.gain.linearRampToValueAtTime(0.08, t0 + dur * 0.5); g.gain.linearRampToValueAtTime(0.22, t0 + dur * 0.54); }
+  g.gain.setValueAtTime(0.22, t0 + dur - 0.05); g.gain.linearRampToValueAtTime(0, t0 + dur);
+  o.connect(lp); lp.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  return sleep(dur * 1000 + 80);
+}
+function sayTarget(){
+  const t = TARGETS[S.ti];
+  if (!t.say || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(t.say); u.lang = t.lang; u.rate = 0.8;
+  const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.replace('_', '-').startsWith(t.lang.slice(0, 2)));
+  if (v) u.voice = v;
+  S.block = true;
+  u.onend = u.onerror = () => { if (S.running) readyNext(false); };
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+
+function makePcm(t0, t1){
+  if (!S.ring) return new Float32Array(0);
+  let s0 = Math.max(0, Math.round(t0 * S.sr)), s1 = Math.min(S.total, Math.round(t1 * S.sr));
+  s0 = Math.max(s0, S.total - S.ringLen + 1);
+  const n = Math.max(0, s1 - s0), out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = S.ring[(s0 + i) % S.ringLen];
+  return out;
+}
+function wavBlob(parts, gapSec){
+  const sr = S.sr, gap = Math.round((gapSec || 0) * sr);
+  const n = parts.reduce((a, p) => a + p.length, 0) + gap * Math.max(0, parts.length - 1);
+  const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const ws = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ws(36, 'data'); v.setUint32(40, n * 2, true);
+  let o = 44;
+  parts.forEach((p, k) => {
+    if (k) o += gap * 2;
+    for (let i = 0; i < p.length; i++){ v.setInt16(o, Math.max(-1, Math.min(1, p[i])) * 32767, true); o += 2; }
+  });
+  return new Blob([buf], { type: 'audio/wav' });
+}
+// 모든 발화를 0.7초 간격으로 이어 한 파일로 저장 + 각 발화의 시작 위치를 리포트에 적음
+function saveAllWav(){
+  const list = [...S.segs].reverse(); if (!list.length) return;
+  let pos = 0; list.forEach(sg => { sg.filePos = pos; pos += sg.pcm.length / S.sr + 0.7; });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(wavBlob(list.map(sg => sg.pcm), 0.7));
+  a.download = 'LA-T0-3_rec_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.wav';
+  a.click(); updateSummary();
+  msg('녹음 ' + list.length + '개를 한 파일로 저장했습니다. 리포트에 각 발화의 파일 속 위치(초)가 적혀 있습니다.');
+}
+
+// ---------- 그리기 ----------
+function fitCanvas(c){
+  const r = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight || +c.getAttribute('height');
+  if (c.width !== Math.round(w * r) || c.height !== Math.round(h * r)){ c.width = Math.round(w * r); c.height = Math.round(h * r); }
+  const g = c.getContext('2d'); g.setTransform(r, 0, 0, r, 0, 0); return { g, w, h };
+}
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function draw(){
+  if (!S.running) return;
+  const c = $('#live'), { g, w, h } = fitCanvas(c);
+  g.clearRect(0, 0, w, h);
+  const T = now(), span = 6, pitchH = h * 0.74, volTop = h * 0.78;
+  const stLo = hzToSt(P.fmin * 0.9), stHi = hzToSt(P.fmax * 1.1);
+  const X = t => w - (T - t) / span * w;
+  const Y = s => pitchH - (s - stLo) / (stHi - stLo) * (pitchH - 6) - 3;
+  const V = db => h - 2 - (Math.max(-90, Math.min(0, db)) + 90) / 90 * (h - volTop - 4);
+  const mut = css('--mut'), line = css('--line');
+  g.font = '11px system-ui'; g.fillStyle = mut; g.strokeStyle = line; g.lineWidth = 1;
+  [60, 80, 100, 150, 200, 300, 400, 500].forEach(hz => {
+    if (hz < P.fmin * 0.9 || hz > P.fmax * 1.1) return;
+    const y = Y(hzToSt(hz)); g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); g.fillText(hz + 'Hz', 4, y - 2);
+  });
+  g.beginPath(); g.moveTo(0, volTop - 2); g.lineTo(w, volTop - 2); g.stroke();
+  if (S.seg){ g.fillStyle = css('--seg'); g.fillRect(X(S.seg.start), 0, w - X(S.seg.start), h); }
+  const fr = S.frames.filter(f => f.t > T - span);
+  g.fillStyle = css('--raw');
+  fr.forEach(f => { if (f.stc !== null) g.fillRect(X(f.t) - 1.5, Y(f.stc) - 1.5, 3, 3); });
+  g.strokeStyle = css('--curve'); g.lineWidth = 2.5; g.beginPath();
+  let pen = false;
+  fr.forEach(f => { if (f.sm === null){ pen = false; return; } const x = X(f.t), y = Y(f.sm); pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true; });
+  g.stroke();
+  g.strokeStyle = mut; g.lineWidth = 1.2; g.beginPath(); pen = false;
+  fr.forEach(f => { const x = X(f.t), y = V(f.db); pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true; });
+  g.stroke();
+  if (S.floor !== null){
+    const y = V(S.floor + P.margin); g.setLineDash([4, 4]); g.strokeStyle = css('--bad'); g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); g.setLineDash([]);
+  }
+  const last = S.frames[S.frames.length - 1];
+  if (last){
+    $('#sHz').textContent = last.sm !== null ? Math.round(stToHz(last.sm)) + 'Hz' : '–';
+    $('#sDb').textContent = last.db.toFixed(0) + 'dB';
+    $('#sFloor').textContent = S.floor !== null ? S.floor.toFixed(0) + 'dB' : '측정 중';
+    $('#sAnchor').textContent = S.anchor !== null ? Math.round(stToHz(S.anchor)) + 'Hz' : '–';
+  }
+  requestAnimationFrame(draw);
+}
+
+function drawSeg(c, seg){
+  const { g, w, h } = fitCanvas(c);
+  g.clearRect(0, 0, w, h);
+  const fs = seg.frames, cv = seg.curve || [], sts = cv.length ? cv.map(p => p.v) : fs.map(f => f.st).filter(v => v !== null);
+  if (!sts.length){ g.fillStyle = css('--mut'); g.font = '13px system-ui'; g.fillText('음높이를 잡지 못했습니다', 10, h / 2); return; }
+  const md = seg.medSt !== undefined ? seg.medSt : median(sts);
+  let lo = Math.min(md - 6, pct(sts, 0.02) - 1), hi = Math.max(md + 6, pct(sts, 0.98) + 1);
+  const X = t => (t - seg.t0) / (seg.t1 - seg.t0) * (w - 8) + 4;
+  const Y = s => h - 4 - (s - lo) / (hi - lo) * (h - 8);
+  g.fillStyle = css('--seg');
+  fs.forEach(f => { if (f.loud) g.fillRect(X(f.t) - 3, 0, 6, h); });
+  g.strokeStyle = css('--line'); g.lineWidth = 1; g.font = '10px system-ui'; g.fillStyle = css('--mut');
+  for (let s = Math.ceil(lo / 3) * 3; s <= hi; s += 3){ const y = Y(s); g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.fillText(Math.round(stToHz(hi)) + 'Hz', 4, 11); g.fillText(Math.round(stToHz(lo)) + 'Hz', 4, h - 4);
+  // 기대 모양 (주황 점선): 목소리가 잡힌 구간에 맞춰 그림
+  if (seg.ex && seg.t0v !== null && seg.t1v > seg.t0v){
+    g.strokeStyle = css('--guide'); g.lineWidth = 2.5; g.setLineDash([6, 5]); g.beginPath();
+    for (let i = 0; i <= 40; i++){ const x = i / 40, t = seg.t0v + x * (seg.t1v - seg.t0v), y = Y(md + guideAt(seg.ex, seg.kind, x)); i ? g.lineTo(X(t), y) : g.moveTo(X(t), y); }
+    g.stroke(); g.setLineDash([]);
+  }
+  g.fillStyle = css('--raw');
+  fs.forEach(f => { if (f.st !== null && f.loud) g.fillRect(X(f.t) - 2, Y(f.st) - 2, 4, 4); });
+  g.strokeStyle = css('--curve'); g.lineWidth = 3; g.beginPath();
+  cv.forEach((p, i) => { const x = X(p.t), y = Y(p.v); (i && p.t - cv[i - 1].t <= 0.07) ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.stroke();
+}
+
+// ---------- 화면 ----------
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function verdictHtml(seg){
+  if (seg.dir === 'na' || seg.grade === 'bad') return `<span class="na">곡선을 못 읽었습니다 — 같은 단어를 다시 해 보세요</span>`;
+  if (seg.match === null) return `내 곡선: ${DIR[seg.dir]}`;
+  return seg.match ? `<span class="ok">✓ 기대와 같음</span> · 내 곡선 ${DIR[seg.dir]}`
+                   : `<span class="ng">✗ 기대와 다름</span> · 내 곡선 ${DIR[seg.dir]} / 기대 ${DIR[seg.ex]}`;
+}
+function showResult(seg){
+  $('#res').hidden = false;
+  $('#resTxt').innerHTML = `${esc(seg.target)} ${seg.kana ? '<span class="mut">' + seg.kana + '</span> ' : ''}— ${verdictHtml(seg)}`;
+  drawSeg($('#resCv'), seg);
+  S.lastShown = seg;
+  document.querySelectorAll('[data-rr]').forEach(x => x.classList.toggle('sel', x.dataset.rr === seg.rate));
+}
+function rateSeg(seg, r){
+  seg.rate = r;
+  const el = document.getElementById('seg' + seg.no);
+  if (el) el.querySelectorAll('[data-r]').forEach(x => x.classList.toggle('sel', x.dataset.r === r));
+  if (S.lastShown === seg) document.querySelectorAll('[data-rr]').forEach(x => x.classList.toggle('sel', x.dataset.rr === r));
+  updateSummary();
+}
+function renderSeg(seg, prepend){
+  const el = document.createElement('div'); el.className = 'seg'; el.id = 'seg' + seg.no;
+  el.innerHTML = `<div class="hd"><b>#${seg.no} ${esc(seg.target)} ${seg.kana ? '<span class="mut">' + seg.kana + '</span>' : ''} <span class="mut">${seg.tries}번째</span></b>
+    <span><span class="badge g-${seg.grade}">${GRADE[seg.grade]}</span></span></div>
+    <div style="font-size:14px;margin-bottom:4px">${verdictHtml(seg)}</div>
+    <canvas height="120"></canvas>
+    <div class="mut" style="margin-top:4px">음높이 잡힘 ${Math.round(seg.voicedRatio * 100)}% · 튐 ${seg.jumps}회
+    · 폭 ${seg.range !== null ? seg.range.toFixed(1) + '반음' : '–'} · 평균 ${seg.medHz ? Math.round(seg.medHz) + 'Hz' : '–'}
+    · 여유 ${seg.sigDb !== null ? (seg.sigDb - seg.floor).toFixed(0) + 'dB' : '–'} · ${seg.dur.toFixed(1)}초 · ${esc(seg.env)}</div>
+    <div class="row rate">${seg.url ? `<audio controls src="${seg.url}"></audio>` : ''}
+    <span class="mut">귀로 들은 것과 곡선이</span>
+    <button data-r="맞음">맞음</button><button data-r="애매">애매</button><button data-r="틀림">틀림</button>
+    <button data-del="1" title="이 기록 지우기">삭제</button></div>`;
+  el.querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
+    rateSeg(seg, b.dataset.r);
+  });
+  el.querySelector('[data-del]').onclick = () => { S.segs = S.segs.filter(s => s !== seg); el.remove(); updateSummary(); };
+  const box = $('#segs'); prepend ? box.prepend(el) : box.append(el);
+  drawSeg(el.querySelector('canvas'), seg);
+}
+
+function updateSummary(){
+  $('#segCount').textContent = S.segs.length ? `(${S.segs.length}개)` : '';
+  const keys = [...new Set(S.segs.map(s => s.env + ' / ' + micShort(s.mic) + ' / 소음억제 ' + (s.set.ns ? '켬' : '끔')))];
+  if (!keys.length){ $('#sum').innerHTML = '<tr><td class="mut">아직 기록이 없습니다.</td></tr>'; $('#report').value = ''; return; }
+  const rows = keys.map(key => {
+    const a = S.segs.filter(s => s.env + ' / ' + micShort(s.mic) + ' / 소음억제 ' + (s.set.ns ? '켬' : '끔') === key);
+    const gd = k => a.filter(s => s.grade === k).length;
+    const m = a.filter(s => s.match !== null), mOk = m.filter(s => s.match).length;
+    const r = a.filter(s => s.rate), rOk = r.filter(s => s.rate === '맞음').length;
+    const snr = median(a.filter(s => s.sigDb !== null).map(s => s.sigDb - s.floor));
+    return { env: key, n: a.length, vr: mean(a.map(s => s.voicedRatio)), good: gd('good'), mid: gd('mid'), bad: gd('bad'),
+      mTxt: m.length ? `${mOk}/${m.length}` : '–', rTxt: r.length ? `${rOk}/${r.length}` : '–', snr };
+  });
+  $('#sum').innerHTML = '<tr><th>환경 / 마이크 / 소음억제</th><th>발화</th><th>음높이 잡힘</th><th>쉬움/애매/어려움</th><th>방향 일치</th><th>귀로 맞음</th><th>여유</th></tr>' +
+    rows.map(r => `<tr><td>${esc(r.env)}</td><td>${r.n}</td><td>${Math.round(r.vr * 100)}%</td><td>${r.good}/${r.mid}/${r.bad}</td><td>${r.mTxt}</td><td>${r.rTxt}</td><td>${r.snr !== null ? r.snr.toFixed(0) + 'dB' : '–'}</td></tr>`).join('');
+  $('#report').value = buildReport(rows);
+}
+function micShort(m){ return /bluetooth|수화기|hands-?free/i.test(m) ? '블루투스' : (m.length > 18 ? m.slice(0, 18) + '…' : m); }
+
+function buildReport(rows){
+  const L = [];
+  L.push('[LA-T0-3 음높이 곡선 테스트 리포트] la_0-3_pitch-test_v3');
+  L.push('작성: ' + new Date().toLocaleString('ko-KR'));
+  L.push('브라우저: ' + navigator.userAgent);
+  L.push('샘플레이트: ' + S.sr + 'Hz · 내 기준 음높이: ' + (S.anchor !== null ? Math.round(stToHz(S.anchor)) + 'Hz' : '-') + ' · 결과 보는 시간: ' + $('#hold').value + '초');
+  L.push('');
+  L.push('-- 환경별 요약 --');
+  rows.forEach(r => L.push(`${r.env}: 발화 ${r.n}개, 음높이 잡힘 평균 ${Math.round(r.vr * 100)}%, 쉬움/애매/어려움 ${r.good}/${r.mid}/${r.bad}, 방향 일치 ${r.mTxt}, 귀로 맞음 ${r.rTxt}, 여유 ${r.snr !== null ? r.snr.toFixed(0) + 'dB' : '–'}`));
+  L.push('');
+  L.push('-- 발화 목록 (오래된 순) --');
+  [...S.segs].reverse().forEach(s => {
+    L.push(`#${s.no} [${s.env}] ${s.target}${s.kana ? '(' + s.kana + ')' : ''} ${s.tries}번째 기대:${s.ex ? DIR[s.ex] : '-'} 자동:${DIR[s.dir]}${s.match === null ? '' : s.match ? ' 일치' : ' 불일치'}` +
+      ` | 잡힘 ${Math.round(s.voicedRatio * 100)}% 튐 ${s.jumps} 폭 ${s.range !== null ? s.range.toFixed(1) : '-'}반음 평균 ${s.medHz ? Math.round(s.medHz) : '-'}Hz` +
+      ` 변화 ${s.diff !== undefined ? s.diff.toFixed(1) : '-'}반음 | 소음 ${s.floor.toFixed(0)}dB 말소리 ${s.sigDb !== null ? s.sigDb.toFixed(0) : '-'}dB 문턱+${s.margin}` +
+      ` | ${GRADE[s.grade]} | 귀:${s.rate || '미입력'} | 파일 ${s.filePos !== undefined ? s.filePos.toFixed(1) + '초' : '-'} | ${s.dur.toFixed(1)}초 | 소음억제 ${s.set.ns ? '켬' : '끔'} 에코 ${s.set.ec ? '켬' : '끔'} 자동음량 ${s.set.agc ? '켬' : '끔'} | ${s.mic}`);
+  });
+  return L.join('\n');
+}
+
+function setTarget(i, keepFlow){
+  S.ti = i; S.tries = 0; const t = TARGETS[i];
+  $('#target').innerHTML = esc(t.w) + (t.k ? `<small>${t.k}</small>` : '');
+  $('#targetNote').textContent = t.note + (t.ex ? ' · 기대 모양: ' + DIR[t.ex] : '');
+  document.querySelectorAll('.chip').forEach((c, j) => c.classList.toggle('on', j === i));
+  if (!keepFlow && S.running && S.floor !== null){ clearTimeout(S.timer); clearInterval(S.cdTimer); readyNext(true); }
+}
+
+function download(){
+  const txt = $('#report').value; if (!txt) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain;charset=utf-8' }));
+  a.download = 'LA-T0-3_report_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.txt';
+  a.click();
+}
+async function copyReport(){
+  const txt = $('#report').value; if (!txt) return;
+  try { await navigator.clipboard.writeText(txt); msg('리포트를 복사했습니다. 대화창에 붙여 넣어 주세요.'); }
+  catch (e){ const ta = $('#report'); ta.select(); document.execCommand('copy'); msg('리포트를 복사했습니다.'); }
+}
+async function getWake(){
+  try { if (navigator.wakeLock){ S.wake = await navigator.wakeLock.request('screen'); S.wake.addEventListener('release', () => { S.wake = null; }); } } catch (e) {}
+}
+
+// ---------- 시작 ----------
+$('#chips').innerHTML = TARGETS.map((t, i) => `<button class="chip" data-i="${i}">${esc(t.w)}</button>`).join('');
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => setTarget(+c.dataset.i));
+setTarget(0);
+resetAnchor();
+$('#bStart').onclick = start;
+$('#bStop').onclick = stop;
+$('#bCalib').onclick = startCalib;
+$('#bPause').onclick = () => { S.paused = !S.paused; S.seg = null; $('#bPause').textContent = S.paused ? '기록 다시 시작' : '기록 멈춤'; msg(S.paused ? '기록을 멈췄습니다. 곡선만 보입니다.' : '기록을 다시 시작합니다.'); cue(S.paused ? '기록 멈춤' : '말하세요', S.paused ? 'wait' : 'go'); };
+$('#bHum').onclick = async () => { if (S.running && S.floor !== null){ clearTimeout(S.timer); clearInterval(S.cdTimer); S.block = true; await playGuide(); await sleep(250); readyNext(false); } else playGuide(); };
+$('#bSay').onclick = sayTarget;
+$('#bNext').onclick = () => setTarget(nextIdx());
+$('#bCopy').onclick = copyReport;
+$('#bWav').onclick = saveAllWav;
+document.querySelectorAll('[data-rr]').forEach(b => b.onclick = () => { if (S.lastShown) rateSeg(S.lastShown, b.dataset.rr); });
+$('#bPlayLast').onclick = () => { if (S.lastShown && S.lastShown.url){ const was = S.block; S.block = true; const au = new Audio(S.lastShown.url); au.onended = () => { S.block = was; }; au.play(); } };
+$('#bDown').onclick = download;
+$('#bClear').onclick = () => { if (!S.segs.length || !confirm('기록을 모두 지울까요?')) return; S.segs = []; $('#segs').innerHTML = ''; $('#res').hidden = true; updateSummary(); };
+['ns', 'ec', 'agc', 'dev'].forEach(id => $('#' + id).onchange = restart);
+$('#range').onchange = () => { const [a, b] = $('#range').value.split(',').map(Number); P.fmin = a; P.fmax = b; resetAnchor(); if (S.running) setupAnalysis(); };
+$('#margin').oninput = () => { P.margin = +$('#margin').value; $('#marginV').textContent = '+' + P.margin + 'dB'; };
+window.addEventListener('resize', () => { S.segs.forEach(s => { const el = document.getElementById('seg' + s.no); el && drawSeg(el.querySelector('canvas'), s); }); if (S.lastShown) drawSeg($('#resCv'), S.lastShown); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.running && !S.wake) getWake(); });
+if (window.speechSynthesis) speechSynthesis.getVoices();
+</script>
+</body>
+</html>
