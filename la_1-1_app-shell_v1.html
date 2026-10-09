@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LA 외국어 학습</title>
+<!--
+  LA 외국어 학습 앱 — 작업 1-1 앱 뼈대와 언어팩 구조
+  파일: la_1-1_app-shell_v1.html
+
+  파일 구성 (위에서 아래 순서)
+   [A] 공통 설정        APP 정보, 학습 흐름 단계, 설명 카드 형식
+   [B] 언어팩           LANG_PACKS — 언어를 추가할 때는 여기만 고친다
+   [C] 언어팩 검사       validatePack — 언어팩에 빠진 항목을 찾아 알려 줌
+   [D] 저장소           Store — 설정·기록을 이 기기(브라우저)에만 저장
+   [E] 음성             Speaker(읽어 주기), Listener(음성 인식), Awake(화면 꺼짐 방지)
+   [F] 모델 어댑터       ModelAdapter — 모든 AI 요청은 여기 한 곳으로만 나감
+   [G] 모드             MODE_TYPES — 모드 종류별 화면 (아직 없는 모드는 '준비 중')
+   [H] 화면             홈 / 모드 / 점검 / 설정 / 정보
+-->
+<style>
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --surface2:#efede8; --text:#1d1c1a; --muted:#6b6862;
+  --line:#dedbd4; --accent:#2f5d8a; --accent-text:#ffffff; --ok:#2e7d4f; --ng:#b3412e; --warn:#a46a00;
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151513; --surface:#1f1f1c; --surface2:#2a2a26; --text:#ecebe6; --muted:#a29f97;
+    --line:#383732; --accent:#7fb0e0; --accent-text:#10202f; --ok:#6cc391; --ng:#ee8a77; --warn:#e2b04a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151513; --surface:#1f1f1c; --surface2:#2a2a26; --text:#ecebe6; --muted:#a29f97;
+  --line:#383732; --accent:#7fb0e0; --accent-text:#10202f; --ok:#6cc391; --ng:#ee8a77; --warn:#e2b04a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Hiragino Sans","Yu Gothic",sans-serif;
+  font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+header.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;
+  padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--bg);border-bottom:1px solid var(--line)}
+header.top h1{flex:1;margin:0;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#backBtn{display:none;border:0;background:none;color:var(--accent);font-size:26px;line-height:1;padding:4px 8px 4px 0;cursor:pointer}
+#langBadge{font-size:13px;padding:3px 10px;border-radius:99px;background:var(--surface2);color:var(--muted);white-space:nowrap}
+main{max-width:720px;margin:0 auto;padding:16px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;background:var(--surface);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav.tabs a{flex:1;text-align:center;padding:12px 4px;color:var(--muted);text-decoration:none;font-size:14px;font-weight:600}
+nav.tabs a.on{color:var(--accent)}
+h2{font-size:17px;margin:22px 0 10px}
+h2:first-child{margin-top:4px}
+p{margin:6px 0}
+.muted{color:var(--muted);font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mode{display:block;text-decoration:none;color:inherit;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);padding:14px;min-height:96px}
+.mode b{display:block;font-size:16px}
+.mode .tag{display:inline-block;margin-top:8px;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--surface2);color:var(--muted)}
+.mode .tag.ready{background:var(--accent);color:var(--accent-text)}
+button.btn{appearance:none;border:0;border-radius:12px;background:var(--accent);color:var(--accent-text);
+  font-size:16px;font-weight:700;padding:14px 18px;min-height:52px;cursor:pointer;width:100%;margin:6px 0}
+button.btn.sub{background:var(--surface2);color:var(--text)}
+button.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row > *{flex:1}
+label.field{display:block;margin:12px 0}
+label.field span{display:block;font-size:14px;color:var(--muted);margin-bottom:4px}
+select,input[type=range]{width:100%}
+select{font-size:16px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.check:last-child{border-bottom:0}
+.dot{flex:0 0 22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;margin-top:2px}
+.dot.ok{background:var(--ok)} .dot.ng{background:var(--ng)} .dot.warn{background:var(--warn)} .dot.wait{background:var(--muted)}
+.big{font-size:26px;font-weight:700;margin:6px 0}
+.jp{font-family:"Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif}
+table.kv{width:100%;border-collapse:collapse;font-size:15px}
+table.kv th{text-align:left;vertical-align:top;color:var(--muted);font-weight:600;width:7.5em;padding:8px 8px 8px 0;border-bottom:1px solid var(--line)}
+table.kv td{padding:8px 0;border-bottom:1px solid var(--line)}
+table.kv tr:last-child th, table.kv tr:last-child td{border-bottom:0}
+ol.flow{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0}
+ol.flow li{font-size:13px;padding:4px 10px;border-radius:99px;background:var(--surface2)}
+pre.json{white-space:pre-wrap;word-break:break-all;font-size:13px;background:var(--surface2);padding:10px;border-radius:10px;margin:8px 0 0}
+.ex{display:flex;align-items:center;gap:8px;padding:6px 0}
+.ex .t{flex:1}
+.play{flex:0 0 auto;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:10px;padding:8px 12px;font-size:14px;cursor:pointer}
+.result{font-size:15px;margin-top:8px}
+@media (max-width:520px){table.kv th,table.kv td{display:block;width:auto}table.kv th{border-bottom:0;padding-bottom:0}}
+</style>
+</head>
+<body>
+<header class="top">
+  <button id="backBtn" aria-label="뒤로">‹</button>
+  <h1 id="title">LA</h1>
+  <span id="langBadge"></span>
+</header>
+<main id="view"></main>
+<nav class="tabs">
+  <a href="#/home" data-tab="home">홈</a>
+  <a href="#/check" data-tab="check">점검</a>
+  <a href="#/settings" data-tab="settings">설정</a>
+  <a href="#/about" data-tab="about">정보</a>
+</nav>
+
+<script>
+"use strict";
+/* =====================================================================
+   [A] 공통 설정
+   ===================================================================== */
+const APP = { name: "LA 외국어 학습", task: "1-1", version: "v1", file: "la_1-1_app-shell_v1.html" };
+
+// 학습 한 바퀴 (LA-01 §4) — 모든 언어·모든 항목이 같은 순서를 따른다
+const LEARNING_FLOW = [
+  { id: "explain", name: "설명 카드" },
+  { id: "example", name: "예문" },
+  { id: "speak",   name: "직접 발음" },
+  { id: "judge",   name: "판정" },
+  { id: "recheck", name: "재확인(1·3·7일)" }
+];
+
+// 설명 카드 형식 (LA-01 §4). 언어가 달라도 카드 칸은 같다.
+const CARD_FIELDS = {
+  P: [ // 발음 카드
+    { key: "how",     name: "소리 내는 법" },
+    { key: "vsKo",    name: "한국어와의 차이" },
+    { key: "mistake", name: "흔한 실수" },
+    { key: "examples",name: "예문 (쉬움 → 실전)" },
+    { key: "verify",  name: "확인 방법" }
+  ],
+  G: [ // 문법 카드
+    { key: "rule",    name: "규칙 한 줄" },
+    { key: "when",    name: "언제 쓰나" },
+    { key: "examples",name: "예문 (쉬움 → 실전)" },
+    { key: "mistake", name: "흔한 오류" },
+    { key: "task",    name: "말하기 과제" }
+  ]
+};
+
+/* =====================================================================
+   [B] 언어팩
+   - 언어별 내용은 전부 여기에 둔다. 공통 코드는 언어 이름을 직접 쓰지 않는다.
+   - 새 언어 추가 = 이 객체에 한 덩어리 추가 + status를 "ready"로.
+   - 일본어 문장을 읽어 줄 때는 한자가 아니라 reading(가나)을 넘긴다 (LA-T0-3).
+   ===================================================================== */
+const LANG_PACKS = {};
+function registerPack(pack){ LANG_PACKS[pack.code] = pack; }
+
+/* ---------- 일본어 언어팩 (ja) ---------- */
+registerPack({
+  code: "ja",
+  status: "ready",
+  version: "ja-1",
+  name: "일본어",
+  nativeName: "日本語",
+  level: "고급",
+  stage: "1단계",
+  fontClass: "jp",
+
+  speech: {
+    asrLang: "ja-JP",     // 음성 인식 언어
+    ttsLang: "ja-JP",     // 읽어 주기 언어
+    ttsRate: 1.0,
+    judgeTopOnly: true    // 판정은 1순위 인식 결과로만 (LA-T0-2 v2)
+  },
+
+  // 글자 비교용 정리: 전각·반각 통일, 가타카나→히라가나, 문장부호·공백 제거
+  text: {
+    normalize(s){
+      s = String(s || "").normalize("NFKC");
+      s = s.replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+      return s.replace(/[\s、。，．,.!?！？「」『』（）()・…〜~]/g, "");
+    }
+  },
+
+  // 모드 목록 — type은 공통 모드 종류([G] MODE_TYPES), task는 LA-02 작업 번호
+  modes: [
+    { id: "cards",     type: "cards",        name: "설명 카드",       desc: "청탁음·장음·촉음·ざ행·つ", task: "1-2" },
+    { id: "pron",      type: "pron-check",   name: "발음 체크",       desc: "최소대립쌍 읽기와 판정",   task: "1-3" },
+    { id: "interp",    type: "interp-drill", name: "통역 드릴",       desc: "한국어 → 일본어로 말하기", task: "1-4" },
+    { id: "roleplay",  type: "roleplay",     name: "상황 롤플레이",   desc: "거래처·납기·공장 통화",    task: "1-5" },
+    { id: "review",    type: "rec-review",   name: "녹음 검토",       desc: "문장별 분석 리포트",       task: "1-6" },
+    { id: "handsfree", type: "handsfree",    name: "핸즈프리",        desc: "이어폰만으로 한 세션",     task: "1-7" },
+    { id: "keigo",     type: "transform",    name: "경어 변환",       desc: "존경어·겸양어·정중어",     task: "1-8" },
+    { id: "pitch",     type: "pitch",        name: "피치 악센트",     desc: "곡선과 사전 고저 비교",    task: "1-9" },
+    { id: "notes",     type: "notes",        name: "오답 노트",       desc: "1·3·7일 재확인",           task: "1-10" }
+  ],
+
+  // 설명 카드 — 번호는 LA-K-언어-종류순번. 아래 1장은 형식 확인용 샘플(1-2에서 검토·확정)
+  cards: [
+    {
+      id: "LA-K-JA-P02", kind: "P", title: "장음 (おばさん / おばあさん)", draft: true,
+      how: "장음은 앞 모음을 한 박자 더 끈다. おばあさん은 お・ば・あ・さ・ん 다섯 박이다.",
+      vsKo: "한국어는 소리 길이로 뜻이 갈리는 경우가 거의 없어서, 길게 끌어야 할 곳을 짧게 끝내기 쉽다.",
+      mistake: "おばあさん(할머니)을 짧게 말해 おばさん(아주머니)으로 들리게 함.",
+      examples: [
+        { text: "おばあさん", reading: "おばあさん", ko: "할머니" },
+        { text: "おばあさんが来ました。", reading: "おばあさんがきました。", ko: "할머니가 오셨습니다." },
+        { text: "少々お待ちください。", reading: "しょうしょうおまちください。", ko: "잠시만 기다려 주십시오." }
+      ],
+      verify: "음성 인식 1순위가 おばさん·叔母さん·伯母さん이면 미통과."
+    }
+  ],
+
+  // 점검 화면에서 쓰는 짧은 확인 문장 — accept는 정답으로 인정하는 표기
+  checkItems: [
+    { text: "おばあさん", reading: "おばあさん", accept: ["おばあさん", "お婆さん", "祖母さん"] },
+    { text: "雑誌",       reading: "ざっし",     accept: ["雑誌", "ざっし"] },
+    { text: "お世話になっております", reading: "おせわになっております", accept: ["お世話になっております"] }
+  ],
+
+  // 출처 표시 (LA-05). 실제로 앱에 넣은 자료만 적는다.
+  sources: []
+});
+
+/* ---------- 앞으로 추가할 언어 (자리만 잡아 둠) ---------- */
+registerPack({ code: "zh", status: "planned", name: "중국어", nativeName: "中文",   level: "기초", stage: "3단계" });
+registerPack({ code: "en", status: "planned", name: "영어",   nativeName: "English", level: "기초", stage: "4단계" });
+
+/* =====================================================================
+   [C] 언어팩 검사 — 빠진 칸이 있으면 화면에 알려 준다
+   ===================================================================== */
+function validatePack(p){
+  const errs = [];
+  const need = (cond, msg) => { if (!cond) errs.push(msg); };
+  need(p.code && p.name, "code·name 없음");
+  if (p.status !== "ready") return errs;
+  need(p.speech && p.speech.asrLang && p.speech.ttsLang, "speech.asrLang / ttsLang 없음");
+  need(p.text && typeof p.text.normalize === "function", "text.normalize 함수 없음");
+  need(Array.isArray(p.modes) && p.modes.length > 0, "modes 비어 있음");
+  (p.modes || []).forEach(m => {
+    need(m.id && m.name && m.task, "모드 칸 부족: " + JSON.stringify(m));
+    need(MODE_TYPES[m.type], "모르는 모드 종류: " + m.type);
+  });
+  (p.cards || []).forEach(c => {
+    const fields = CARD_FIELDS[c.kind];
+    need(!!fields, c.id + ": kind는 P 또는 G");
+    need(/^LA-K-[A-Z]{2}-[PG]\d{2}$/.test(c.id || ""), (c.id || "(번호 없음)") + ": 카드 번호 형식 오류");
+    (fields || []).forEach(f => need(c[f.key] && (f.key !== "examples" || c[f.key].length), c.id + ": '" + f.name + "' 칸 비어 있음"));
+    (c.examples || []).forEach(e => need(e.text && e.reading, c.id + ": 예문에 text·reading 필요"));
+  });
+  (p.checkItems || []).forEach(it => need(it.text && it.reading && it.accept && it.accept.length, "checkItems 칸 부족: " + it.text));
+  return errs;
+}
+
+/* =====================================================================
+   [D] 저장소 — 이 기기의 브라우저에만 저장 (localStorage). 막혀 있으면 메모리에만.
+   ===================================================================== */
+const Store = (function(){
+  const PREFIX = "la.";
+  const mem = {};
+  let persistent = true;
+  try { const k = PREFIX + "__t"; localStorage.setItem(k, "1"); localStorage.removeItem(k); } catch(e){ persistent = false; }
+  return {
+    persistent,
+    get(key, fallback){
+      try {
+        const raw = persistent ? localStorage.getItem(PREFIX + key) : mem[key];
+        return raw == null ? fallback : JSON.parse(raw);
+      } catch(e){ return fallback; }
+    },
+    set(key, value){
+      const raw = JSON.stringify(value);
+      try { if (persistent) localStorage.setItem(PREFIX + key, raw); else mem[key] = raw; } catch(e){ mem[key] = raw; }
+    },
+    clearAll(){
+      try { Object.keys(localStorage).filter(k => k.indexOf(PREFIX) === 0).forEach(k => localStorage.removeItem(k)); } catch(e){}
+      Object.keys(mem).forEach(k => delete mem[k]);
+    }
+  };
+})();
+
+const DEFAULT_SETTINGS = { lang: "ja", voice: {}, rate: {}, keepAwake: true, model: "none" };
+let settings = Object.assign({}, DEFAULT_SETTINGS, Store.get("settings", {}));
+function saveSettings(){ Store.set("settings", settings); }
+function currentPack(){
+  const p = LANG_PACKS[settings.lang];
+  return (p && p.status === "ready") ? p : LANG_PACKS.ja;
+}
+
+/* =====================================================================
+   [E] 음성 — 읽어 주기(TTS), 음성 인식(ASR), 화면 꺼짐 방지
+   ===================================================================== */
+const Speaker = {
+  supported: "speechSynthesis" in window,
+  voices: [],
+  loadVoices(){
+    if (!this.supported) return Promise.resolve([]);
+    const now = speechSynthesis.getVoices();
+    if (now.length) { this.voices = now; return Promise.resolve(now); }
+    return new Promise(res => {
+      const done = () => { this.voices = speechSynthesis.getVoices(); res(this.voices); };
+      speechSynthesis.onvoiceschanged = done;
+      setTimeout(done, 1500); // 아이폰 등 이벤트가 안 오는 경우 대비
+    });
+  },
+  voicesFor(lang){
+    const base = lang.split("-")[0].toLowerCase();
+    return this.voices.filter(v => (v.lang || "").replace("_", "-").toLowerCase().split("-")[0] === base);
+  },
+  speak(text, lang, opts){
+    opts = opts || {};
+    if (!this.supported) return Promise.resolve(false);
+    speechSynthesis.cancel();
+    return new Promise(res => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = lang;
+      u.rate = opts.rate || 1;
+      const v = this.voices.find(x => x.voiceURI === opts.voiceURI) || this.voicesFor(lang)[0];
+      if (v) u.voice = v;
+      u.onend = () => res(true);
+      u.onerror = () => res(false);
+      speechSynthesis.speak(u);
+    });
+  }
+};
+
+const Listener = {
+  Ctor: window.SpeechRecognition || window.webkitSpeechRecognition || null,
+  get supported(){ return !!this.Ctor; },
+  active: null,
+  // 한 번 듣기: 결과 { alts:[{text,conf}], error } — 판정은 alts[0]만 쓴다
+  listenOnce(lang, onInterim){
+    if (!this.Ctor) return Promise.resolve({ alts: [], error: "not-supported" });
+    this.stop();
+    return new Promise(res => {
+      const r = new this.Ctor();
+      r.lang = lang; r.continuous = false; r.interimResults = true; r.maxAlternatives = 3;
+      let final = null, error = null;
+      r.onresult = ev => {
+        const last = ev.results[ev.results.length - 1];
+        if (last.isFinal) {
+          final = Array.from(last).map(a => ({ text: a.transcript, conf: a.confidence }));
+        } else if (onInterim) onInterim(last[0].transcript);
+      };
+      r.onerror = ev => { error = ev.error; };
+      r.onend = () => { this.active = null; res({ alts: final || [], error: final ? null : (error || "no-speech") }); };
+      this.active = r;
+      try { r.start(); } catch(e){ this.active = null; res({ alts: [], error: String(e.message || e) }); }
+    });
+  },
+  stop(){ if (this.active) { try { this.active.stop(); } catch(e){} } }
+};
+
+// 화면 꺼짐 방지: 숨기면 자동 해제되므로 다시 보일 때 다시 켠다 (LA-T0-2)
+const Awake = {
+  supported: "wakeLock" in navigator,
+  lock: null,
+  async on(){
+    if (!this.supported || this.lock) return !!this.lock;
+    try {
+      this.lock = await navigator.wakeLock.request("screen");
+      this.lock.addEventListener("release", () => { this.lock = null; });
+      return true;
+    } catch(e){ return false; }
+  },
+  async off(){ if (this.lock) { try { await this.lock.release(); } catch(e){} this.lock = null; } }
+};
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && settings.keepAwake) Awake.on();
+});
+
+/* =====================================================================
+   [F] 모델 어댑터 — 앱의 모든 AI 요청은 ModelAdapter.request 하나로만 나간다.
+   - 한 요청에는 한 가지 일(task)만. 응답은 항상 JSON 객체.
+   - 형식이 깨지면 1번 재요청 후, 그래도 깨지면 원문을 그대로 돌려준다 (LA-01 §7).
+   - 실제 모델 연결은 1-4(Claude), 2-2(무료 모델)에서 providers에 추가한다.
+   ===================================================================== */
+const ModelAdapter = {
+  // 작업 종류별로 응답에 꼭 있어야 하는 칸
+  TASKS: {
+    "correct":   ["wrong", "fixed", "reason"],   // 교정: 틀린 부분, 고친 문장, 이유 한 줄
+    "next-turn": ["reply"],                      // 롤플레이 다음 대사
+    "review":    ["good", "fix", "next"]         // 녹음 리포트 검토
+  },
+  providers: {
+    none: {
+      name: "연결 안 함",
+      async call(){ throw new Error("모델이 연결되지 않았습니다 (설정 → 모델)"); }
+    },
+    mock: {
+      name: "모의 응답 (테스트용)",
+      async call(task, input){
+        const samples = {
+          "correct":   { wrong: "来ました", fixed: "いらっしゃいました", reason: "손님에게는 존경어를 씁니다." },
+          "next-turn": { reply: "承知いたしました。では、納期について確認させてください。" },
+          "review":    { good: "리듬이 자연스럽습니다.", fix: ["おばあさん의 あ를 한 박자 더 끄세요."], next: "おばあさんが来ました。" }
+        };
+        return JSON.stringify(samples[task] || {});
+      }
+    }
+  },
+  parse(raw, fields){
+    try {
+      const m = String(raw).match(/\{[\s\S]*\}/);
+      const obj = JSON.parse(m ? m[0] : raw);
+      return fields.every(f => f in obj) ? obj : null;
+    } catch(e){ return null; }
+  },
+  async request(task, input){
+    const fields = this.TASKS[task];
+    if (!fields) return { ok: false, error: "모르는 작업: " + task };
+    const prov = this.providers[settings.model] || this.providers.none;
+    let raw = "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try { raw = await prov.call(task, input); }
+      catch(e){ return { ok: false, error: e.message }; }
+      const data = this.parse(raw, fields);
+      if (data) return { ok: true, data, provider: settings.model, attempt };
+    }
+    return { ok: false, error: "응답 형식 오류", raw };
+  }
+};
+
+/* =====================================================================
+   [G] 모드 종류 — 언어와 상관없는 공통 화면. 아직 만들지 않은 종류는 '준비 중'.
+   ===================================================================== */
+const MODE_TYPES = {
+  "cards":        { ready: true,  render: renderCardsMode },
+  "pron-check":   { ready: false },
+  "interp-drill": { ready: false },
+  "roleplay":     { ready: false },
+  "rec-review":   { ready: false },
+  "handsfree":    { ready: false },
+  "transform":    { ready: false },
+  "pitch":        { ready: false },
+  "notes":        { ready: false }
+};
+
+/* =====================================================================
+   [H] 화면
+   ===================================================================== */
+const $view = document.getElementById("view");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+function setHeader(title, showBack){
+  document.getElementById("title").textContent = title;
+  document.getElementById("backBtn").style.display = showBack ? "block" : "none";
+  const p = currentPack();
+  document.getElementById("langBadge").textContent = p.nativeName + " · " + p.level;
+  document.title = title === APP.name ? APP.name : title + " · LA";
+}
+function setTab(name){
+  document.querySelectorAll("nav.tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === name));
+}
+function sayInPack(text){
+  const p = currentPack();
+  return Speaker.speak(text, p.speech.ttsLang, { voiceURI: settings.voice[p.code], rate: settings.rate[p.code] || p.speech.ttsRate });
+}
+
+/* ---------- 홈 ---------- */
+function renderHome(){
+  const p = currentPack();
+  setHeader(APP.name, false); setTab("home");
+  const flow = LEARNING_FLOW.map(s => "<li>" + esc(s.name) + "</li>").join("");
+  const modes = p.modes.map(m => {
+    const ready = MODE_TYPES[m.type] && MODE_TYPES[m.type].ready;
+    return '<a class="mode" href="#/mode/' + esc(m.id) + '"><b>' + esc(m.name) + '</b>' +
+      '<span class="muted">' + esc(m.desc || "") + '</span><br>' +
+      '<span class="tag' + (ready ? " ready" : "") + '">' + (ready ? "열기" : "준비 중 · " + esc(m.task)) + '</span></a>';
+  }).join("");
+  $view.innerHTML =
+    '<div class="card"><div class="muted">학습 언어</div><div class="big ' + esc(p.fontClass || "") + '">' + esc(p.nativeName) +
+    ' <span class="muted">' + esc(p.name + " " + p.level) + '</span></div>' +
+    '<div class="muted">학습 흐름</div><ol class="flow">' + flow + '</ol></div>' +
+    '<h2>모드</h2><div class="grid">' + modes + '</div>';
+}
+
+/* ---------- 모드 ---------- */
+function renderMode(id){
+  const p = currentPack();
+  const m = p.modes.find(x => x.id === id);
+  setTab("home");
+  if (!m) { setHeader("없는 모드", true); $view.innerHTML = '<div class="card">이 언어팩에 없는 모드입니다.</div>'; return; }
+  setHeader(m.name, true);
+  const type = MODE_TYPES[m.type];
+  if (type && type.ready) { type.render(p, m); return; }
+  $view.innerHTML = '<div class="card"><b>' + esc(m.name) + '</b> 화면은 아직 준비 중입니다.' +
+    '<p class="muted">LA-02 작업 ' + esc(m.task) + '에서 만듭니다. 모드 종류: ' + esc(m.type) + '</p></div>';
+}
+
+function renderCardsMode(p, m){
+  const cards = p.cards || [];
+  if (!cards.length) { $view.innerHTML = '<div class="card">카드가 없습니다.</div>'; return; }
+  $view.innerHTML = cards.map((c, ci) => {
+    const fields = CARD_FIELDS[c.kind] || [];
+    const rows = fields.map(f => {
+      let val;
+      if (f.key === "examples") {
+        val = c.examples.map((e, ei) =>
+          '<div class="ex"><div class="t"><span class="' + esc(p.fontClass || "") + '">' + esc(e.text) + '</span>' +
+          (e.ko ? '<br><span class="muted">' + esc(e.ko) + '</span>' : '') + '</div>' +
+          '<button class="play" data-c="' + ci + '" data-e="' + ei + '">▶ 듣기</button></div>').join("");
+      } else val = esc(c[f.key]);
+      return '<tr><th>' + esc(f.name) + '</th><td>' + val + '</td></tr>';
+    }).join("");
+    return '<div class="card"><div class="muted">' + esc(c.id) + (c.draft ? " · 초안(1-2에서 검토)" : "") + '</div>' +
+      '<h2 style="margin-top:4px">' + esc(c.title) + '</h2><table class="kv">' + rows + '</table></div>';
+  }).join("") + '<p class="muted">발음 → 판정 단계는 1-3에서 연결합니다.</p>';
+  $view.querySelectorAll("button.play").forEach(b => b.onclick = () => {
+    const e = cards[+b.dataset.c].examples[+b.dataset.e];
+    sayInPack(e.reading);
+  });
+}
+
+/* ---------- 점검 ---------- */
+function renderCheck(){
+  const p = currentPack();
+  setHeader("기능 점검", false); setTab("check");
+  const packErrs = Object.values(LANG_PACKS).map(pk => ({ pk, errs: validatePack(pk) }));
+  const ttsVoices = Speaker.voicesFor(p.speech.ttsLang);
+  const line = (state, title, detail) =>
+    '<div class="check"><span class="dot ' + state + '">' + ({ ok:"✓", ng:"✕", warn:"!", wait:"…" }[state]) + '</span>' +
+    '<div><b>' + title + '</b><div class="muted">' + detail + '</div></div></div>';
+
+  const packLines = packErrs.map(x => x.pk.status !== "ready"
+    ? line("wait", "언어팩 " + esc(x.pk.name), "자리만 있음 (" + esc(x.pk.stage) + ")")
+    : line(x.errs.length ? "ng" : "ok", "언어팩 " + esc(x.pk.name), x.errs.length ? esc(x.errs.join(" / ")) : "모든 칸 정상 · 모드 " + x.pk.modes.length + "개 · 카드 " + (x.pk.cards || []).length + "장")
+  ).join("");
+
+  const items = p.checkItems.map((it, i) => '<option value="' + i + '">' + esc(it.text) + '</option>').join("");
+
+  $view.innerHTML =
+    '<h2>환경</h2><div class="card">' + packLines +
+      line(Store.persistent ? "ok" : "warn", "기기 저장", Store.persistent ? "이 브라우저에 저장됨" : "저장이 막혀 있어 새로고침하면 설정이 사라짐") +
+      line(Speaker.supported ? (ttsVoices.length ? "ok" : "warn") : "ng", "읽어 주기(TTS)",
+        Speaker.supported ? (ttsVoices.length ? esc(p.speech.ttsLang) + " 음성 " + ttsVoices.length + "개" : esc(p.speech.ttsLang) + " 음성이 없음") : "지원 안 함") +
+      line(Listener.supported ? "ok" : "ng", "음성 인식", Listener.supported ? "지원 (" + esc(p.speech.asrLang) + ", 인터넷 필요)" : "이 브라우저는 지원 안 함 — PC Chrome 권장") +
+      line(Awake.supported ? (Awake.lock ? "ok" : "warn") : "warn", "화면 꺼짐 방지",
+        Awake.supported ? (Awake.lock ? "켜져 있음" : (settings.keepAwake ? "아래 버튼이나 화면을 한 번 누르면 켜짐" : "설정에서 꺼 둠")) : "이 브라우저는 지원 안 함") +
+    '</div>' +
+
+    '<h2>읽기 · 듣기 시험</h2><div class="card">' +
+      '<label class="field"><span>시험 문장</span><select id="ckItem" class="' + esc(p.fontClass || "") + '">' + items + '</select></label>' +
+      '<div class="row"><button class="btn sub" id="ckSay">▶ 읽어 주기</button><button class="btn" id="ckListen"' + (Listener.supported ? "" : " disabled") + '>● 말하기</button></div>' +
+      '<div class="result" id="ckOut"><span class="muted">말하기를 누르고 위 문장을 말해 보세요. 1순위 결과로만 판정합니다.</span></div>' +
+    '</div>' +
+
+    '<h2>모델 어댑터</h2><div class="card">' +
+      '<p class="muted">현재: ' + esc((ModelAdapter.providers[settings.model] || {}).name) + '. 설정에서 "모의 응답"을 고르면 응답 형식 검사를 시험할 수 있습니다.</p>' +
+      '<button class="btn sub" id="ckModel">교정 요청 보내 보기</button><pre class="json" id="ckModelOut" hidden></pre>' +
+    '</div>';
+
+  const out = document.getElementById("ckOut");
+  const pick = () => p.checkItems[+document.getElementById("ckItem").value];
+  document.getElementById("ckSay").onclick = () => { Awake.on(); sayInPack(pick().reading); };
+  document.getElementById("ckListen").onclick = async (ev) => {
+    const btn = ev.currentTarget, it = pick();
+    if (settings.keepAwake) Awake.on();
+    btn.disabled = true; btn.textContent = "듣는 중…";
+    out.innerHTML = '<span class="muted">듣는 중…</span>';
+    const r = await Listener.listenOnce(p.speech.asrLang, t => { out.innerHTML = '<span class="muted">' + esc(t) + '</span>'; });
+    btn.disabled = false; btn.textContent = "● 말하기";
+    if (!r.alts.length) { out.innerHTML = '<span style="color:var(--ng)">인식 결과 없음 (' + esc(r.error) + ')</span>'; return; }
+    const top = r.alts[0].text;
+    const n = p.text.normalize;
+    const pass = it.accept.some(a => n(a) === n(top));
+    out.innerHTML =
+      '<div class="big ' + esc(p.fontClass || "") + '" style="color:' + (pass ? "var(--ok)" : "var(--ng)") + '">' + (pass ? "일치 " : "불일치 ") + esc(top) + '</div>' +
+      (r.alts.length > 1 ? '<div class="muted">다른 후보(판정에 안 씀): ' + r.alts.slice(1).map(a => esc(a.text)).join(", ") + '</div>' : '');
+  };
+  document.getElementById("ckModel").onclick = async () => {
+    const o = document.getElementById("ckModelOut");
+    o.hidden = false; o.textContent = "요청 중…";
+    const r = await ModelAdapter.request("correct", { target: "部長がいらっしゃいました。", heard: "部長が来ました。" });
+    o.textContent = JSON.stringify(r, null, 2);
+  };
+}
+
+/* ---------- 설정 ---------- */
+function renderSettings(){
+  const p = currentPack();
+  setHeader("설정", false); setTab("settings");
+  const langOpts = Object.values(LANG_PACKS).map(pk =>
+    '<option value="' + esc(pk.code) + '"' + (pk.code === p.code ? " selected" : "") + (pk.status === "ready" ? "" : " disabled") + '>' +
+    esc(pk.name + " " + pk.level) + (pk.status === "ready" ? "" : " — " + esc(pk.stage) + "에서 추가") + '</option>').join("");
+  const voices = Speaker.voicesFor(p.speech.ttsLang);
+  const voiceOpts = '<option value="">자동 선택</option>' + voices.map(v =>
+    '<option value="' + esc(v.voiceURI) + '"' + (settings.voice[p.code] === v.voiceURI ? " selected" : "") + '>' + esc(v.name + " (" + v.lang + ")") + '</option>').join("");
+  const rate = settings.rate[p.code] || p.speech.ttsRate;
+  const modelOpts = Object.keys(ModelAdapter.providers).map(k =>
+    '<option value="' + k + '"' + (settings.model === k ? " selected" : "") + '>' + esc(ModelAdapter.providers[k].name) + '</option>').join("");
+
+  $view.innerHTML =
+    '<div class="card">' +
+      '<label class="field"><span>학습 언어</span><select id="stLang">' + langOpts + '</select></label>' +
+      '<label class="field"><span>읽어 주기 음성 (' + esc(p.speech.ttsLang) + ')</span><select id="stVoice">' + voiceOpts + '</select></label>' +
+      '<label class="field"><span>읽기 속도: <b id="stRateV">' + rate.toFixed(1) + '</b></span><input type="range" id="stRate" min="0.6" max="1.4" step="0.1" value="' + rate + '"></label>' +
+      '<button class="btn sub" id="stTest">▶ 음성 들어 보기</button>' +
+      '<label class="field"><span>학습 중 화면 꺼짐 방지</span><select id="stAwake"><option value="1"' + (settings.keepAwake ? " selected" : "") + '>켜기</option><option value="0"' + (settings.keepAwake ? "" : " selected") + '>끄기</option></select></label>' +
+      '<label class="field"><span>모델 (AI 연결)</span><select id="stModel">' + modelOpts + '</select></label>' +
+      '<p class="muted">Claude·무료 모델 연결과 API 키 입력은 1-4·2-2에서 추가합니다. API 키는 이 기기에만 저장합니다.</p>' +
+    '</div>' +
+    '<h2>데이터</h2><div class="card"><p class="muted">설정과 학습 기록은 이 기기의 이 브라우저에만 저장됩니다.</p>' +
+      '<button class="btn sub" id="stReset">이 기기의 LA 데이터 모두 지우기</button></div>';
+
+  document.getElementById("stLang").onchange = e => { settings.lang = e.target.value; saveSettings(); renderSettings(); };
+  document.getElementById("stVoice").onchange = e => { settings.voice[p.code] = e.target.value; saveSettings(); };
+  document.getElementById("stRate").oninput = e => {
+    settings.rate[p.code] = +e.target.value; saveSettings();
+    document.getElementById("stRateV").textContent = (+e.target.value).toFixed(1);
+  };
+  document.getElementById("stTest").onclick = () => sayInPack(p.checkItems[0].reading);
+  document.getElementById("stAwake").onchange = e => {
+    settings.keepAwake = e.target.value === "1"; saveSettings();
+    if (settings.keepAwake) Awake.on(); else Awake.off();
+  };
+  document.getElementById("stModel").onchange = e => { settings.model = e.target.value; saveSettings(); };
+  const reset = document.getElementById("stReset");
+  reset.onclick = () => {
+    if (reset.dataset.armed) { Store.clearAll(); settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)); renderSettings(); return; }
+    reset.dataset.armed = "1"; reset.textContent = "한 번 더 누르면 지웁니다";
+    setTimeout(() => { if (reset.isConnected) { delete reset.dataset.armed; reset.textContent = "이 기기의 LA 데이터 모두 지우기"; } }, 4000);
+  };
+}
+
+/* ---------- 정보 ---------- */
+function renderAbout(){
+  setHeader("정보", false); setTab("about");
+  const packs = Object.values(LANG_PACKS).map(pk =>
+    '<tr><th>' + esc(pk.name) + '</th><td>' + (pk.status === "ready" ? "사용 중 · " + esc(pk.version) : "준비 중 · " + esc(pk.stage)) + '</td></tr>').join("");
+  const src = [];
+  Object.values(LANG_PACKS).forEach(pk => (pk.sources || []).forEach(s => src.push(s)));
+  const srcHtml = src.length
+    ? src.map(s => '<div class="check"><div><b>' + esc(s.name) + '</b><div class="muted">' + esc(s.author || "") + " · " + esc(s.license || "") + '</div></div></div>').join("")
+    : '<p class="muted">아직 앱에 넣은 외부 자료가 없습니다. 자료를 넣으면 언어팩의 sources에 적고 여기에 표시됩니다 (LA-05).</p>';
+  $view.innerHTML =
+    '<div class="card"><table class="kv">' +
+      '<tr><th>앱</th><td>' + esc(APP.name) + '</td></tr>' +
+      '<tr><th>버전</th><td>작업 ' + esc(APP.task) + ' ' + esc(APP.version) + '</td></tr>' +
+      '<tr><th>파일</th><td>' + esc(APP.file) + '</td></tr>' + packs +
+    '</table></div>' +
+    '<h2>자료 출처</h2><div class="card">' + srcHtml + '</div>' +
+    '<h2>참고</h2><div class="card"><p class="muted">음성 인식은 브라우저 기능을 씁니다. Chrome은 음성을 구글 서버로 보내 처리하므로 인터넷이 필요합니다. ' +
+    '발음 맞고 틀림은 기기 안 규칙·데이터로 판정하고, AI 모델은 설명만 맡습니다.</p></div>';
+}
+
+/* ---------- 화면 이동 ---------- */
+function route(){
+  const parts = (location.hash || "#/home").replace(/^#\/?/, "").split("/");
+  Listener.stop();
+  if (Speaker.supported) speechSynthesis.cancel();
+  switch (parts[0]) {
+    case "mode":     renderMode(parts[1]); break;
+    case "check":    renderCheck(); break;
+    case "settings": renderSettings(); break;
+    case "about":    renderAbout(); break;
+    default:         renderHome();
+  }
+  window.scrollTo(0, 0);
+}
+document.getElementById("backBtn").onclick = () => { location.hash = "#/home"; };
+window.addEventListener("hashchange", route);
+// 화면 꺼짐 방지는 사용자가 화면을 한 번 눌러야 켜지는 브라우저가 있어 첫 터치 때 시도
+document.addEventListener("pointerdown", () => { if (settings.keepAwake) Awake.on(); }, { once: true });
+
+Speaker.loadVoices().then(() => {
+  const h = (location.hash || "").split("/")[1];
+  if (h === "settings" || h === "check") route(); // 음성 목록이 늦게 오면 다시 그림
+});
+route();
+</script>
+</body>
+</html>
