@@ -36,7 +36,7 @@ button{cursor:pointer}
 .jp{font-family:var(--f-jps)}
 .wrap{max-width:760px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
-.hrow{display:flex;align-items:baseline;gap:10px;padding-block:12px 4px}
+.hrow{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding-block:12px 4px}
 .brand{font-family:var(--f-jp);font-weight:700;font-size:1.15rem;letter-spacing:.02em}
 .ver{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
 nav{display:flex;gap:2px;overflow-x:auto}
@@ -179,7 +179,6 @@ details.prow .exs{padding:0 0 10px}
 @media (prefers-reduced-motion: no-preference){.opt,.chip,.item{transition:border-color .15s,background .15s}}
 @media (max-width:540px){.stem{font-size:1.15rem}.card{padding:15px}.bar{grid-template-columns:4.6rem 1fr 3rem}.two{grid-template-columns:1fr}.skel .f{grid-template-columns:1fr;gap:2px}.pbar{grid-template-columns:minmax(0,8.5rem) 1fr 1.6rem 3.2rem}}
 </style>
-
 <style>
 /* ==== LA 디자인 v3 — 쪽빛 학습 노트 (문제은행·통역 드릴 공통) ==== */
 :root{
@@ -278,9 +277,10 @@ table.heat td{animation:fade .5s ease both}
 @keyframes tick{0%{opacity:1}50%{opacity:.75}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
+
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v2.8 · 옛 판</span></div>
+    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v3.0 · 작문 중심</span><span class="spacer"></span><span class="pill" id="sync" role="status">연결 중…</span></div>
     <nav id="tabs" role="tablist">
       <button role="tab" data-tab="write">작문</button>
       <button role="tab" data-tab="drill">오답 드릴</button>
@@ -289,23 +289,9 @@ table.heat td{animation:fade .5s ease both}
       <button role="tab" data-tab="mc">객관식</button>
       <button role="tab" data-tab="log">기록</button>
     </nav>
+    <p class="small" id="syncnote" role="status" hidden style="padding:6px 0 10px;color:var(--warn)">구글 시트에 연결되지 않아 이 기기에만 저장하고 있습니다. claude.ai에 로그인한 상태에서 <a href="https://claude.ai/artifact/JajEgZVK3ThJzjtsQokLMi" target="_top" rel="noopener">claude.ai/artifact/JajEgZVK3ThJzjtsQokLMi</a> 로 열거나, 「기록」 탭 → 「저장 위치」에서 Apps Script 주소를 설정하세요. 연결되면 이 기기의 기록을 합쳐 올립니다.</p>
   </div>
 </header>
-<section class="wrap" id="moved" style="padding-top:16px">
-  <div class="card" style="border:2px solid var(--warn);background:var(--warn-soft);gap:10px">
-    <h2>문제은행이 새 주소로 옮겨졌습니다 (v2.9)</h2>
-    <p class="small">이 화면(v2.8)은 더 이상 고치지 않습니다. 새 문제은행은 기록을 <b>서버에 저장</b>해서 휴대폰·PC가 같은 기록을 씁니다. claude.ai에 로그인한 상태에서 여세요.</p>
-    <div class="row"><a class="btn primary" href="https://claude.ai/artifact/JajEgZVK3ThJzjtsQokLMi" target="_blank" rel="noopener" style="text-decoration:none">새 문제은행 열기</a></div>
-    <details><summary>이 기기의 기록 옮기기 (한 번만)</summary>
-      <ol class="small" style="margin:8px 0 0;padding-left:1.3em;display:grid;gap:4px">
-        <li>이 화면에서 「기록」 탭 → 「백업 만들기」 → 「복사」.</li>
-        <li>새 문제은행을 열고 「기록」 탭 → 「백업·복원 코드 불러오기」 칸에 붙여 넣고 → 「불러와서 합치기」.</li>
-        <li>여러 기기에서 쓰던 기록이 있으면 기기마다 1~2를 한 번씩 합니다. 기존 기록은 지워지지 않고 합쳐집니다.</li>
-        <li>새 문제은행에는 오답 드릴 문장이 이미 들어 있어 「개인 자료 팩」을 붙여 넣지 않아도 됩니다. 「결과지에서 가릴 말」은 백업과 함께 옮겨집니다.</li>
-      </ol>
-    </details>
-  </div>
-</section>
 <main class="wrap" id="view"></main>
 
 <script>
@@ -610,7 +596,6 @@ const TRANS = [
 ];
 
 // 오답 드릴: 내가 실제로 쓴 틀린·부자연스러운 문장을 고쳐 쓰기. [id, 패턴, 출처, 장면, 고칠 문장, 모범(漢字{よみ}), 이유, 종류("고쳐쓰기"|"뜻")]
-// 오답 드릴 원문(내가 실제로 쓴 문장)은 공개 파일에 두지 않는다. 개인 자료 팩(LAPK1)으로 이 기기에만 넣는다 (v2.7)
 let DRILL=[];
 
 
@@ -631,8 +616,9 @@ const PDEF={
  "P-10":{n:"한 문장에 같은 접속 반복",c:"G2"}
 };
 let PEX={};
-const SEED=""; // 첫 오류 노트 기록도 개인 자료 팩에 들어 있다
+let SEED="";
 const MARK=["①","②","③","④"];
+const BUILD="web"; // GitHub판은 "web" (오답 드릴 원문 없이 시트에서 받음)
 const DAY=86400000, GAP=[1,3,7];
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -642,23 +628,20 @@ const stamp=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.g
 const jpLen=s=>String(s||"").replace(/\s/g,"").length;
 const fmt=ms=>{const m=Math.floor(ms/60000),s=Math.floor(ms/1000)%60;return `${m}분 ${pad(s)}초`};
 
-/* 저장: 이 기기 브라우저에만 */
-const KEY="la_qbank_v1";
+/* 저장 (D-54): 구글 시트 「LA 기록」이 기준.
+   연결 순서: ① 이 기기에 Apps Script 주소가 설정돼 있으면 그것 ② claude.ai에서 열었으면 Google Sheets 커넥터
+   ③ 둘 다 안 되면 아티팩트 서버(qb) ④ 이 기기 브라우저. 브라우저는 빠른 캐시이자 연결이 끊겼을 때의 보관소 */
+const KEY="la_qbank_v1", SYNCED_KEY="la_qbank_synced", DIRTY_KEY="la_qbank_dirty", STORE_KEY="la_qbank_store", GAS_KEY="la_sheet_gas";
+const SHEET_ID="1ckFdIJD-AOEnYoYvgvfnMs9aJ5mXvFVDSGoHWqZRZjA", SHEET_URL="https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/edit";
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
 let DB={items:{},sessions:[],drafts:{},notes:null};
-try{const s=localStorage.getItem(KEY); if(s) DB=Object.assign(DB,JSON.parse(s));}catch(e){}
-if(!DB.notes){DB.notes={defs:{},entries:[]};}
-/* 개인 자료 팩: 오답 드릴 원문·오류 예문·첫 기록. 이 기기 브라우저에만 저장 */
-function applyPack(){DRILL=(DB.pack&&DB.pack.drill)||[]; PEX=(DB.pack&&DB.pack.pex)||{};}
-function loadPack(code){
-  const t=String(code||"").trim(); if(!t.startsWith("LAPK1:")) throw new Error("형식");
-  const o=JSON.parse(decodeURIComponent(escape(atob(t.slice(6)))));
-  if(!Array.isArray(o.drill)) throw new Error("형식");
-  DB.pack={v:o.v||1,made:o.made||"",drill:o.drill,pex:o.pex||{},seed:o.seed||""};
-  if(DB.pack.seed) importCode(DB.pack.seed);
-  applyPack(); save(); return DB.pack.drill.length;
-}
-applyPack();
-/* 결과지 가림: 실명·회사명 등 내가 정한 말과 연락처 형식을 결과지에서 가린다 (v2.7) */
+try{const s=lsGet(KEY); if(s) DB=Object.assign(DB,JSON.parse(s));}catch(e){}
+if(!DB.notes){DB.notes={defs:{},entries:[]}; importCode(SEED);}
+/* 오답 드릴 원문(DRILL·PEX·SEED)은 시트의 src 줄에도 둔다. 원문이 빠진 GitHub판은 시트에서 받아 쓴다 */
+let SRC=DRILL.length?{drill:DRILL,pex:PEX,seed:SEED}:null;
+function applySrc(o){ if(!o||!Array.isArray(o.drill)) return; if(!DRILL.length){DRILL=o.drill; PEX=o.pex||{}; SEED=o.seed||""} if(!SRC) SRC=o }
+/* 결과지 가림: 실명·회사명 등 내가 정한 말과 연락처 형식을 결과지에서 가린다 */
 function maskText(t){
   let x=String(t||"");
   (DB.mask||[]).map(w=>String(w).trim()).filter(w=>w.length>=2).sort((a,b)=>b.length-a.length).forEach(w=>{x=x.split(w).join("〔가림〕")});
@@ -667,8 +650,161 @@ function maskText(t){
     .replace(/\b0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}\b/g,"〔전화〕");
 }
 /* v1에서 제출한 작문을 v2의 버전 기록으로 옮김 */
-Object.entries(DB.drafts).forEach(([id,d])=>{ if(/^W-/.test(id)&&d&&d.sent&&!d.versions){ d.versions=[{n:1,mode:"초고",text:d.text||"",len:jpLen(d.text),ms:d.ms||0,at:"v1에서 제출",skel:{},checks:{}}]; d.locked=true; d.mode="초고"; delete d.sent; } });
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+function migrate(){Object.entries(DB.drafts).forEach(([id,d])=>{ if(/^W-/.test(id)&&d&&d.sent&&!d.versions){ d.versions=[{n:1,mode:"초고",text:d.text||"",len:jpLen(d.text),ms:d.ms||0,at:"v1에서 제출",skel:{},checks:{}}]; d.locked=true; d.mode="초고"; delete d.sent; } })}
+migrate();
+function save(){lsSet(KEY,JSON.stringify(DB)); lsSet(DIRTY_KEY,"1"); cloudDirty()}
+
+/* DB를 키별 문서로 나눠 바뀐 문서만 쓴다. 작문·번역 초안은 과제마다 한 문서. 시트에서는 문서 하나 = 한 줄(길면 key~1, key~2 줄로 나눔) */
+const CLOUD={store:null,last:{},timer:null,busy:false,again:false,pending:null,err:""};
+const CH=45000, BIG=["items","sessions","notes","drill","reads"];
+const docId=id=>"d_"+String(id).replace(/[^A-Za-z0-9_\-.:@+]/g,"_");
+const chunks=s=>{const p=[];for(let i=0;i<s.length||i===0;i+=CH)p.push(s.slice(i,i+CH));return p};
+function cloudDocs(){
+  const out={}, misc={};
+  Object.keys(DB).forEach(k=>{ if(k==="drafts") return; if(BIG.includes(k)) out[k]=JSON.stringify(DB[k]); else misc[k]=DB[k] });
+  out.misc=JSON.stringify(misc);
+  Object.entries(DB.drafts||{}).forEach(([id,d])=>{out[docId(id)]=JSON.stringify({id,d})});
+  if(SRC) out.src=JSON.stringify(SRC);
+  return out;
+}
+/* 아티팩트 서버 저장 (v2.7~v2.9 방식). 시트에 연결되지 않을 때만 쓴다 */
+function dbStore(db){
+  const col=db.collection("qb");
+  return {kind:"db",
+    async load(){ const snap=await col.get(), raw={}, out={}; snap.docs.forEach(d=>{raw[d.id]=d.data()});
+      Object.entries(raw).forEach(([id,b])=>{ if(id.includes("~")) return; let s=b.v||""; for(let i=1;i<(b.n||1);i++){const p=raw[id+"~"+i]; s+=p?p.v:""} out[id]={s,n:b.n||1} });
+      return out },
+    async write(id,s,prevN){ const P=chunks(s); await col.doc(id).set({v:P[0],n:P.length,at:Date.now()}); for(let i=1;i<P.length;i++) await col.doc(id+"~"+i).set({v:P[i]}); for(let i=P.length;i<prevN;i++) await col.doc(id+"~"+i).delete(); return P.length },
+    async remove(id,prevN){ await col.doc(id).delete(); for(let i=1;i<prevN;i++) await col.doc(id+"~"+i).delete() },
+    async flush(){}
+  };
+}
+/* 구글 시트 저장. records 탭: key | kind | v | json | updatedAt | device. 시트가 입력값을 수식·숫자로 바꾸지 않도록 json 칸 앞에 ~ 를 붙인다 */
+const KIND=id=>({items:"item",sessions:"session",notes:"notes",drill:"drillrec",reads:"reads",misc:"conf",src:"drillsrc"})[id]||(id.startsWith("d_")?"draft":"etc");
+function sheetStore(t,dev){
+  let rowOf={}, end=2, buf=new Map();
+  const un=c=>{c=String(c??""); return c.startsWith("~")?c.slice(1):c};
+  const index=V=>{V.forEach((r,i)=>{ if(i&&r&&r[0]) rowOf[String(r[0])]=i+1 }); end=Math.max(end,V.length+1)};
+  const blank=k=>{const row=rowOf[k]; if(row){buf.set(row,["","","","","",""]); delete rowOf[k]}};
+  return {kind:"sheet",dev,
+    async load(){ const V=await t.get("records!A1:F"); rowOf={}; end=2; index(V); const raw={};
+      V.forEach((r,i)=>{ if(i&&r&&r[0]) raw[String(r[0])]=r });
+      const out={}; Object.keys(raw).forEach(k=>{ if(k.includes("~")) return; let s=un(raw[k][3]), n=1; while(raw[k+"~"+n]){ s+=un(raw[k+"~"+n][3]); n++ } out[k]={s,n} });
+      return out },
+    async write(id,s,prevN){
+      const P=chunks(s), keys=P.map((_,i)=>i?id+"~"+i:id);
+      if(keys.some(k=>!rowOf[k])) index(await t.get("records!A1:A"));
+      const at=stamp();
+      P.forEach((p,i)=>{ const k=keys[i]; let row=rowOf[k]; if(!row){row=end++; rowOf[k]=row} buf.set(row,[k,KIND(id),"~1","~"+p,at,dev]) });
+      for(let i=P.length;i<prevN;i++) blank(id+"~"+i);
+      return P.length },
+    async remove(id,prevN){ for(let i=0;i<Math.max(prevN,1);i++) blank(i?id+"~"+i:id) },
+    async flush(){ /* 이어진 줄끼리 묶어서 한 번에 쓴다 (한 번에 60만 자 이하) */
+      const rows=[...buf.keys()].sort((a,b)=>a-b); buf.size;
+      let i=0; while(i<rows.length){ let j=i, size=0; const vals=[];
+        while(j<rows.length&&(j===i||rows[j]===rows[j-1]+1)&&size<600000){ const v=buf.get(rows[j]); vals.push(v); size+=v[3].length; j++ }
+        await t.update(`records!A${rows[i]}:F${rows[j-1]}`,vals); vals.forEach((_,k)=>buf.delete(rows[i+k])); i=j }
+    }
+  };
+}
+/* 시트 연결 통로: claude.ai 안에서는 Google Sheets 커넥터, 밖(GitHub판 등)에서는 Apps Script 웹 앱 */
+function mcpT(mcp){
+  const call=async(tool,input)=>{const r=await mcp.callTool("Google Sheets",tool,input,{cache:false}); return r&&r.payload};
+  return {async get(range){const p=await call("get_values",{spreadsheetId:SHEET_ID,range}); return (p&&p.values)||[]},
+          async update(range,values){await call("update_values",{spreadsheetId:SHEET_ID,range,values})}};
+}
+function gasCfg(){try{const o=JSON.parse(lsGet(GAS_KEY)||"null"); return o&&o.url&&o.token?o:null}catch(e){return null}}
+function gasT(cfg){
+  const post=async body=>{
+    let r; try{ r=await fetch(cfg.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({token:cfg.token},body))}) }catch(e){ throw {code:"gas_net"} }
+    let j; try{ j=await r.json() }catch(e){ throw {code:"gas_net"} }
+    if(!j||!j.ok) throw {code:"gas_"+((j&&j.error)||"err")}; return j };
+  return {async get(range){return (await post({op:"get",range})).values||[]},
+          async update(range,values){await post({op:"update",range,values})}};
+}
+function errText(e){
+  const c=(e&&e.code)||"";
+  return ({server_not_connected:"Google Sheets 커넥터가 연결돼 있지 않습니다 (claude.ai 설정 → 커넥터)",needs_reauth:"Google Sheets를 다시 연결해야 합니다 (claude.ai 설정 → 커넥터)",
+    not_in_manifest:"시트 사용을 허용하지 않았습니다",approval_required:"시트 사용 허용이 필요합니다",consent_required:"시트 사용 허용이 필요합니다",
+    selection_required:"Google Sheets 커넥터를 하나 골라야 합니다",tool_error:"시트가 요청을 거절했습니다",server_unavailable:"시트에 잠시 연결할 수 없습니다",
+    gas_net:"Apps Script 주소에 연결하지 못했습니다",gas_token:"Apps Script 토큰이 맞지 않습니다",gas_range:"Apps Script가 요청을 거절했습니다"})[c]||("연결 실패"+(c?` (${c})`:""));
+}
+const STORE_LABEL={sheet:"시트",db:"아티팩트 서버"};
+function setCloud(st){
+  const el=$("#sync"); if(!el) return; const w=CLOUD.store?STORE_LABEL[CLOUD.store.kind]:"서버";
+  const T={wait:["연결 중…",""],ok:[`${w}에 저장됨`,"ok"],saving:["저장 중…",""],local:["이 기기에만 저장 (연결 안 됨)","warn"],err:[`${w} 저장 실패 · 이 기기에는 저장됨`,"bad"]}[st];
+  el.textContent=T[0]; el.className="pill "+T[1]; el.title=CLOUD.err||"";
+  const n=$("#syncnote"); if(n) n.hidden=st!=="local";
+}
+function cloudDirty(){ if(!CLOUD.store) return; clearTimeout(CLOUD.timer); CLOUD.timer=setTimeout(()=>{CLOUD.timer=null; cloudSync()},CLOUD.store.kind==="sheet"?2500:1200) }
+async function cloudSync(){
+  if(!CLOUD.store||CLOUD.pending) return;
+  if(CLOUD.busy){CLOUD.again=true; return}
+  CLOUD.busy=true; setCloud("saving");
+  const st=CLOUD.store;
+  try{
+    const cur=cloudDocs(), done={};
+    for(const [id,s] of Object.entries(cur)){ const l=CLOUD.last[id]; if(l&&l.s===s) continue; done[id]={s,n:await st.write(id,s,l?l.n:0)} }
+    const gone=Object.keys(CLOUD.last).filter(id=>!(id in cur));
+    for(const id of gone) await st.remove(id,CLOUD.last[id].n);
+    await st.flush();
+    Object.assign(CLOUD.last,done); gone.forEach(id=>delete CLOUD.last[id]);
+    if(!CLOUD.again&&!CLOUD.timer) lsSet(DIRTY_KEY,null);
+    CLOUD.err=""; setCloud("ok");
+  }catch(e){ CLOUD.err=errText(e); setCloud("err") }
+  CLOUD.busy=false; if(CLOUD.again){CLOUD.again=false; cloudSync()}
+}
+function parseDocs(data){
+  const srv={}; Object.entries(data).forEach(([id,o])=>{try{srv[id]=JSON.parse(o.s)}catch(e){}});
+  const sdb={items:{},sessions:[],drafts:{},notes:null};
+  if(srv.misc) Object.assign(sdb,srv.misc);
+  BIG.forEach(k=>{ if(srv[k]!==undefined) sdb[k]=srv[k] });
+  Object.entries(srv).forEach(([id,v])=>{ if(id.startsWith("d_")&&v&&v.id) sdb.drafts[v.id]=v.d });
+  return {sdb,src:srv.src,any:Object.keys(srv).some(k=>k!=="src")};
+}
+async function connectStore(){
+  const c=window.claude, use=n=>c&&c.use?c.use(n).catch(()=>null):Promise.resolve(null);
+  const g=gasCfg(); CLOUD.err="";
+  if(g){ try{ const s=sheetStore(gasT(g),"web"); return {s,data:await s.load()} }catch(e){ CLOUD.err=errText(e) } }
+  const [mcp,db]=await Promise.all([use("mcp"),use("db")]);
+  if(mcp){ try{ const s=sheetStore(mcpT(mcp),BUILD); return {s,data:await s.load(),db} }catch(e){ CLOUD.err=errText(e) } }
+  if(db){ try{ const s=dbStore(db); return {s,data:await s.load()} }catch(e){ CLOUD.err=CLOUD.err||"아티팩트 서버에 연결하지 못했습니다" } }
+  return null;
+}
+async function cloudLoad(){
+  setCloud("wait");
+  const r=await connectStore();
+  if(!r){ CLOUD.store=null; setCloud("local"); if(tab==="log"&&!S) render(); return }
+  const {sdb,src,any}=parseDocs(r.data); applySrc(src);
+  let extra=null;
+  /* 시트에 처음 연결할 때 한 번만: 아티팩트 서버(v2.7~v2.9)에 있던 기록을 시트로 옮긴다 */
+  if(r.s.kind==="sheet"&&r.db&&!(any&&sdb.migratedDb)){ try{ const d=parseDocs(await dbStore(r.db).load()); if(d.any) extra=d.sdb; applySrc(d.src) }catch(e){} }
+  CLOUD.store=r.s; CLOUD.last=Object.fromEntries(Object.entries(r.data).map(([k,o])=>[k,{s:o.s,n:o.n}]));
+  CLOUD.pending={sdb,any,extra,kind:r.s.kind};
+  applyCloud();
+}
+/* 서버 기록을 화면에 반영. 과제를 하는 중이면 목록으로 돌아올 때 반영한다 */
+function applyCloud(){
+  if(!CLOUD.pending||S) return;
+  const {sdb,any,extra,kind}=CLOUD.pending; CLOUD.pending=null;
+  const before=JSON.stringify(DB), local=DB, first=!lsGet(SYNCED_KEY)||lsGet(STORE_KEY)!==kind, dirty=!!lsGet(DIRTY_KEY);
+  if(any){
+    if(first){ DB=sdb; if(!DB.notes){DB.notes={defs:{},entries:[]}; importCode(SEED)} mergeBackup(local) }   // 이 기기를 이 저장소에 처음 연결: 저장소 기록에 이 기기 기록을 합침
+    else if(dirty){ mergeBackup(sdb) }                                                                        // 못 올린 수정이 있음: 이 기기 기록에 저장소 기록을 합침
+    else DB=sdb;
+    if(!DB.notes){DB.notes={defs:{},entries:[]}; importCode(SEED)}
+  }
+  if(extra){ mergeBackup(extra) }
+  if(kind==="sheet") DB.migratedDb=true;
+  migrate();
+  lsSet(SYNCED_KEY,"1"); lsSet(STORE_KEY,kind); lsSet(KEY,JSON.stringify(DB));
+  cloudSync();
+  if(JSON.stringify(DB)!==before||tab==="log"||tab==="drill") render();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){ if(CLOUD.timer){clearTimeout(CLOUD.timer); CLOUD.timer=null; cloudSync()} }
+  else if(CLOUD.store&&!CLOUD.busy&&!CLOUD.timer&&!CLOUD.pending&&!S&&!lsGet(DIRTY_KEY)) cloudLoad();
+});
 function rec(id){return DB.items[id]||(DB.items[id]={n:0,c:0,w:0,streak:0,last:0,lastOk:null})}
 function isDue(id){const r=DB.items[id]; if(!r||!r.w||r.streak>=3) return false; return Date.now()>=r.last+GAP[r.streak]*DAY}
 
@@ -683,6 +819,7 @@ function go(t){tab=t; document.querySelectorAll("#tabs button").forEach(b=>b.set
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{ if(S&&S.leave) S.leave(); S=null; go(b.dataset.tab); window.scrollTo(0,0)});
 
 function render(){
+  if(CLOUD.pending&&!S) return applyCloud();
   const v=$("#view");
   if(S&&S.phase==="quiz") return renderQuiz(v);
   if(S&&S.phase==="result") return renderResult(v);
@@ -727,7 +864,6 @@ function drillSetup(v){
   if(dset.mode==="miss") pool=pool.filter(i=>DB.drill&&DB.drill[i.id]&&DB.drill[i.id].lastG&&DB.drill[i.id].lastG!=="○");
   if(dset.mode==="new") pool=pool.filter(i=>!(DB.drill&&DB.drill[i.id]&&DB.drill[i.id].n));
   const done=all.filter(i=>DB.drill&&DB.drill[i.id]&&DB.drill[i.id].n).length, due=all.filter(i=>dDue(i.id)).length;
-  if(!(DB.pack&&DB.pack.drill&&DB.pack.drill.length)&&!all.length){v.innerHTML=`<section class="card"><h2>오답 드릴</h2><p class="small">오답 드릴은 내가 실제로 쓴 문장으로 만들어서, 공개된 앱에는 들어 있지 않습니다.</p><p class="small muted">기록 탭 → 「개인 자료 팩」에 구글 드라이브의 LAPK1 코드를 붙여 넣으면 이 기기에서 쓸 수 있습니다.</p><div class="row"><button class="btn primary" id="gopk">기록 탭으로</button></div></section>`; $("#gopk").onclick=()=>go("log"); return}
   v.innerHTML=`
   <section class="card"><h2>오답 드릴 ${all.length}문장</h2>
     <p class="small muted">내가 작문·번역에서 실제로 쓴 틀리거나 어색한 문장을 고쳐 쓰는 연습입니다. 고쳐 쓴 뒤 「답 보기」로 비교하고 ○△×로 채점하세요. 모범 답안과 달라도 맞을 수 있으니 △는 결과지로 확인받으세요.</p>
@@ -1022,7 +1158,7 @@ function renderRead(v){
     <div class="row"><h2>다독</h2><span class="spacer"></span><button class="btn" id="back">목록</button></div>
     <p class="small muted">한 편 15분: ① 원래 사이트에서 읽기 → ② 주장·근거·결론을 한 줄씩 요약 → ③ 내가 쓸 때는 안 나올 표현 3~5개(읽기 포함) → 결과지를 Claude에게. 분야 배분은 업무·행정 40 · 시사·경제 20 · 생활·여행 20 · 취미·문화 20.</p>
     <p class="note"><b>복사할 필요 없음</b>: 본문을 옮기지 않아도 됩니다. 결과지에 들어가는 <b>주소로 Claude가 글을 직접 읽고</b> 요약을 확인하고 표현을 해설합니다. 표현은 단어 몇 개만 적거나(로마자·한국어 메모도 됨), 표시한 화면을 사진으로 찍어 결과지와 함께 올려도 됩니다.</p>
-    <p class="note"><b>저작권</b>: 링크 글은 원래 사이트에서 읽기만 하고 본문을 옮기지 않습니다. 「재사용 허락 계열」(정부의 政府標準利用規約·公共データ利用規約을 따르는 사이트)은 출처를 밝히면 본문을 붙여 넣어 앱 안에서 읽을 수 있습니다. 붙여 넣기 전 그 페이지의 「利用規約」을 한 번 확인하세요. 붙여 넣은 본문은 이 기기에만 저장되고 앱 파일에는 들어가지 않습니다.</p>
+    <p class="note"><b>저작권</b>: 링크 글은 원래 사이트에서 읽기만 하고 본문을 옮기지 않습니다. 「재사용 허락 계열」(정부의 政府標準利用規約·公共データ利用規約을 따르는 사이트)은 출처를 밝히면 본문을 붙여 넣어 앱 안에서 읽을 수 있습니다. 붙여 넣기 전 그 페이지의 「利用規約」을 한 번 확인하세요. 붙여 넣은 본문은 내 기록에만 저장되고 앱 파일에는 들어가지 않습니다.</p>
   </section>
   ${R?readForm(R):`
   <section class="card"><h3>읽을 글 (${READS.length})</h3><div class="list">${READS.map((x,i)=>`<div class="item" style="cursor:default"><span class="tag">${esc(x.f)}</span><span class="main"><span class="ptitle"><a href="${esc(x.u)}" target="_blank" rel="noopener">${esc(x.t)}</a></span><span class="sub">${esc(x.s)} · ${esc(x.note)}</span></span>${lic(x.lic)}<button class="btn" data-ri="${i}">기록하기</button></div>`).join("")}</div>
@@ -1050,7 +1186,7 @@ function readForm(R){
       <div class="f"><span>라이선스</span><select id="rl"><option value="link" ${R.lic!=="open"?"selected":""}>링크로 읽기만</option><option value="open" ${R.lic==="open"?"selected":""}>재사용 허락 (출처 표시)</option></select></div>
     </div>
     ${R.u?`<p class="small"><a href="${esc(R.u)}" target="_blank" rel="noopener">원래 사이트에서 읽기 ↗</a> <button class="btn" data-pop="${esc(R.u)}">옆 창으로 열기 (PC)</button></p><p class="note">옆 창이 열리지 않으면 새 탭으로 열립니다. 윈도우에서는 ⊞+← / ⊞+→ 로 두 창을 반반 배치할 수 있습니다.</p><p class="note"><b>본문만 보기</b>: 사이트 메뉴가 방해되면 브라우저의 <b>읽기 모드</b>를 쓰세요. 크롬: 본문에서 오른쪽 클릭 → 「읽기 모드에서 열기」(또는 ⋮ 메뉴 → 도구 더보기 → 읽기 모드) · 엣지: F9 (몰입형 리더) · 아이폰 사파리: 주소창 옆 「가가」 → 리더 보기. 메뉴 이름은 버전에 따라 다를 수 있습니다.</p>`:""}
-    ${R.lic==="open"?`<label class="lb" for="rbody">본문 붙여 넣기 (선택, 재사용 허락 글만, 이 기기에만 저장)</label><textarea class="write" id="rbody" lang="ja" style="min-height:8rem">${esc(R.body)}</textarea>${R.body?`<div class="passage full" lang="ja">${esc(R.body)}</div>`:""}<label class="small"><input type="checkbox" id="rsb" ${R.sendBody?"checked":""}> 결과지에 본문도 넣기 (요약이 맞는지 확인받을 때)</label>`:""}
+    ${R.lic==="open"?`<label class="lb" for="rbody">본문 붙여 넣기 (선택, 재사용 허락 글만, 내 기록에만 저장)</label><textarea class="write" id="rbody" lang="ja" style="min-height:8rem">${esc(R.body)}</textarea>${R.body?`<div class="passage full" lang="ja">${esc(R.body)}</div>`:""}<label class="small"><input type="checkbox" id="rsb" ${R.sendBody?"checked":""}> 결과지에 본문도 넣기 (요약이 맞는지 확인받을 때)</label>`:""}
     <label class="lb">3문장 요약</label>
     ${["주장(무엇을 말하나)","근거(왜·어떻게)","결론(그래서 무엇을)"].map((h,i)=>`<input type="text" data-sum="${i}" placeholder="${h}" value="${esc(R.sum[i])}">`).join("")}
     <label class="lb" for="rx">내가 쓸 때는 안 나올 표현 3~5개 (일본어 입력이 어려우면 로마자·한국어 메모)</label>
@@ -1087,7 +1223,7 @@ function tdraft(id){const d=DB.drafts[id]||(DB.drafts[id]={}); d.ko=d.ko||""; d.
 function renderTransList(v){
   v.innerHTML=`
   <section class="card"><div class="row"><h2>다독 · 사람이 쓴 실제 글</h2><span class="spacer"></span><button class="btn primary" id="rd">다독 열기</button></div>
-  <p class="small muted">관공서 안내문, 업무 가이드, 기사 등을 원래 사이트에서 읽고 3문장 요약과 표현 수집을 합니다. 재사용이 허락된 글은 본문을 붙여 넣어 앱 안에서 읽을 수도 있습니다(이 기기에만 저장). 기록 ${(DB.reads||[]).length}편</p></section>
+  <p class="small muted">관공서 안내문, 업무 가이드, 기사 등을 원래 사이트에서 읽고 3문장 요약과 표현 수집을 합니다. 재사용이 허락된 글은 본문을 붙여 넣어 앱 안에서 읽을 수도 있습니다(내 기록에만 저장). 기록 ${(DB.reads||[]).length}편</p></section>
   <section class="card"><h2>번역 독해 ${TRANS.length}과제</h2>
   <p class="small muted">일본어 지문을 한국어로 옮기고 필자의 의도를 한 줄로 씁니다. 교정을 받은 뒤에는 원문을 가린 채 내 번역을 다시 일본어로 옮겨(역번역) 원문과 비교합니다. 원문에 있는데 내 일본어로 안 나오는 표현이 다음에 익힐 표현입니다.</p></section>
   <section class="list">${TRANS.map(t=>{const s=tsrc(t), d=DB.drafts[t.id]; const st=d&&d.done&&d.done.back?`<span class="pill ok">역번역까지</span>`:d&&d.done&&d.done.ko?`<span class="pill acc">번역 제출</span>`:d&&d.ko?`<span class="pill warn">쓰는 중</span>`:"";return `<button class="item" data-t="${t.id}"><span class="tag">${t.id}</span><span class="main"><span class="ptitle">${esc(s.title)}</span><span class="sub">${esc(s.kind)} · ${jpLen(s.text)}자 · 초점: ${esc(t.focus)}</span></span>${st}</button>`}).join("")}</section>`;
@@ -1181,7 +1317,7 @@ function renderSetup(v){
   <section class="card"><h3>독해 객관식 (참고용)</h3>
     <div class="list">${READ.map(p=>`<button class="item" data-p="${p.id}"><span class="tag">${p.id}</span><span class="main"><span class="ptitle">${esc(p.title)}</span><span class="sub">${esc(p.kind)} · ${p.qs.length}문항</span></span></button>`).join("")}</div>
   </section>
-  <p class="note">모든 문항과 지문은 이 문제은행을 위해 직접 작성했습니다. 기록은 이 기기의 브라우저에만 저장됩니다.</p>`;
+  <p class="note">모든 문항과 지문은 이 문제은행을 위해 직접 작성했습니다. 기록은 구글 시트 「LA 기록」에 저장되어 어느 기기에서 열어도 같습니다.</p>`;
   v.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{const c=b.dataset.c; setup.codes.has(c)?setup.codes.delete(c):setup.codes.add(c); render()});
   $("#all").onclick=()=>{GROUPS.forEach(([,cs])=>cs.forEach(c=>setup.codes.add(c)));render()};
   $("#none").onclick=()=>{setup.codes.clear();render()};
@@ -1287,8 +1423,20 @@ function renderLog(v){
   <section class="card"><h3>지금 틀린 상태인 객관식 문항 (${wrongNow.length})</h3>
     ${wrongNow.length?`<div class="list">${wrongNow.slice(0,40).map(q=>`<div class="item"><span class="tag">${q.id}</span><span class="main"><span class="jp small">${esc(q.stem)}</span><span class="sub">틀린 횟수 ${DB.items[q.id].w} · 정답 <span class="jp">${esc(q.opts[0])}</span></span></span></div>`).join("")}</div>`:`<p class="small muted">없습니다.</p>`}
   </section>
+  <section class="card" id="where"><h3>저장 위치</h3>
+    ${(()=>{const k=CLOUD.store&&CLOUD.store.kind, g=gasCfg();
+      return `<p class="small">${k==="sheet"?`<span class="pill ok">구글 시트</span> 「LA 기록」에 저장 중 (${CLOUD.store.dev==="web"?"Apps Script":"Google Sheets 커넥터"})`:k==="db"?`<span class="pill warn">아티팩트 서버</span> 시트에 연결되지 않아 예전 방식으로 저장 중`:`<span class="pill bad">이 기기만</span> 시트·서버에 연결되지 않음`}${CLOUD.err?` · <span style="color:var(--bad)">${esc(CLOUD.err)}</span>`:""}</p>
+      <div class="row"><a class="btn" href="${SHEET_URL}" target="_blank" rel="noopener" style="text-decoration:none">시트 열기 ↗</a><button class="btn primary" id="relink">다시 연결</button><span class="small" id="rlmsg"></span></div>
+      <p class="note">claude.ai에서 열면 처음 한 번 「Google Sheets 사용 허용」을 묻습니다. 허용하면 휴대폰·PC가 같은 시트를 씁니다. 거절하면 아티팩트 서버에 저장합니다.</p>
+      <details${g?" open":""}><summary>claude.ai 밖에서 쓰기 (Apps Script, 선택)</summary>
+        <p class="small muted" style="margin-top:6px">GitHub판이나 claude.ai에 로그인하지 않은 기기에서 쓸 때만 필요합니다. 시트에 Apps Script를 한 번 배포하고(LA-09 안내), 웹 앱 주소와 토큰을 여기에 넣으세요. 이 기기에만 저장됩니다.</p>
+        <div class="skel"><div class="f"><span>웹 앱 주소</span><input type="text" id="gasu" value="${esc(g?g.url:"")}" placeholder="https://script.google.com/macros/s/…/exec"></div>
+        <div class="f"><span>토큰</span><input type="text" id="gast" value="${esc(g?g.token:"")}"></div></div>
+        <div class="row"><button class="btn" id="gass">저장하고 연결</button><button class="btn" id="gasx" ${g?"":"disabled"}>지우기</button><span class="small" id="gasm"></span></div>
+      </details>`})()}
+  </section>
   <section class="card"><h3>백업 만들기</h3>
-    <p class="small muted">기록은 이 기기·이 브라우저에만 저장됩니다. 다른 기기로 옮기거나 보관하려면 백업 글을 만들어 복사해 두세요.</p>
+    <p class="small muted">기록은 구글 시트에 저장되어 휴대폰·PC 어디서 열어도 같습니다. 연결되지 않을 때는 이 기기에만 저장했다가 다음에 연결되면 올립니다. 따로 보관해 두고 싶으면 백업 글을 만들어 복사해 두세요.</p>
     <div class="row"><button class="btn" id="exp">백업 만들기</button><span class="toast" id="bk-t"></span><button class="btn primary" id="bkcp" hidden>복사</button></div>
     <pre class="sheet" id="bk-s" hidden></pre>
   </section>
@@ -1297,27 +1445,23 @@ function renderLog(v){
     <textarea id="bkin" rows="3" placeholder="LAQB1:{...}"></textarea>
     <div class="row"><button class="btn primary" id="bkload">불러와서 합치기</button><span class="small" id="bkmsg"></span></div>
   </section>
-  <section class="card"><h3>개인 자료 팩 (오답 드릴 원문)</h3>
-    <p class="small muted">내가 실제로 쓴 문장으로 만든 오답 드릴·오류 예문은 공개된 앱 파일에 넣지 않습니다. 구글 드라이브의 「LA-개인자료팩」 코드(LAPK1: 로 시작)를 기기마다 한 번 붙여 넣으면 <b>이 기기 브라우저에만</b> 저장됩니다.</p>
-    <p class="small">${DB.pack&&DB.pack.drill?`<span class="pill ok">불러옴</span> 오답 드릴 ${DB.pack.drill.length}문장 · ${esc(DB.pack.made||"")}`:`<span class="pill warn">아직 없음</span> 오답 드릴이 비어 있습니다`}</p>
-    <textarea id="pkin" rows="2" placeholder="LAPK1:..."></textarea>
-    <div class="row"><button class="btn primary" id="pkload">개인 자료 불러오기</button><span class="small" id="pkmsg"></span></div>
-  </section>
   <section class="card"><h3>결과지에서 가릴 말</h3>
-    <p class="small muted">작문에 실명·회사명·동네 이름 등을 썼더라도, 여기 적은 말은 결과지를 만들 때 〔가림〕으로 바뀝니다. 메일 주소·전화번호·주민번호 형식은 적지 않아도 자동으로 가립니다. 내가 쓴 원문(초안·버전 기록)은 이 기기에 그대로 남습니다.</p>
+    <p class="small muted">작문에 실명·회사명·동네 이름 등을 썼더라도, 여기 적은 말은 결과지를 만들 때 〔가림〕으로 바뀝니다. 메일 주소·전화번호·주민번호 형식은 적지 않아도 자동으로 가립니다. 내가 쓴 원문(초안·버전 기록)은 내 기록에 그대로 남습니다.</p>
     <textarea id="mkin" rows="3" placeholder="한 줄에 하나씩 (예: 내 이름, 회사 이름, 동네 이름)">${esc((DB.mask||[]).join("\n"))}</textarea>
     <div class="row"><button class="btn" id="mksave">저장</button><span class="small" id="mkmsg"></span></div>
   </section>
   <section class="card"><h3>기록 지우기</h3>
-    <p class="small muted">이 기기에 저장된 풀이 기록, 작문·번역 초안과 버전, 오류 노트를 모두 지웁니다. 되돌릴 수 없습니다.</p>
+    <p class="small muted">풀이 기록, 작문·번역 초안과 버전, 오류 노트를 시트와 이 기기에서 모두 지웁니다. 모든 기기에서 사라지며 되돌릴 수 없습니다. (오답 드릴 원문과 가릴 말은 남습니다)</p>
     <div class="row"><button class="btn" id="reset">기록 모두 지우기</button><span id="rc"></span></div>
   </section>`;
+  $("#relink").onclick=()=>{$("#rlmsg").textContent="연결 중…"; cloudLoad()};
+  $("#gass").onclick=()=>{const url=$("#gasu").value.trim(), token=$("#gast").value.trim(); if(!/^https:\/\/script\.google\.com\//.test(url)||!token){$("#gasm").style.color="var(--bad)"; $("#gasm").textContent="주소(https://script.google.com/…)와 토큰을 넣어 주세요"; return} lsSet(GAS_KEY,JSON.stringify({url,token})); $("#gasm").textContent="연결 중…"; cloudLoad()};
+  $("#gasx").onclick=()=>{lsSet(GAS_KEY,null); cloudLoad()};
+  $("#mksave").onclick=()=>{DB.mask=$("#mkin").value.split(/\n/).map(x=>x.trim()).filter(Boolean); save(); const m=$("#mkmsg"); m.style.color="var(--ok)"; m.textContent=`${DB.mask.length}개 저장했습니다`};
   $("#exp").onclick=()=>{const t="LAQB1:"+JSON.stringify(DB); const el=$("#bk-s"); el.textContent=t; el.hidden=false; const c=$("#bkcp"); c.hidden=false; c.onclick=()=>copyText(t,el,$("#bk-t"))};
   $("#bkload").onclick=()=>{const m=$("#bkmsg"); try{const t=$("#bkin").value.trim(); if(!t.startsWith("LAQB1:")) throw 0; const n=mergeBackup(JSON.parse(t.slice(6))); save(); render(); const m2=$("#bkmsg"); m2.style.color="var(--ok)"; m2.textContent=`합쳤습니다: 작문·번역 ${n.d}건, 오류 노트 ${n.e}회차, 기록 ${n.s}건`}catch(e){m.style.color="var(--bad)"; m.textContent="형식이 맞지 않습니다 (LAQB1: 로 시작해야 함)"}};
-  $("#pkload").onclick=()=>{const m=$("#pkmsg"); try{const n=loadPack($("#pkin").value); render(); const m2=$("#pkmsg"); m2.style.color="var(--ok)"; m2.textContent=`오답 드릴 ${n}문장을 불러왔습니다`}catch(e){m.style.color="var(--bad)"; m.textContent="형식이 맞지 않습니다 (LAPK1: 로 시작해야 함)"}};
-  $("#mksave").onclick=()=>{DB.mask=$("#mkin").value.split(/\n/).map(x=>x.trim()).filter(Boolean); save(); const m=$("#mkmsg"); m.style.color="var(--ok)"; m.textContent=`${DB.mask.length}개 저장했습니다`};
   $("#reset").onclick=()=>{$("#rc").innerHTML=`<span class="row"><span class="small" style="color:var(--bad)">정말 지울까요?</span><button class="btn" id="yes">지우기</button><button class="btn" id="no">취소</button></span>`;
-    $("#yes").onclick=()=>{const pk=DB.pack, mk=DB.mask; DB={items:{},sessions:[],drafts:{},notes:{defs:{},entries:[]},pack:pk,mask:mk}; if(pk&&pk.seed) importCode(pk.seed); applyPack(); save(); render()}; $("#no").onclick=()=>render()};
+    $("#yes").onclick=()=>{const mk=DB.mask, mg=DB.migratedDb; DB={items:{},sessions:[],drafts:{},notes:{defs:{},entries:[]},mask:mk,migratedDb:mg}; importCode(SEED); save(); render()}; $("#no").onclick=()=>render()};
 }
 
 function mergeBackup(o){
@@ -1332,14 +1476,15 @@ function mergeBackup(o){
   (on.entries||[]).forEach(e=>{ if(!DB.notes.entries.some(x=>x.key===e.key)){DB.notes.entries.push(e); n.e++} });
   DB.notes.entries.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
   DB.notes.ex=DB.notes.ex||{}; Object.entries(on.ex||{}).forEach(([p,L])=>{const cur=DB.notes.ex[p]=DB.notes.ex[p]||[]; L.forEach(e=>{ if(!cur.some(x=>x[0]===e[0]&&x[1]===e[1])) cur.push(e) })});
-  if(o.pack&&Array.isArray(o.pack.drill)&&!(DB.pack&&DB.pack.drill&&DB.pack.drill.length)){DB.pack=o.pack; applyPack()}
+  DB.drill=DB.drill||{}; Object.entries(o.drill||{}).forEach(([k,r])=>{const cur=DB.drill[k]; if(!cur||(r.n||0)>(cur.n||0)) DB.drill[k]=r});
+  DB.reads=DB.reads||[]; (o.reads||[]).forEach(r=>{ if(!DB.reads.some(x=>x.at===r.at&&x.t===r.t)) DB.reads.push(r) });
   if(Array.isArray(o.mask)) DB.mask=[...new Set([...(DB.mask||[]),...o.mask])];
   return n;
 }
-save();
+lsSet(KEY,JSON.stringify(DB));
 go("write");
+cloudLoad();
 </script>
-
 <script>
 /* LA 디자인 v3 — 화면 전환 움직임과 숫자 올라가기.
    앱은 화면을 통째로 다시 그린다. 같은 카드를 다시 그릴 때는 움직임을 생략하고(.still),
@@ -1368,4 +1513,5 @@ go("write");
   }).observe(view,{childList:true});
 })();
 </script>
+
 </body></html>
