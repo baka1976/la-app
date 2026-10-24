@@ -180,9 +180,107 @@ details.prow .exs{padding:0 0 10px}
 @media (max-width:540px){.stem{font-size:1.15rem}.card{padding:15px}.bar{grid-template-columns:4.6rem 1fr 3rem}.two{grid-template-columns:1fr}.skel .f{grid-template-columns:1fr;gap:2px}.pbar{grid-template-columns:minmax(0,8.5rem) 1fr 1.6rem 3.2rem}}
 </style>
 
+<style>
+/* ==== LA 디자인 v3 — 쪽빛 학습 노트 (문제은행·통역 드릴 공통) ==== */
+:root{
+  --bg:#f2f4f8; --surface:#ffffff; --sunken:#f4f6fa; --ink:#172033; --muted:#5d6880; --line:#e1e6ee;
+  --accent:#2a4c9a; --accent-2:#5a80d8; --accent-soft:#e8eefb; --accent-ink:#ffffff; --on-accent:#ffffff;
+  --ok:#1f8a5a; --ok-soft:#e3f4ec; --bad:#c43b2f; --bad-soft:#fde8e5; --red:#c43b2f; --red-soft:#fde8e5; --warn:#a8650a; --warn-soft:#fcf0dc;
+  --shadow:0 1px 2px rgba(20,32,60,.05),0 8px 24px -12px rgba(20,32,60,.18);
+  --shadow-up:0 2px 4px rgba(20,32,60,.06),0 14px 30px -12px rgba(20,32,60,.24);
+  --ease:cubic-bezier(.2,.7,.2,1); --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f131a; --surface:#181e28; --sunken:#131821; --ink:#e6eaf2; --muted:#9ba5b8; --line:#283141;
+  --accent:#8fb0f0; --accent-2:#6d8fe0; --accent-soft:#1c2840; --accent-ink:#0c1424; --on-accent:#0c1424;
+  --ok:#5fcf98; --ok-soft:#14301f; --bad:#ff8f84; --bad-soft:#3a1c1a; --red:#ff8f84; --red-soft:#3a1c1a; --warn:#f0b866; --warn-soft:#3a2b15;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5); --shadow-up:0 2px 4px rgba(0,0,0,.35),0 14px 30px -12px rgba(0,0,0,.6);
+}}
+body{background:radial-gradient(1200px 420px at 50% -120px,var(--accent-soft),transparent 70%),var(--bg);background-attachment:fixed}
+
+/* 머리: 반투명 고정 + 탭 밑줄이 미끄러지듯 */
+header{background:color-mix(in srgb,var(--surface) 84%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.brand{display:inline-flex;align-items:center;gap:8px}
+.brand::before{content:"";width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--accent-2),var(--accent));box-shadow:0 3px 8px -2px color-mix(in srgb,var(--accent) 60%,transparent)}
+.ver{padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+nav button{position:relative;border-bottom-color:transparent!important;transition:color .2s}
+nav button:hover{color:var(--ink)}
+nav button[aria-selected="true"]{color:var(--accent)!important}
+nav button[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:linear-gradient(90deg,var(--accent-2),var(--accent));animation:tabIn .35s var(--ease) both}
+
+/* 카드: 선 대신 그림자, 둥글게 */
+.card{border-color:color-mix(in srgb,var(--line) 60%,transparent);border-radius:var(--r);box-shadow:var(--shadow)}
+.item{border-color:color-mix(in srgb,var(--line) 75%,transparent);border-radius:12px;transition:transform .18s var(--ease),box-shadow .18s,border-color .18s}
+button.item:hover{transform:translateY(-2px);box-shadow:var(--shadow-up);border-color:var(--accent)}
+.tag{background:linear-gradient(135deg,var(--accent-soft),color-mix(in srgb,var(--accent-soft) 60%,var(--surface)));border-radius:7px}
+.watch{border-radius:12px}
+details{border-radius:10px}
+
+/* 버튼·칩: 누를 때 눌리고, 주 버튼은 그라디언트 */
+.btn,.chip,.seg button,.grade button,.opt{transition:transform .12s var(--ease),background-color .2s,border-color .2s,box-shadow .2s,color .2s}
+.btn{border-radius:10px}
+.btn:active:not(:disabled),.chip:active,.seg button:active,.grade button:active{transform:scale(.96)}
+.btn.primary,.btn.pri{background:linear-gradient(135deg,var(--accent-2),var(--accent));border-color:transparent;color:var(--accent-ink);box-shadow:0 4px 12px -4px color-mix(in srgb,var(--accent) 70%,transparent)}
+.btn.primary:hover:not(:disabled),.btn.pri:hover:not(:disabled){box-shadow:0 8px 18px -6px color-mix(in srgb,var(--accent) 75%,transparent);transform:translateY(-1px)}
+.chip[aria-pressed="true"]{box-shadow:0 2px 8px -3px color-mix(in srgb,var(--accent) 60%,transparent)}
+.seg{border-radius:10px}
+
+/* 진행 막대·타이머 */
+.prog{height:6px;border-radius:3px;background:var(--sunken)}
+.prog i{background:linear-gradient(90deg,var(--accent-2),var(--accent));border-radius:3px;transition:width .45s var(--ease)}
+.timer{height:8px;border-radius:4px}
+.timer i{background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:4px;box-shadow:0 0 10px color-mix(in srgb,var(--accent-2) 60%,transparent)}
+.big{font-variant-numeric:tabular-nums;animation:tick 1s steps(1) infinite}
+.lvl{height:8px;border-radius:4px}
+.lvl i{background:linear-gradient(90deg,var(--ok),var(--accent-2));border-radius:4px}
+
+/* 문제 풀이: 정답은 살짝 튀고, 오답은 흔들림 */
+.opt{border-radius:12px}
+.opt:hover:not(:disabled){transform:translateX(3px);box-shadow:var(--shadow)}
+.opt.ok{animation:okPop .5s var(--ease);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.opt.bad{animation:shake .4s ease}
+.fb{animation:rise .35s var(--ease) both;border-radius:12px}
+.stem{letter-spacing:.01em}
+.score{background:linear-gradient(135deg,var(--accent-2),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.score .muted{-webkit-text-fill-color:var(--muted)}
+.grade button[aria-pressed="true"]{animation:okPop .35s var(--ease)}
+.wrong{border-radius:12px} .model{border-radius:12px;animation:rise .35s var(--ease) both}
+
+/* 그래프·표가 그려지며 나타남 */
+.bar .t i,.pbar .t i,.para .t i,.prog i{transform-origin:left}
+.bar .t i,.pbar .t i{animation:grow .8s var(--ease) both .1s}
+table.heat td{animation:fade .5s ease both}
+.stat div,.sum div{border-radius:12px;border-color:color-mix(in srgb,var(--line) 70%,transparent);background:linear-gradient(180deg,var(--surface),var(--sunken))}
+
+/* 화면이 바뀔 때 카드가 차례로 떠오름 (같은 화면을 다시 그릴 때는 생략) */
+#view>*{animation:rise .45s var(--ease) both}
+#view>*:nth-child(2){animation-delay:.05s} #view>*:nth-child(3){animation-delay:.1s}
+#view>*:nth-child(4){animation-delay:.15s} #view>*:nth-child(n+5){animation-delay:.2s}
+#view>.still{animation:none!important}
+#view>.still .bar .t i,#view>.still .pbar .t i,#view>.still table.heat td{animation:none!important}
+
+/* 넓은 화면: 목록은 2열, 작문·번역은 과제(왼쪽)와 쓰는 칸(오른쪽) 2단 */
+@media (min-width:1000px){
+  .wrap{max-width:1080px}
+  .stage .list,#view>.list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  #view:has(>section.task){grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:start;column-gap:20px}
+  #view:has(>section.task)>*{grid-column:1}
+  #view:has(>section.task)>section.card:has(#wt),#view:has(>section.task)>section.card:has(#ko),#view:has(>section.task)>section.card:has(#bk){grid-column:2;grid-row:1/span 6;position:sticky;top:120px}
+  #view:has(>section.task) textarea.write{min-height:22rem}
+}
+
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes tabIn{from{transform:scaleX(.2);opacity:0}to{transform:none;opacity:1}}
+@keyframes okPop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+@keyframes tick{0%{opacity:1}50%{opacity:.75}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v2.7 · 작문 중심</span></div>
+    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v2.8 · 작문 중심</span></div>
     <nav id="tabs" role="tablist">
       <button role="tab" data-tab="write">작문</button>
       <button role="tab" data-tab="drill">오답 드릴</button>
@@ -1227,4 +1325,32 @@ save();
 go("write");
 </script>
 
+<script>
+/* LA 디자인 v3 — 화면 전환 움직임과 숫자 올라가기.
+   앱은 화면을 통째로 다시 그린다. 같은 카드를 다시 그릴 때는 움직임을 생략하고(.still),
+   새로 나타난 카드에만 떠오르기·숫자 올라가기를 준다. */
+(()=>{
+  const view=document.getElementById("view"); if(!view) return;
+  const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const keyOf=el=>el.tagName+"."+String(el.className||"").replace(/\bstill\b/,"").trim()+"|"+(el.textContent||"").replace(/\s+/g,"").slice(0,40);
+  let prev=new Set();
+  const countUp=el=>{
+    const n=[...el.childNodes].find(x=>x.nodeType===3&&/\d/.test(x.nodeValue)); if(!n) return;
+    const m=n.nodeValue.match(/^(\D*)(\d+)([\s\S]*)$/); if(!m) return;
+    const to=+m[2]; if(to<2) return;
+    const t0=performance.now(), d=700;
+    const step=t=>{const k=Math.min(1,(t-t0)/d); n.nodeValue=m[1]+Math.round(to*(1-Math.pow(1-k,3)))+m[3]; if(k<1) requestAnimationFrame(step);};
+    requestAnimationFrame(step);
+  };
+  new MutationObserver(()=>{
+    const now=new Set();
+    [...view.children].forEach(el=>{
+      const k=keyOf(el); now.add(k);
+      if(prev.has(k)) el.classList.add("still");
+      else if(!reduce) el.querySelectorAll(".score,.sum b,.stat b").forEach(countUp);
+    });
+    prev=now;
+  }).observe(view,{childList:true});
+})();
+</script>
 </body></html>
