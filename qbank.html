@@ -280,7 +280,7 @@ table.heat td{animation:fade .5s ease both}
 </style>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v2.8 · 작문 중심</span></div>
+    <div class="hrow"><span class="brand">LA 문제은행</span><span class="ver">S1-2 · v2.8 · 옛 판</span></div>
     <nav id="tabs" role="tablist">
       <button role="tab" data-tab="write">작문</button>
       <button role="tab" data-tab="drill">오답 드릴</button>
@@ -291,6 +291,21 @@ table.heat td{animation:fade .5s ease both}
     </nav>
   </div>
 </header>
+<section class="wrap" id="moved" style="padding-top:16px">
+  <div class="card" style="border:2px solid var(--warn);background:var(--warn-soft);gap:10px">
+    <h2>문제은행이 새 주소로 옮겨졌습니다 (v2.9)</h2>
+    <p class="small">이 화면(v2.8)은 더 이상 고치지 않습니다. 새 문제은행은 기록을 <b>서버에 저장</b>해서 휴대폰·PC가 같은 기록을 씁니다. claude.ai에 로그인한 상태에서 여세요.</p>
+    <div class="row"><a class="btn primary" href="https://claude.ai/artifact/JajEgZVK3ThJzjtsQokLMi" target="_blank" rel="noopener" style="text-decoration:none">새 문제은행 열기</a></div>
+    <details><summary>이 기기의 기록 옮기기 (한 번만)</summary>
+      <ol class="small" style="margin:8px 0 0;padding-left:1.3em;display:grid;gap:4px">
+        <li>이 화면에서 「기록」 탭 → 「백업 만들기」 → 「복사」.</li>
+        <li>새 문제은행을 열고 「기록」 탭 → 「백업·복원 코드 불러오기」 칸에 붙여 넣고 → 「불러와서 합치기」.</li>
+        <li>여러 기기에서 쓰던 기록이 있으면 기기마다 1~2를 한 번씩 합니다. 기존 기록은 지워지지 않고 합쳐집니다.</li>
+        <li>새 문제은행에는 오답 드릴 문장이 이미 들어 있어 「개인 자료 팩」을 붙여 넣지 않아도 됩니다. 「결과지에서 가릴 말」은 백업과 함께 옮겨집니다.</li>
+      </ol>
+    </details>
+  </div>
+</section>
 <main class="wrap" id="view"></main>
 
 <script>
