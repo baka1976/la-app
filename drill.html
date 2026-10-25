@@ -94,6 +94,10 @@ td.n{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:n
 .opt input{margin-top:5px;width:16px;height:16px;accent-color:var(--accent)}
 details summary{cursor:pointer;font-weight:600;font-size:.9rem;color:var(--accent)}
 details[open] summary{margin-bottom:8px}
+.ko.listen{font-size:1.05rem;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:8px;padding:14px;text-align:center}
+.rec,.hfr{display:grid;gap:6px}
+.hfr{border-top:1px solid var(--line);padding-top:12px}
+audio{max-width:100%}
 @media (max-width:480px){.ko{font-size:1.12rem}.ja{font-size:1.08rem}.card{padding:15px}}
 </style>
 <style>
@@ -198,12 +202,13 @@ table.heat td{animation:fade .5s ease both}
 <body>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v4.1 · AI 없이 동작</span></div>
+    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.0 · AI 없이 동작</span></div>
     <nav role="tablist" id="tabs">
       <button role="tab" data-tab="drill">연습</button>
       <button role="tab" data-tab="hands">핸즈프리</button>
       <button role="tab" data-tab="rp">롤플레이</button>
       <button role="tab" data-tab="log">기록</button>
+      <button role="tab" data-tab="check">기기 점검</button>
       <button role="tab" data-tab="help">사용법</button>
     </nav>
   </div>
@@ -212,17 +217,25 @@ table.heat td{animation:fade .5s ease both}
 
 <script>
 /* ===== 문장 은행 =====
-   ja·alt의 漢字{よみ}는 후리가나로 표시되고, 음성 읽기에는 よみ를 쓴다. */
+   ja·alt의 漢字{よみ}는 후리가나로 표시되고, 음성 읽기에는 よみ를 쓴다.
+   문항별 선택 항목: limit(제한 시간, 초) · kw(목표 표현 [[후보…]…]) · ng(피할 표현) · lead(결론 먼저 확인할 말).
+   P-01 세트의 한국어는 일부러 공문체·메모체다 (그 문체를 말로 푸는 것이 훈련 목표). */
 const SETS = {
-  P01:{name:"P-01 명사 나열 풀기", short:"P-01", limit:10,
-    rule:"한국어 공문체의 '명사 + 및 + 명사 + 후'를 그대로 옮기지 않는다. 말로 할 때는 동사로 이어서 순서대로 말한다.",
+  P01:{name:"P-01 명사 나열 풀기", short:"P-01", chip:"P-01 명사 나열", limit:10,
+    rule:"한국어 공문체의 '명사 + 및 + 명사 + 후'를 그대로 옮기지 않는다. 말로 할 때는 동사로 이어서 순서대로 말한다. (한국어 원문이 딱딱한 것은 일부러다.)",
     chunk:"～を確認して、～してから ／ ～したうえで ／ ～かどうか ／ ～が起きたら"},
-  L1:{name:"L1 결론 먼저", short:"L1", limit:25,
+  L1:{name:"L1 결론 먼저", short:"L1", chip:"L1 결론 먼저", limit:25,
     rule:"경과부터 말하지 않는다. 첫 문장에 결론(결과·결정·답)을 말하고, 그다음 이유·조건, 경과는 마지막에 짧게.",
     chunk:"結論から申し上げますと、～ ／ ～の件、～でした ／ ～ためです"},
-  P04:{name:"P-04 한국 회사 용어", short:"P-04", limit:10,
+  P04:{name:"P-04 한국 회사 용어", short:"P-04", chip:"P-04 회사 용어", limit:10,
     rule:"한국 회사 용어를 한자 그대로 옮기지 않는다. 일본 업무어는 훈독 동사에서 온 말이 많다. 한국 한자어가 일본어에도 있는지, 뜻이 같은지, 그 장면에서 실제로 쓰는지 확인한다.",
-    chunk:"差し戻し ／ 決裁が下りる ／ 引き継ぎ ／ 相殺 ／ 催促"}
+    chunk:"差し戻し ／ 決裁が下りる ／ 引き継ぎ ／ 相殺 ／ 催促"},
+  H1:{name:"H1 한자어 함정 (일상)", short:"H1", chip:"H1 한자어 함정", limit:8,
+    rule:"한국 한자어를 일본어 음으로 그대로 읽지 않는다. ① 일본어에 그 말이 있는가 ② 뜻이 같은가 ③ 회화에서 쓰는가를 확인한다. 회화에서는 한자어 동사(決定する·到着する)보다 고유어 동사(決める·着く)가 자연스러운 경우가 많다.",
+    chunk:"勉強 ／ 恋人 ／ 手紙 ／ 友達 ／ 魚 ／ お会計 ／ 決める ／ 着く"},
+  C1:{name:"C1 장면별 말투", short:"C1", chip:"C1 장면별 말투", limit:10,
+    rule:"말하기 전에 관계를 먼저 정한다: 친구 = タメ口, 처음 보는 사람 = です・ます, 점원 = 접객 경어, 회사 밖 사람 = 우리 쪽(사장 포함)을 낮춘다. 한국어 존댓말 수준을 그대로 옮기지 않는다.",
+    chunk:"～てて ／ ～そう ／ ～ですか ／ お持ちですか ／ ～しております ／ 承ります"}
 };
 const ITEMS = [
 {id:"P01-01",set:"P01",type:"문장형",scene:"신입에게 접수 업무 설명",
@@ -395,9 +408,10 @@ const ITEMS = [
  pts:["정시 퇴근 = 定時で上がる・定時で失礼する"]},
 {id:"P04-12",set:"P04",type:"문장형",scene:"거래처 전화 (본인 부재 안내)",
  ko:"오후에는 외근이라 자리에 없습니다.",
- ja:"午後は外出{がいしゅつ}しておりまして、席を外しております。",
+ ja:"あいにく、午後は外出{がいしゅつ}しております。",
  alt:["午後は外回りで不在にしております。"],
- pts:["외근 = 外出・外回り","자리에 없다 = 席を外している・不在にしている"]},
+ pts:["외근 = 外出・外回り","外出しております 하나로 '자리에 없음'까지 전달된다 (外出 + 席を外す를 겹치지 않음)"],
+ tip:"席{せき}を外{はず}しております는 사내에서 잠깐 자리를 비운 경우. 밖에 나가 있으면 外出しております・不在にしております."},
 {id:"P04-13",set:"P04",type:"문장형",scene:"부하에게",
  ko:"주간 보고서는 금요일까지 올려 주세요.",
  ja:"週報{しゅうほう}は金曜日までに提出してください。",
@@ -417,7 +431,136 @@ const ITEMS = [
  ko:"내일 발표 자료 만들고 있는데 데이터가 생각보다 많아서 정리가 오래 걸리고 있어. 그래서 그래프 부분 좀 도와줄 수 있어? 30분 정도면 될 것 같아.",
  ja:"グラフのところ、ちょっと手伝ってもらえない？30分くらいで済むと思う。明日の発表資料を作ってるんだけど、データが多くて整理に時間がかかってて。",
  alt:["悪いんだけど、グラフの部分を手伝ってくれないかな。30分くらいで終わると思う。"],
- pts:["첫 문장이 부탁(결론)","필요한 시간을 바로","사정은 뒤에"]}
+ pts:["첫 문장이 부탁(결론)","필요한 시간을 바로","사정은 뒤에"]},
+
+{id:"H1-01",set:"H1",type:"문장형",scene:"친구에게 (반말)",
+ ko:"요즘 시험 때문에 공부하느라 바빠.",
+ ja:"最近、試験{しけん}の勉強{べんきょう}で忙{いそが}しいんだ。",
+ alt:["最近テスト勉強でバタバタしてる。"],
+ pts:["공부 = 勉強 (工夫{くふう}는 '궁리·고안')","반말 끝맺음 (～んだ・～てる)"],
+ kw:[["勉強","べんきょう"]], ng:["工夫","くふう"]},
+{id:"H1-02",set:"H1",type:"문장형",scene:"친구에게 소문 전하기",
+ ko:"걔 애인 생겼대.",
+ ja:"あの子、恋人{こいびと}できたんだって。",
+ alt:["あいつ、彼女{かのじょ}できたらしいよ。","あの子、彼氏{かれし}できたって。"],
+ pts:["애인 = 恋人・彼氏・彼女 (愛人{あいじん}은 불륜 상대)","들은 말 전하기 = ～んだって・～らしい"],
+ kw:[["恋人","こいびと","彼氏","かれし","彼女","かのじょ"]], ng:["愛人","あいじん"]},
+{id:"H1-03",set:"H1",type:"문장형",scene:"처음 만난 사람과 이야기",
+ ko:"어제 할머니께 편지를 썼어요.",
+ ja:"昨日、祖母{そぼ}に手紙{てがみ}を書{か}きました。",
+ alt:["昨日、おばあちゃんに手紙を書いたんです。"],
+ pts:["편지 = 手紙 (便紙는 일본어에 없음)","남에게 자기 할머니 = 祖母 (おばあさん이라 하지 않음. 친한 말투라면 おばあちゃん)"],
+ kw:[["手紙","てがみ"]], ng:["便紙","おばあさん"]},
+{id:"H1-04",set:"H1",type:"문장형",scene:"일이 끝난 뒤 동료에게",
+ ko:"이번 일로 고생 많으셨어요.",
+ ja:"今回は本当にお疲{つか}れさまでした。",
+ alt:["今回は大変でしたね。本当にありがとうございました。"],
+ pts:["고생 많으셨어요 = お疲れさまでした (苦生는 일본어에 없음)","ご苦労{くろう}さま는 아랫사람에게 쓰는 말이라 동료·윗사람에게는 피한다"],
+ kw:[["疲れ","つかれ","大変"]], ng:["苦生","ご苦労","ごくろう"]},
+{id:"H1-05",set:"H1",type:"문장형",scene:"친구와 저녁 메뉴",
+ ko:"생선 구워 먹을까?",
+ ja:"魚{さかな}、焼{や}いて食べようか。",
+ alt:["焼き魚にしない？"],
+ pts:["생선 = 魚 (生鮮{せいせん}은 「生鮮食品」 같은 복합어로만 씀)","권유 = ～ようか・～しない？"],
+ kw:[["魚","さかな"]], ng:["生鮮","せいせん"]},
+{id:"H1-06",set:"H1",type:"문장형",scene:"처음 만난 사람과 이야기",
+ ko:"제 친구가 이 근처에 살아요.",
+ ja:"友達{ともだち}がこの近くに住{す}んでいるんです。",
+ alt:["友人{ゆうじん}がこの辺に住んでいます。"],
+ pts:["친구 = 友達・友人 (親旧는 일본어에 없음)","설명하는 말투 ～んです"],
+ kw:[["友達","ともだち","友人","ゆうじん"]], ng:["親旧","しんきゅう"]},
+{id:"H1-07",set:"H1",type:"문장형",scene:"친구와 여행 계획 (반말)",
+ ko:"어디 갈지 빨리 결정하자.",
+ ja:"どこ行くか、早く決{き}めよう。",
+ alt:["どこにするか、さっさと決めちゃおう。"],
+ pts:["결정하다 = 決める (決定する는 회의·공식 발표에서)","반말 권유 = ～よう・～ちゃおう"],
+ kw:[["決め","きめ"]], ng:["決定","けってい"]},
+{id:"H1-08",set:"H1",type:"문장형",scene:"택시 기사에게",
+ ko:"역에는 몇 시쯤 도착해요?",
+ ja:"駅{えき}には何時{なんじ}ごろ着{つ}きますか？",
+ alt:["駅まで、何時くらいに着きそうですか？"],
+ pts:["도착하다 = 着く (到着する는 안내 방송·문서체)","~쯤 = ～ごろ・～くらい"],
+ kw:[["着き","つき"]], ng:["到着","とうちゃく"]},
+{id:"H1-09",set:"H1",type:"문장형",scene:"식당에서 손님이 점원에게",
+ ko:"여기 계산이요.",
+ ja:"すみません、お会計{かいけい}お願いします。",
+ alt:["お会計でお願いします。"],
+ pts:["계산 = お会計 (計算은 숫자 계산)","점원을 부를 때 すみません"],
+ kw:[["会計","かいけい"]], ng:["計算","けいさん"]},
+
+{id:"C1-01",set:"C1",type:"문장형",scene:"친구에게 (반말)",
+ ko:"야, 어제 그 드라마 봤어? 진짜 대박이더라.",
+ ja:"ねえ、昨日のあのドラマ見た？マジでヤバかったんだけど。",
+ alt:["昨日のあれ見た？めっちゃよかったよね。","昨日のドラマ見た？最高だったね。"],
+ pts:["대박 = ヤバい・最高・めっちゃよかった (大当たり는 복권·흥행 대박)","반말 질문 「見た？」"],
+ kw:[["ヤバ","やば","最高","めっちゃ","すごかった","よかった"]], ng:["大当たり","おおあたり"]},
+{id:"C1-02",set:"C1",type:"문장형",scene:"친구 말에 맞장구",
+ ko:"그거 완전 인정. 나도 똑같이 생각했어.",
+ ja:"それな。私も同じこと思{おも}ってた。",
+ alt:["わかる、ほんとそれ。俺もそう思ってた。"],
+ pts:["인정 = それな・わかる・ほんとそれ (認定{にんてい}은 '공식 인정')","～てた (思っていた의 회화체)"],
+ tip:"それな는 2010년대 중반부터 쓰인 젊은 층 말투. 나이·상대에 따라 わかる가 무난하다 (변이).",
+ kw:[["それな","わかる","ほんとそれ","本当それ"]], ng:["認定","にんてい"]},
+{id:"C1-03",set:"C1",type:"문장형",scene:"약속 장소에 늦는 친구",
+ ko:"미안, 나 오늘 좀 늦을 것 같아. 먼저 들어가 있어.",
+ ja:"ごめん、今日ちょっと遅{おく}れそう。先{さき}に入ってて。",
+ alt:["ごめん、ちょっと遅れる。先入ってて。"],
+ pts:["~할 것 같아 = ～そう (遅れると思う는 딱딱함)","들어가 있어 = 入ってて (入っていて의 회화 축약)"],
+ kw:[["遅れ","おくれ"],["入って","はいって"]]},
+{id:"C1-04",set:"C1",type:"문장형",scene:"친구에게 속마음 (반말)",limit:12,
+ ko:"솔직히 그 사람 좀 별로야. 근데 다른 애들 앞에서는 말하지 마, 알았지?",
+ ja:"正直{しょうじき}、あの人ちょっと微妙{びみょう}なんだよね。でも、みんなの前では言わないでね。わかった？",
+ alt:["正直あの人あんまり好きじゃないんだ。これ、内緒{ないしょ}ね？"],
+ pts:["별로 = 微妙・あんまり好きじゃない (別に는 '딱히·별로 ~않다'로 쓰임이 다름)","다른 애들 = みんな (他の子たち보다 자연스러움)","다짐 = ～ね、わかった？・内緒ね"],
+ kw:[["微妙","びみょう","あんまり","好きじゃない"]], ng:["別に","べつに"]},
+{id:"C1-05",set:"C1",type:"문장형",scene:"카페에서 모르는 사람에게",
+ ko:"저기, 혹시 이 자리 비어 있어요?",
+ ja:"すみません、ここ空{あ}いてますか？",
+ alt:["あの、この席{せき}空いてますか？"],
+ pts:["혹시 → すみません・あの (もしかして는 '혹시 ~인가?' 추측일 때)","비어 있어요 = 空いてますか"],
+ kw:[["空いて","あいて"]], ng:["もしかして"]},
+{id:"C1-06",set:"C1",type:"문장형",scene:"모임에서 첫인사",
+ ko:"처음 뵙겠습니다. 친구 소개로 왔는데요, 오늘 잘 부탁드려요.",
+ ja:"はじめまして。友達の紹介{しょうかい}で来ました。今日はよろしくお願いします。",
+ alt:["はじめまして、友達に紹介してもらって来ました。よろしくお願いします。"],
+ pts:["친구 = 友達 (親旧 없음)","잘 부탁드려요 = よろしくお願いします (よく頼みます가 아님)"],
+ kw:[["紹介","しょうかい"],["よろしく"]], ng:["親旧","よく頼"]},
+{id:"C1-07",set:"C1",type:"문장형",scene:"길에서 헤매는 사람에게",limit:12,
+ ko:"아, 길 찾으세요? 저도 그쪽 가는 길이라서 같이 가실래요?",
+ ja:"道{みち}、迷{まよ}ってますか？私もそっちの方に行くので、よかったら一緒に行きましょうか。",
+ alt:["どこか探してます？同じ方向なので、一緒に行きましょうか。"],
+ pts:["길 찾으세요 = 迷ってますか・どこか探してますか (道を探していますか는 직역)","같이 가실래요 = よかったら一緒に行きましょうか (제안형. 行きますか는 무뚝뚝함)"],
+ kw:[["ましょうか","ませんか"]]},
+{id:"C1-08",set:"C1",type:"문장형",scene:"편의점 점원이 손님에게",
+ ko:"포인트 카드 있으세요? 봉투 필요하세요?",
+ ja:"ポイントカードはお持{も}ちですか？袋{ふくろ}はご利用ですか？",
+ alt:["ポイントカードはお持ちですか？レジ袋はお付けしますか？"],
+ pts:["있으세요 = お持ちですか (ありますか는 손님에게 가벼움)","필요하세요 = ご利用ですか・お付けしますか (必要ですか는 딱딱함)"],
+ kw:[["お持ち","おもち"],["ご利用","ごりよう","お付け","おつけ"]], ng:["必要ですか"]},
+{id:"C1-09",set:"C1",type:"문장형",scene:"옷가게에서 손님이",limit:12,
+ ko:"이거 사이즈 하나 큰 걸로 교환 가능할까요? 영수증은 여기 있어요.",
+ ja:"これ、ワンサイズ大きいのに交換{こうかん}できますか？レシートはこれです。",
+ alt:["これ、一つ上のサイズに替えてもらえますか？レシートはこちらです。"],
+ pts:["영수증(가게) = レシート (領収書{りょうしゅうしょ}는 회사 경비 처리용)","교환 가능할까요 = 交換できますか・替えてもらえますか (交換可能でしょうか는 딱딱함)"],
+ kw:[["レシート"],["交換","こうかん","替え","かえ"]], ng:["領収","りょうしゅう"]},
+{id:"C1-10",set:"C1",type:"문장형",scene:"거래처 전화를 끊기 전",
+ ko:"확인하고 다시 연락드리겠습니다.",
+ ja:"確認{かくにん}して、改{あらた}めてご連絡いたします。",
+ alt:["確認して、折{お}り返{かえ}しご連絡します。"],
+ pts:["다시 = 改めて・折り返し(전화) (再び는 글말)","업무 장면에서는 確認 같은 한자어가 오히려 자연스럽다 (H1과 비교)"],
+ kw:[["改めて","あらためて","折り返し","おりかえし"]], ng:["再び","ふたたび"]},
+{id:"C1-11",set:"C1",type:"문장형",scene:"회사 밖 사람의 전화 (사장 부재)",limit:12,
+ ko:"죄송합니다만, 사장님은 지금 외출 중이십니다. 메모 남겨 드릴까요?",
+ ja:"申{もう}し訳{わけ}ございません。社長{しゃちょう}はただいま外出しております。よろしければ、ご伝言{でんごん}を承{うけたまわ}りましょうか。",
+ alt:["申し訳ございません、社長は外出しております。お伝えしましょうか。"],
+ pts:["회사 밖 사람에게는 우리 사장도 낮춘다: 外出しております (外出なさって・いらっしゃいません은 ×)","사장님 → 社長 (社長さん은 ×)","메모 남겨 드릴까요 = ご伝言を承りましょうか・お伝えしましょうか"],
+ kw:[["しております","おります"],["伝言","でんごん","お伝え","おつたえ"]], ng:["社長さん","なさって","いらっしゃいません","メモを残"]},
+{id:"C1-12",set:"C1",type:"문장형",scene:"도움 준 거래처 사람에게",limit:15,
+ ko:"지난번 건은 정말 감사했습니다. 덕분에 일이 잘 마무리됐어요. 다음에 식사라도 한번 대접하고 싶습니다.",
+ ja:"先日{せんじつ}の件では本当にありがとうございました。おかげさまで無事{ぶじ}に終わりました。今度ぜひ、お食事でもご馳走{ちそう}させてください。",
+ alt:["先日はありがとうございました。おかげさまでうまくいきました。今度お食事でもいかがですか。"],
+ pts:["덕분에 = おかげさまで","잘 마무리됐어요 = 無事に終わりました・うまくいきました","대접하다 = ご馳走させてください・お食事でもいかがですか (待接은 없음, 接待는 '접대'라 무거움)"],
+ kw:[["おかげ"],["ご馳走","ごちそう","いかが"]], ng:["待接","接待","せったい"]}
 ];
 
 /* ===== 롤플레이 시작 문서 ===== */
@@ -468,7 +611,18 @@ const RP = [
 4. 대화 중에는 교정하지 않는다. 部長로서만 반응한다.
 5. 내가 「終了」라고 하면 한국어로 리포트를 쓴다.
 리포트: ① 결론을 먼저 말했나(L1) ② 질문에 빠짐없이 답했나(L3) ③ 다음 행동으로 닫았나(L5) ④ 한국 회사 용어를 한자 그대로 옮긴 곳(P-04) — 문장 인용과 일본 업무어 ⑤ 고칠 표현 3개 (한자어는 읽기 병기). 뜻이 바뀌는 중인 말이나 구어 변화(すいません 등)는 틀림이 아니라 '변이'로 표시. 확신이 낮으면 '확인 필요'.
-첫 마디는 네가 시작한다: 「この前の稟議、どうなった？」`}
+첫 마디는 네가 시작한다: 「この前の稟議、どうなった？」`},
+{id:"rp5",pat:["C1","H1"],title:"친구와 저녁 약속 → 가게에서",
+ text:`[LA 롤플레이 시작 문서]
+너는 나의 일본인 친구(20대 후반) 역할이다. 대화는 모두 일본어로 한다.
+장면: ① 내가 약속에 늦는다고 연락하면서 대화가 시작된다 (반말, タメ口). ② 중간에 내가 「店に入った」라고 하면 너는 식당 점원 역할로 바꾼다 (접객 경어). ③ 다시 「友達に戻る」라고 하면 친구로 돌아온다.
+규칙:
+1. 친구일 때는 요즘 젊은 사람이 쓰는 자연스러운 말투로 말한다 (교과서 말투 금지). 내가 어색하게 딱딱하면 「なんでそんな丁寧なの（笑）」처럼 반응한다.
+2. 점원일 때는 실제 가게처럼 말한다 (人数、注文、お会計、ポイントカード 등).
+3. 내 말이 애매하면 짐작하지 말고 되묻는다. 예상 밖의 질문을 한 번 이상 한다.
+4. 대화 중에는 교정하지 않는다.
+5. 내가 「終了」라고 하면 한국어로 리포트: ① 장면에 맞는 말투였나(친구 タメ口 / 점원에게 です・ます) — 어긋난 문장 인용 ② 한국 한자어를 음독으로 옮긴 말(計算·親旧·愛人 등, H1) ③ 더 자연스러운 회화 표현 3개 (한자어는 읽기 병기). 확신이 낮으면 '확인 필요', 세대·지역에 따라 다른 말은 '변이'.
+첫 마디는 네가 시작한다: 「もしもし？今どこー？」`}
 ];
 
 /* ===== 자동 확인 규칙 (v4, 참고용) =====
@@ -477,7 +631,7 @@ const RP = [
 const SET_CHK={
   P01:{kw:[{label:"동사로 잇기 (～てから·～たうえで·～たら 등)",alts:["てから","たうえで","た上で","たうえに","た上に","たら","かどうか","ないか","次第","ましたら"]}],
        ng:["及び","および","確認後","発生時","有無","変更後","作成後","完了後"]},
-  P04:{kw:[],ng:[]}, L1:{kw:[],ng:[]}
+  P04:{kw:[],ng:[]}, L1:{kw:[],ng:[]}, H1:{kw:[],ng:[]}, C1:{kw:[],ng:[]}
 };
 const CHK={
  "P04-01":{kw:[["稟議","りんぎ"],["下り","おり"]]},
@@ -500,10 +654,12 @@ const CHK={
 const normJa=s=>String(s||"").replace(/[\s、。,.!?！？「」]/g,"");
 function autoCheck(it,heard){
   const h=normJa(heard); if(!h) return null;
-  const base=SET_CHK[it.set]||{kw:[],ng:[]}, own=CHK[it.id]||{}, out=[];
+  const base=SET_CHK[it.set]||{kw:[],ng:[]}, own=Object.assign({},CHK[it.id]||{}), out=[];
+  ["kw","ng","lead"].forEach(k=>{if(it[k]) own[k]=it[k];});
   base.kw.forEach(g=>out.push({label:g.label,ok:g.alts.some(a=>h.includes(a))}));
-  (own.kw||[]).forEach(g=>out.push({label:"목표 표현 "+g[0],ok:g.some(a=>h.includes(a))}));
-  if(base.ng.length){const f=base.ng.filter(a=>h.includes(a)); out.push({label:"피할 표현 "+(f.length?f.join("·")+" 나옴":"안 나옴"),ok:!f.length});}
+  (own.kw||[]).forEach(g=>out.push({label:"목표 표현 "+plainJa(g[0]),ok:g.some(a=>h.includes(normJa(plainJa(a))))}));
+  const ng=base.ng.concat(own.ng||[]);
+  if(ng.length){const f=ng.filter(a=>h.includes(a)); out.push({label:"피할 표현 "+(f.length?f.join("·")+" 나옴":"안 나옴"),ok:!f.length});}
   if(own.lead){const head=h.slice(0,Math.max(12,Math.round(h.length*.35))); out.push({label:"결론 먼저 ("+own.lead[0]+")",ok:own.lead.some(a=>head.includes(a))});}
   return out;
 }
@@ -569,12 +725,98 @@ function asrStop(){
   });
 }
 
+/* ===== 녹음 다시 듣기 (v5) =====
+   이번 세션 동안만 메모리에 두고, 저장·전송하지 않는다. 새로 시작하거나 페이지를 닫으면 사라진다. */
+const REC={ok:!!(window.MediaRecorder&&navigator.mediaDevices),mr:null,chunks:[],urls:[]};
+function recStart(){
+  if(!REC.ok||!MIC.stream) return; recAbort();
+  try{
+    const t=["audio/webm;codecs=opus","audio/mp4","audio/webm"].find(x=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(x));
+    const mr=new MediaRecorder(MIC.stream,t?{mimeType:t}:undefined); REC.chunks=[];
+    mr.ondataavailable=e=>{if(e.data&&e.data.size) REC.chunks.push(e.data);};
+    mr.start(); REC.mr=mr;
+  }catch(e){REC.mr=null;}
+}
+function recAbort(){const mr=REC.mr; REC.mr=null; if(mr&&mr.state!=="inactive"){mr.ondataavailable=null; try{mr.stop()}catch(e){}}}
+function recStop(){
+  return new Promise(res=>{
+    const mr=REC.mr; REC.mr=null; if(!mr||mr.state==="inactive"){res(null);return;}
+    const chunks=REC.chunks; let done=false;
+    const fin=()=>{if(done)return; done=true; const b=new Blob(chunks,{type:mr.mimeType||"audio/webm"}); if(!b.size){res(null);return;} const u=URL.createObjectURL(b); REC.urls.push(u); res(u);};
+    mr.onstop=fin; try{mr.stop()}catch(e){fin()} setTimeout(fin,1500);
+  });
+}
+function recClear(){recAbort(); REC.urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}}); REC.urls=[];}
+const audioHTML=u=>u?`<audio controls preload="auto" src="${u}" style="width:100%"></audio>`:"";
+
+/* ===== 말하는 동안 잡기: 측정·음성 인식·녹음을 한꺼번에 켜고 끈다 ===== */
+function capStart(){ if(DB.opt.mic&&MIC.ok) measStart(); if(DB.opt.asr&&ASR.ok) asrStart(); if(DB.opt.rec&&MIC.ok) recStart(); }
+async function capStop(it){
+  const out={};
+  out.meas=DB.opt.mic&&MIC.ok?measStop():(measStop(true),null);
+  const pa=DB.opt.asr&&ASR.ok?asrStop():(asrAbort(),Promise.resolve(null));
+  const pr=DB.opt.rec&&MIC.ok?recStop():(recAbort(),Promise.resolve(null));
+  const [heard,audio]=await Promise.all([pa,pr]);
+  if(heard!=null){out.heard=heard.trim(); out.auto=autoCheck(it,out.heard);}
+  out.audio=audio; return out;
+}
+const needMic=()=>DB.opt.mic||DB.opt.rec;
+
 /* ===== 저장 ===== */
 const KEY="la-interp-v1";
-let DB={items:{},talk:{},sessions:[],opt:{mic:false,asr:false}};
-function load(){try{const s=localStorage.getItem(KEY);if(s){const d=JSON.parse(s);DB={items:d.items||{},talk:d.talk||{},sessions:d.sessions||[],opt:Object.assign({mic:false,asr:false},d.opt||{})};}}catch(e){}}
+const OPT0={mic:false,asr:false,rec:false,listen:false,replay:1};
+let DB={items:{},talk:{},sessions:[],opt:Object.assign({},OPT0)};
+function load(){try{const s=localStorage.getItem(KEY);if(s){const d=JSON.parse(s);DB={items:d.items||{},talk:d.talk||{},sessions:d.sessions||[],opt:Object.assign({},OPT0,d.opt||{}),dev:d.dev};}}catch(e){}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}}
 load();
+
+/* ===== 추가한 문제 (v5) =====
+   Claude가 만든 문제(JSON)를 붙여 넣어 이 기기에만 저장한다. 저장소 파일에는 들어가지 않는다. */
+const CKEY="la-interp-custom-v1";
+const BUILTIN_SETS=Object.keys(SETS), BUILTIN_IDS=new Set(ITEMS.map(i=>i.id));
+let CUSTOM={sets:{},items:[]};
+function loadCustom(){try{const s=localStorage.getItem(CKEY);if(s){const d=JSON.parse(s);CUSTOM={sets:d.sets||{},items:d.items||[]};}}catch(e){} applyCustom();}
+function saveCustom(){try{localStorage.setItem(CKEY,JSON.stringify(CUSTOM));}catch(e){}}
+function applyCustom(){
+  Object.keys(SETS).forEach(k=>{if(!BUILTIN_SETS.includes(k)) delete SETS[k];});
+  for(let i=ITEMS.length-1;i>=0;i--) if(!BUILTIN_IDS.has(ITEMS[i].id)) ITEMS.splice(i,1);
+  Object.entries(CUSTOM.sets).forEach(([k,s])=>{if(!SETS[k]) SETS[k]=s;});
+  CUSTOM.items.forEach(it=>{if(SETS[it.set]&&!BUILTIN_IDS.has(it.id)) ITEMS.push(it);});
+}
+/* 붙여 넣은 글에서 JSON을 찾아 검사한다. 돌려주는 값: {sets, items, skipped:[이유…]} */
+function parseCustom(txt){
+  const s=String(txt||""), a=s.indexOf("{"), b=s.lastIndexOf("}");
+  if(a<0||b<a) throw new Error("JSON을 찾지 못했습니다.");
+  const d=JSON.parse(s.slice(a,b+1)), sets={}, items=[], skipped=[];
+  Object.entries(d.sets||{}).forEach(([k,v])=>{
+    if(BUILTIN_SETS.includes(k)){skipped.push(`세트 ${k}: 기본 세트와 이름이 같음`);return;}
+    if(!v||!v.name){skipped.push(`세트 ${k}: name 없음`);return;}
+    sets[k]={name:String(v.name),short:String(v.short||k),chip:String(v.chip||v.name),limit:+v.limit||10,rule:String(v.rule||""),chunk:String(v.chunk||"")};
+  });
+  (Array.isArray(d.items)?d.items:[]).forEach((v,n)=>{
+    const id=v&&String(v.id||"");
+    if(!id||!v.set||!v.ko||!v.ja){skipped.push(`${n+1}번째: id·set·ko·ja 중 빠진 것이 있음`);return;}
+    if(BUILTIN_IDS.has(id)){skipped.push(`${id}: 기본 문항과 번호가 같음`);return;}
+    if(!SETS[v.set]&&!sets[v.set]&&!CUSTOM.sets[v.set]){skipped.push(`${id}: 세트 ${v.set}가 없음`);return;}
+    const arr=x=>Array.isArray(x)?x.map(String):[];
+    const it={id,set:String(v.set),type:String(v.type||"문장형"),scene:String(v.scene||""),ko:String(v.ko),ja:String(v.ja),alt:arr(v.alt),pts:arr(v.pts)};
+    if(!it.pts.length) it.pts=["모범 답과 뜻이 같다"];
+    if(v.tip) it.tip=String(v.tip);
+    if(+v.limit) it.limit=+v.limit;
+    if(Array.isArray(v.kw)) it.kw=v.kw.filter(Array.isArray).map(arr);
+    if(Array.isArray(v.ng)) it.ng=arr(v.ng);
+    if(Array.isArray(v.lead)) it.lead=arr(v.lead);
+    items.push(it);
+  });
+  return {sets,items,skipped};
+}
+function mergeCustom(p){
+  Object.assign(CUSTOM.sets,p.sets);
+  p.items.forEach(it=>{const i=CUSTOM.items.findIndex(x=>x.id===it.id); if(i>=0) CUSTOM.items[i]=it; else CUSTOM.items.push(it);});
+  saveCustom(); applyCustom();
+}
+const limitOf=it=>it.limit||(SETS[it.set]&&SETS[it.set].limit)||10;
+loadCustom();
 
 /* ===== 도구 ===== */
 const $=s=>document.querySelector(s);
@@ -617,10 +859,10 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 
 /* ===== 탭 ===== */
 let TAB="drill";
-document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{stopHands();clearTimer();asrAbort();micOff();if(RUN&&!RUN.done)RUN=null;TAB=b.dataset.tab;render();});
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{CARD++;stopHands();stopCheck();clearTimer();asrAbort();recAbort();micOff();if(TTS.ok)speechSynthesis.cancel();if(RUN&&!RUN.done)RUN=null;TAB=b.dataset.tab;render();});
 function render(){
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===TAB));
-  ({drill:viewDrill,hands:viewHands,rp:viewRP,log:viewLog,help:viewHelp})[TAB]();
+  ({drill:viewDrill,hands:viewHands,rp:viewRP,log:viewLog,check:viewCheck,help:viewHelp})[TAB]();
 }
 
 /* ===== 연습 ===== */
@@ -635,123 +877,177 @@ function viewDrill(){
   if(RUN&&!RUN.done)return viewCard();
   if(RUN&&RUN.done)return viewEnd();
   const due=ITEMS.filter(i=>isDue(i.id)).length;
-  const srcs=[["P01","P-01 명사 나열"],["P04","P-04 회사 용어"],["L1","L1 결론 먼저"],["MIX","섞어서 (3단계)"],["DUE","복습 대상 "+due]];
+  if(SET.src!=="MIX"&&SET.src!=="DUE"&&!SETS[SET.src]) SET.src="P01";
+  const srcs=Object.keys(SETS).map(k=>[k,SETS[k].chip||SETS[k].name]).concat([["MIX","섞어서 (3단계)"],["DUE","복습 대상 "+due]]);
   const st=SET.src==="MIX"?3:SET.stage;
   $("#view").innerHTML=`
   <section class="card">
     <h2>연습 세트 고르기</h2>
-    <div class="chips" id="srcs">${srcs.map(([k,l])=>`<button class="chip" data-k="${k}" aria-pressed="${SET.src===k}">${l}</button>`).join("")}</div>
+    <div class="chips" id="srcs">${srcs.map(([k,l])=>`<button class="chip" data-k="${k}" aria-pressed="${SET.src===k}">${esc(l)}</button>`).join("")}</div>
     <h3>단계</h3>
     <div class="chips" id="stages">
       <button class="chip" data-s="1" aria-pressed="${st===1}" ${SET.src==="MIX"?"disabled":""}>1 천천히</button>
       <button class="chip" data-s="2" aria-pressed="${st===2}" ${SET.src==="MIX"?"disabled":""}>2 빠르게 (제한 시간)</button>
       <button class="chip" data-s="3" aria-pressed="${st===3}" disabled>3 섞어서</button>
     </div>
-    <p class="note">1 천천히: 생각하고 말한 뒤 직접 답을 연다. 2 빠르게: 제한 시간(문장형 10초, 보고 25초)이 지나면 답이 자동으로 열린다. 3 섞어서: 모든 세트를 섞어 빠르게. 4단계(대화 속)는 롤플레이 탭에서.</p>
+    <p class="note">1 천천히: 생각하고 말한 뒤 직접 답을 연다. 2 빠르게: 제한 시간(문장형 8~15초, 보고 25초)이 지나면 답이 자동으로 열린다. 한국어를 읽어 주는 동안에는 시간이 줄지 않는다. 3 섞어서: 모든 세트를 섞어 빠르게. 4단계(대화 속)는 롤플레이 탭에서.</p>
     ${SET.src in SETS?ruleBox(SET.src):""}
+    <h3>문제 내는 방식</h3>
+    <label class="opt"><input type="checkbox" id="optListen" ${DB.opt.listen?"checked":""} ${TTS.ok?"":"disabled"}><span><b>🎧 듣고 통역</b> — 한국어 글자를 가리고 소리로만 냅니다(답을 열면 보임). 실제 통역처럼 듣고 바로 말하는 연습입니다. 보고형(메모)은 메모가 보입니다.${TTS.ok?"":" <span class='warn'>(이 브라우저는 음성 읽기를 지원하지 않습니다)</span>"}</span></label>
+    <div class="row ${DB.opt.listen?"":"hide"}" id="replayRow"><label class="note" for="optReplay">다시 듣기</label><select id="optReplay" style="width:auto">${[[0,"0회 (실전)"],[1,"1회"],[9,"제한 없음"]].map(([v,l])=>`<option value="${v}" ${DB.opt.replay===v?"selected":""}>${l}</option>`).join("")}</select><span class="note">길어서 기억이 버거우면 처음엔 1회로, 익숙해지면 0회로.</span></div>
     <h3>측정 (선택, 참고용)</h3>
-    <label class="opt"><input type="checkbox" id="optMic" ${DB.opt.mic?"checked":""}><span><b>🎤 반응 시간 재기</b> — 문장이 나온 뒤 첫마디까지 걸린 시간과 중간에 멈춘 횟수(0.6초 이상)를 잽니다. 소리 크기만 보고, 녹음은 저장하지 않습니다.</span></label>
-    <label class="opt"><input type="checkbox" id="optAsr" ${DB.opt.asr?"checked":""} ${ASR.ok?"":"disabled"}><span><b>음성 인식으로 목표 표현 확인 (실험)</b> — 말한 것을 글자로 받아 목표 표현을 썼는지, 피할 표현은 안 썼는지, 결론을 먼저 말했는지만 봅니다. 음성 인식은 실수를 다듬어 적으므로 조사·활용 같은 세부는 판정하지 않습니다.${ASR.ok?"":" <span class='warn'>(이 브라우저는 음성 인식을 지원하지 않음)</span>"}</span></label>
+    <label class="opt"><input type="checkbox" id="optMic" ${DB.opt.mic?"checked":""}><span><b>🎤 반응 시간 재기</b> — 문장이 나온 뒤 첫마디까지 걸린 시간과 중간에 멈춘 횟수(0.6초 이상)를 잽니다. 소리 크기만 봅니다.</span></label>
+    <label class="opt"><input type="checkbox" id="optRec" ${DB.opt.rec?"checked":""} ${REC.ok?"":"disabled"}><span><b>⏺ 녹음 다시 듣기</b> — 말한 것을 녹음해 답을 연 뒤 모범 답과 비교해 들을 수 있습니다. 이번 세션 동안만 기기 메모리에 있고, 저장·전송하지 않습니다.${REC.ok?"":" <span class='warn'>(이 브라우저는 녹음을 지원하지 않습니다)</span>"}</span></label>
+    <label class="opt"><input type="checkbox" id="optAsr" ${DB.opt.asr?"checked":""} ${ASR.ok?"":"disabled"}><span><b>음성 인식으로 목표 표현 확인 (실험)</b> — 말한 것을 글자로 받아 목표 표현을 썼는지, 피할 표현(음독 직역 등)은 안 썼는지, 결론을 먼저 말했는지만 봅니다. 음성 인식은 실수를 다듬어 적으므로 조사·활용 같은 세부는 판정하지 않습니다.${ASR.ok?"":" <span class='warn'>(이 브라우저는 음성 인식을 지원하지 않습니다)</span>"}</span></label>
+    <p class="note">처음이거나 기기를 바꿨다면 <b>기기 점검</b> 탭에서 소리·마이크·음성 인식이 되는지 먼저 확인하세요.</p>
     <p class="note" id="micmsg"></p>
     <div class="row"><button class="btn pri" id="go" ${pool(SET.src).length?"":"disabled"}>시작 (${pool(SET.src).length}문장)</button></div>
-    ${SET.src==="DUE"&&!due?`<p class="note">오늘 복습할 문장이 없습니다. △×는 다음 날, ○는 3·7·14·30일 뒤에 다시 나옵니다.</p>`:""}
+    ${SET.src==="DUE"&&!due?`<p class="note">오늘 복습할 문장이 없습니다. ×·△는 다음 날, ○는 3·7·14·30일 뒤에 다시 나옵니다.</p>`:""}
   </section>`;
   document.querySelectorAll("#srcs .chip").forEach(b=>b.onclick=()=>{SET.src=b.dataset.k;viewDrill();});
   document.querySelectorAll("#stages .chip").forEach(b=>b.onclick=()=>{if(!b.disabled){SET.stage=+b.dataset.s;viewDrill();}});
+  $("#optListen").onchange=e=>{DB.opt.listen=e.target.checked;save();$("#replayRow").classList.toggle("hide",!DB.opt.listen);};
+  $("#optReplay").onchange=e=>{DB.opt.replay=+e.target.value;save();};
   $("#optMic").onchange=e=>{DB.opt.mic=e.target.checked;save();};
+  $("#optRec").onchange=e=>{DB.opt.rec=e.target.checked;save();};
   $("#optAsr").onchange=e=>{DB.opt.asr=e.target.checked;save();};
   $("#go").onclick=async()=>{
-    if(DB.opt.mic){
+    if(needMic()){
       const ok=await micStart();
-      if(!ok){ $("#micmsg").innerHTML="<span class='bad'>마이크를 쓸 수 없습니다. 브라우저 주소창의 마이크 권한을 허용하거나, 측정을 끄고 시작하세요.</span>"; return; }
+      if(!ok){ $("#micmsg").innerHTML="<span class='bad'>마이크를 쓸 수 없습니다. 브라우저 주소창의 마이크 권한을 허용하거나, 🎤·⏺를 끄고 시작하세요.</span>"; return; }
     } else micOff();
+    recClear();
     const items=shuffle(pool(SET.src));
-    const stage=SET.src==="MIX"?3:(SET.src==="DUE"?SET.stage:SET.stage);
-    RUN={src:SET.src,stage,items:items.map(it=>({it,g:"",miss:[],memo:"",shown:false})),i:0,start:Date.now(),done:false};
+    const stage=SET.src==="MIX"?3:SET.stage;
+    RUN={src:SET.src,stage,items:items.map(it=>({it,g:"",memo:"",shown:false,ptsOk:it.pts.map(()=>false)})),i:0,start:Date.now(),done:false};
     viewCard();
   };
 }
-function ruleBox(k){const s=SETS[k];return `<div class="rule"><b>${s.name}</b><p>${esc(s.rule)}</p><p class="note">대체 문형: <span lang="ja">${esc(s.chunk)}</span></p></div>`;}
-let TIMER=null;
-function clearTimer(){if(TIMER){clearInterval(TIMER);TIMER=null;}}
+function ruleBox(k){const s=SETS[k];return `<div class="rule"><b>${esc(s.name)}</b><p>${esc(s.rule)}</p><p class="note">대체 문형: <span lang="ja">${esc(s.chunk)}</span></p></div>`;}
+const koSpeech=it=>(it.type==="응답형"?it.scene+". ":"")+it.ko.replace(/\(메모\)\n?/,"메모. ").replace(/\n/g,", ");
+
+/* 제한 시간: 한국어를 읽어 주는 동안은 멈춘다 (v5에서 고침. 전에는 읽는 시간까지 깎였다) */
+let TIMER=null, TM=null, CARD=0;
+function clearTimer(){if(TIMER){clearInterval(TIMER);TIMER=null;} TM=null;}
+function timerPause(on){ if(!TM) return; TM.last=Date.now(); TM.paused=on; const n=$("#tstate"); if(n) n.textContent=on?"듣는 중 · 시간 멈춤":"초 안에 일본어로 말하기"; }
+const finalGrade=c=>c.g==="막힘"?"×":c.ptsOk.every(Boolean)?"○":"△";
 function viewCard(){
   clearTimer();
-  const c=RUN.items[RUN.i], it=c.it, S=SETS[it.set];
+  const c=RUN.items[RUN.i], it=c.it, S=SETS[it.set], lim=limitOf(it), my=++CARD;
   const timed=RUN.stage>=2&&!c.shown;
+  if(!c.shown&&c.listen==null) c.listen=DB.opt.listen&&TTS.ok;
+  const memoType=it.type==="응답형", hideKo=c.listen&&!c.shown&&!memoType;
+  c.plays=c.plays||0;
+  const left=()=>c.listen?Math.max(0,1+DB.opt.replay-c.plays):Infinity;
   $("#view").innerHTML=`
   <section class="card">
-    <div class="meta"><span class="tag">${RUN.i+1} / ${RUN.items.length}</span><span class="tag">${S.short}</span><span class="tag">${it.type}</span><span class="tag">단계 ${RUN.stage}</span></div>
+    <div class="meta"><span class="tag">${RUN.i+1} / ${RUN.items.length}</span><span class="tag">${esc(S.short)}</span><span class="tag">${esc(it.type)}</span><span class="tag">단계 ${RUN.stage}</span>${c.listen?`<span class="tag">🎧 듣고 통역</span>`:""}</div>
     <p class="note">장면: ${esc(it.scene)}</p>
-    <p class="ko ${it.type==="응답형"?"memo":""}">${esc(it.ko)}</p>
-    ${timed?`<div class="row"><span class="big" id="sec">${S.limit}</span><span class="note">초 안에 일본어로 말하기</span></div><div class="timer"><i id="bar"></i></div>`:""}
-    ${!c.shown&&(DB.opt.mic&&MIC.ok||DB.opt.asr&&ASR.ok)?`${MIC.ok?`<div class="lvl" title="마이크 소리 크기"><i id="lvl"></i></div>`:""}<p class="note">${DB.opt.mic?"🎤 재는 중":""}${DB.opt.mic&&DB.opt.asr?" · ":""}${DB.opt.asr?"음성 인식 중":""} — 다 말했으면 버튼을 누르세요.</p>`:""}
+    ${hideKo?`<p class="ko listen">🎧 듣고 바로 일본어로 말하세요</p>`:`<p class="ko ${memoType?"memo":""}">${esc(it.ko)}</p>`}
+    ${timed?`<div class="row"><span class="big" id="sec">${lim}</span><span class="note" id="tstate">초 안에 일본어로 말하기</span></div><div class="timer"><i id="bar"></i></div>`:""}
+    ${!c.shown&&(DB.opt.mic&&MIC.ok||DB.opt.asr&&ASR.ok||DB.opt.rec&&MIC.ok)?`${MIC.ok?`<div class="lvl" title="마이크 소리 크기"><i id="lvl"></i></div>`:""}<p class="note">${[DB.opt.mic&&MIC.ok?"🎤 재는 중":"",DB.opt.rec&&MIC.ok?"⏺ 녹음 중":"",DB.opt.asr&&ASR.ok?"음성 인식 중":""].filter(Boolean).join(" · ")} — 다 말했으면 버튼을 누르세요.</p>`:""}
     <div class="row">
-      ${TTS.ok?`<button class="btn" id="sayKo">한국어 듣기</button>`:""}
+      ${TTS.ok&&!c.shown?`<button class="btn" id="sayKo" ${c.listen&&c.plays===0?"disabled":""}>${c.listen?`한 번 더 듣기${DB.opt.replay<9?` (${left()}회)`:""}`:"한국어 듣기"}</button>`:""}
       ${c.shown?"":`<button class="btn pri" id="reveal">말했어요 · 답 보기</button>`}
     </div>
   </section>
   ${c.shown?answerCard(c):""}`;
-  if(TTS.ok)$("#sayKo").onclick=async()=>{speechSynthesis.cancel();measHold(true);await speak(it.ko,"ko");measHold(false);};
-  const close=()=>{ c.shown=true; if(DB.opt.mic) c.meas=measStop(); else measStop(true);
-    if(DB.opt.asr&&ASR.ok){ c.heardPending=true; asrStop().then(t=>{c.heard=t.trim(); c.auto=autoCheck(it,c.heard); c.heardPending=false; const el=$("#auto"); if(el) el.outerHTML=autoHTML(c);}); } };
-  if(!c.shown){
-    if(DB.opt.mic&&MIC.ok) measStart();
-    if(DB.opt.asr&&ASR.ok) asrStart();
-    $("#reveal").onclick=()=>{close();viewCard();};
-    if(timed){
-      const end=Date.now()+S.limit*1000;
-      TIMER=setInterval(()=>{
-        const left=Math.max(0,end-Date.now());
-        const sec=$("#sec"),bar=$("#bar");
-        if(!sec){clearTimer();return;}
-        sec.textContent=Math.ceil(left/1000);
-        bar.style.width=(left/(S.limit*1000)*100)+"%";
-        if(left<=0){clearTimer();close();c.timeout=true;viewCard();}
-      },200);
-    }
-  }else bindAnswer(c);
+  if(c.shown){bindAnswer(c);return;}
+  const alive=()=>my===CARD&&RUN&&RUN.items[RUN.i]===c&&!c.shown;
+  const sayBtn=()=>{const b=$("#sayKo"); if(!b) return; if(c.listen){b.textContent=`한 번 더 듣기${DB.opt.replay<9?` (${left()}회)`:""}`; b.disabled=left()<=0;}};
+  const close=()=>{
+    if(c.shown) return; c.shown=true; clearTimer(); if(TTS.ok) speechSynthesis.cancel();
+    c.capPending=true;
+    capStop(it).then(o=>{
+      Object.assign(c,o); c.capPending=false;
+      if(!RUN||RUN.items[RUN.i]!==c||TAB!=="drill") return;
+      const a=$("#auto"); if(a) a.outerHTML=autoHTML(c);
+      const r=$("#myrec"); if(r) r.outerHTML=recHTML(c);
+      const m=$("#measbox"); if(m) m.outerHTML=measHTML(c);
+    });
+  };
+  if(timed){
+    TM={left:lim*1000,last:Date.now(),paused:c.listen};
+    TIMER=setInterval(()=>{
+      if(!TM) return;
+      const now=Date.now(); if(!TM.paused) TM.left-=now-TM.last; TM.last=now;
+      const sec=$("#sec"),bar=$("#bar");
+      if(!sec){clearTimer();return;}
+      const l=Math.max(0,TM.left); sec.textContent=Math.ceil(l/1000); bar.style.width=(l/(lim*1000)*100)+"%";
+      if(TM.left<=0){c.timeout=true;close();viewCard();}
+    },200);
+    if(c.listen) timerPause(true);
+  }
+  $("#reveal").onclick=()=>{close();viewCard();};
+  if(c.listen){
+    c.plays=1;
+    speak(koSpeech(it),"ko").then(()=>{ if(!alive()) return; capStart(); timerPause(false); sayBtn(); });
+  } else capStart();
+  if(TTS.ok&&$("#sayKo")) $("#sayKo").onclick=async()=>{
+    if(c.listen&&left()<=0) return;
+    speechSynthesis.cancel(); c.plays++; sayBtn(); $("#sayKo").disabled=true;
+    timerPause(true); measHold(true); if(DB.opt.asr&&ASR.ok) asrAbort();
+    await speak(koSpeech(it),"ko");
+    if(!alive()) return;
+    measHold(false); if(DB.opt.asr&&ASR.ok) asrStart(); timerPause(false); sayBtn(); if(!c.listen&&$("#sayKo")) $("#sayKo").disabled=false;
+  };
+}
+function measHTML(c){
+  if(!c.meas) return `<div id="measbox" class="hide"></div>`;
+  return `<div class="meas" id="measbox"><span>🎤 <b>${esc(measText(c.meas))}</b></span>${c.meas.lat!=null?`<span class="note">말한 길이 ${sec(c.meas.spk)}</span>`:""}</div>`;
+}
+function recHTML(c){
+  if(!(DB.opt.rec&&MIC.ok)) return `<div id="myrec" class="hide"></div>`;
+  if(c.capPending) return `<div id="myrec" class="note">녹음 정리 중…</div>`;
+  return `<div id="myrec" class="rec">${c.audio?`<h3>내 녹음</h3>${audioHTML(c.audio)}<p class="note">모범 답을 듣고 내 녹음과 비교해 포인트를 체크하세요.</p>`:`<p class="note">녹음이 없습니다 (마이크 권한·기기 점검 확인).</p>`}</div>`;
+}
+function gradeNote(c){
+  if(!c.g) return "말함/막힘을 고르세요. 판정: 막힘 = × · 말함 + 포인트 전부 = ○ · 말함 + 빠진 포인트 = △";
+  const g=finalGrade(c);
+  return `판정 <b class="${g==="○"?"ok":g==="△"?"warn":"bad"}">${g}</b> — ${g==="○"?"3일 뒤(연속이면 7·14·30일 뒤) 다시 나옵니다.":g==="△"?"빠진 포인트가 있어 내일 다시 나옵니다.":"내일 다시 나옵니다."}`;
 }
 function answerCard(c){
   const it=c.it;
   return `<section class="card">
     ${c.timeout?`<p class="note warn">시간이 다 됐습니다. 끝까지 말하지 못했으면 막힘을 누르세요.</p>`:""}
-    ${c.meas?`<div class="meas"><span>🎤 <b>${esc(measText(c.meas))}</b></span>${c.meas.lat!=null?`<span class="note">말한 길이 ${sec(c.meas.spk)}</span>`:""}</div>`:""}
+    ${measHTML(c)}
     ${DB.opt.asr&&ASR.ok?autoHTML(c):""}
+    ${recHTML(c)}
+    ${c.listen&&it.type!=="응답형"?`<h3>들은 한국어</h3><p class="note" style="font-size:.95rem;color:var(--ink)">${esc(it.ko)}</p>`:""}
     <h3>모범 답</h3>
     <p class="ja" lang="ja">${ruby(it.ja)}</p>
     ${TTS.ok?`<div class="row"><button class="btn" id="sayJa">일본어 듣기</button></div>`:""}
-    <h3>이것도 OK</h3>
-    <div class="alt">${it.alt.map(a=>`<p class="ja s" lang="ja">${ruby(a)}</p>`).join("")}</div>
-    ${it.tip?`<p class="note">참고: <span>${ruby(it.tip)}</span></p>`:""}
-    <h3>포인트 (참고)</h3>
-    <ul style="margin:0;padding-left:1.2em;display:grid;gap:4px">${it.pts.map(p=>`<li>${ruby(p)}</li>`).join("")}</ul>
-    <h3>제한 시간 안에 끝까지 말했나요?</h3>
-    <p class="note">정확성은 스스로 채점하지 않습니다. 녹음을 받아써서 결과지와 함께 보내면 Claude가 채점합니다.</p>
+    <h3>포인트 — 지킨 것만 체크</h3>
+    <ul class="pts">${it.pts.map((p,k)=>`<li><label><input type="checkbox" data-p="${k}" ${c.ptsOk[k]?"checked":""}><span>${ruby(p)}</span></label></li>`).join("")}</ul>
+    ${it.alt.length||it.tip?`<details><summary>이것도 OK · 참고</summary><div class="alt">${it.alt.map(a=>`<p class="ja s" lang="ja">${ruby(a)}</p>`).join("")}</div>${it.tip?`<p class="note" style="margin-top:8px">참고: <span>${ruby(it.tip)}</span></p>`:""}</details>`:""}
+    <h3>${RUN.stage>=2?"제한 시간 안에 끝까지 말했나요?":"끝까지 말했나요?"}</h3>
     <div class="grade" style="grid-template-columns:repeat(2,1fr)">
       <button class="btn o" data-g="말함" aria-pressed="${c.g==="말함"}">말함</button>
       <button class="btn x" data-g="막힘" aria-pressed="${c.g==="막힘"}">막힘</button>
     </div>
+    <p class="note" id="fg" aria-live="polite">${gradeNote(c)}</p>
     <input type="text" id="memo" placeholder="메모 (선택): 막힌 곳, 내가 말한 문장 (로마자·한국어 가능)" value="${esc(c.memo)}">
     <div class="row"><button class="btn pri" id="next" ${c.g?"":"disabled"}>${RUN.i+1<RUN.items.length?"다음 문장":"결과 보기"}</button></div>
   </section>`;
 }
 function autoHTML(c){
-  if(c.heardPending) return `<div class="auto" id="auto"><span class="note">음성 인식 결과를 정리하는 중…</span></div>`;
+  if(c.capPending) return `<div class="auto" id="auto"><span class="note">음성 인식 결과를 정리하는 중…</span></div>`;
   if(!c.heard) return `<div class="auto" id="auto"><span class="note">음성 인식이 아무것도 받지 못했습니다 (조용한 곳에서, 화면을 켠 채로 말해 보세요).</span></div>`;
   return `<div class="auto" id="auto"><h3>자동 확인 (참고 · 음성 인식이 다듬어 적었을 수 있음)</h3>
     <p class="heard" lang="ja">${esc(c.heard)}</p>
     ${(c.auto||[]).length?`<div class="meas">${c.auto.map(a=>`<span class="${a.ok?"ok":"bad"}">${a.ok?"✓":"✗"} ${esc(a.label)}</span>`).join("")}</div>`:`<span class="note">이 문장은 자동 확인 항목이 없습니다.</span>`}</div>`;
 }
 function bindAnswer(c){
-  if(TTS.ok)$("#sayJa").onclick=()=>{speechSynthesis.cancel();speak(speakJa(c.it.ja),"ja");};
+  if(TTS.ok&&$("#sayJa"))$("#sayJa").onclick=()=>{speechSynthesis.cancel();speak(speakJa(c.it.ja),"ja");};
+  document.querySelectorAll(".pts input").forEach(x=>x.onchange=()=>{c.ptsOk[+x.dataset.p]=x.checked;$("#fg").innerHTML=gradeNote(c);});
   document.querySelectorAll(".grade button").forEach(b=>b.onclick=()=>{
     c.g=b.dataset.g;
     document.querySelectorAll(".grade button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+    $("#fg").innerHTML=gradeNote(c);
     $("#next").disabled=false;
   });
   $("#memo").oninput=e=>c.memo=e.target.value;
   $("#next").onclick=()=>{
-    c.miss=[];
     commit(c);
     RUN.i++;
     if(RUN.i>=RUN.items.length){RUN.done=true;RUN.end=Date.now();saveSession();viewEnd();}
@@ -760,22 +1056,22 @@ function bindAnswer(c){
   };
 }
 function commit(c){
-  const r=rec(c.it.id);
-  r.n++;r.g=c.g;
-  if(c.g==="말함"||c.g==="○"){r.streak++;r.due=addDays([3,7,14,30][Math.min(r.streak-1,3)]);}
+  const r=rec(c.it.id), g=finalGrade(c); c.fg=g;
+  r.n++;r.g=g;
+  if(g==="○"){r.streak++;r.due=addDays([3,7,14,30][Math.min(r.streak-1,3)]);}
   else{r.streak=0;r.due=addDays(1);}
-  r.hist.push({d:today(),st:RUN.stage,g:c.g,miss:c.miss,lat:c.meas&&c.meas.lat!=null?c.meas.lat:undefined,pz:c.meas&&c.meas.lat!=null?c.meas.pz:undefined,auto:c.auto?c.auto.filter(a=>a.ok).length+"/"+c.auto.length:undefined});
+  r.hist.push({d:today(),st:RUN.stage,g,said:c.g,miss:c.ptsOk.map((v,k)=>v?null:k).filter(v=>v!=null),listen:c.listen||undefined,lat:c.meas&&c.meas.lat!=null?c.meas.lat:undefined,pz:c.meas&&c.meas.lat!=null?c.meas.pz:undefined,auto:c.auto?c.auto.filter(a=>a.ok).length+"/"+c.auto.length:undefined});
   if(r.hist.length>30)r.hist=r.hist.slice(-30);
   save();
 }
+const runCount=()=>{const n={"○":0,"△":0,"×":0};RUN.items.forEach(c=>{if(c.fg)n[c.fg]++;});return n;};
 function saveSession(){
-  const cnt={"말함":0,"막힘":0};RUN.items.forEach(c=>cnt[c.g]=(cnt[c.g]||0)+1);
   const L=RUN.items.map(c=>c.meas&&c.meas.lat).filter(v=>v!=null);
-  DB.sessions.push({at:stamp(),src:RUN.src,stage:RUN.stage,n:RUN.items.length,cnt,min:Math.round((RUN.end-RUN.start)/60000),lat:L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):undefined});
+  DB.sessions.push({at:stamp(),src:RUN.src,stage:RUN.stage,n:RUN.items.length,cnt:runCount(),listen:RUN.items.some(c=>c.listen)||undefined,min:Math.round((RUN.end-RUN.start)/60000),lat:L.length?Math.round(L.reduce((a,b)=>a+b,0)/L.length):undefined});
   if(DB.sessions.length>60)DB.sessions=DB.sessions.slice(-60);
   save();
 }
-function srcName(s){return s==="MIX"?"섞어서":s==="DUE"?"복습 대상":SETS[s].short+" "+SETS[s].name.replace(SETS[s].short+" ","");}
+function srcName(s){return s==="MIX"?"섞어서":s==="DUE"?"복습 대상":SETS[s]?SETS[s].short+" "+SETS[s].name.replace(SETS[s].short+" ",""):s;}
 function talkStatus(k){
   const t=DB.talk[k]||{seq:[]};let run=0;for(let i=t.seq.length-1;i>=0;i--){if(t.seq[i]===false)run++;else break;}
   return {run,total:t.seq.length,grad:run>=3};
@@ -791,41 +1087,53 @@ function drillLat(k){
   h.sort((a,b)=>a.d<b.d?-1:1);const last=h.slice(-10); if(!last.length) return null;
   return Math.round(last.reduce((a,x)=>a+x.lat,0)/last.length);
 }
+/* Claude가 새 문장을 이 형식으로 주면 기록 탭 「문제 추가하기」에 그대로 붙여 넣을 수 있다 */
+function jsonAsk(){
+  const d=today().slice(5).replace("-","");
+  return `새 문장은 아래 JSON 형식으로 주세요 (통역 드릴 기록 탭 → 문제 추가하기에 붙여 넣습니다). set은 ${Object.keys(SETS).join("·")} 중 하나, id는 「세트-${d}-번호」(예: H1-${d}-1)로 겹치지 않게. ja·alt·pts의 한자에는 읽기를 漢字{よみ}로 붙일 수 있습니다. kw는 음성 인식으로 확인할 목표 표현(한자와 읽기를 같은 묶음에), ng는 나오면 안 되는 직역·음독 표현입니다.
+{"items":[{"id":"","set":"","type":"문장형","scene":"","ko":"","ja":"","alt":[""],"pts":[""],"tip":"","kw":[["",""]],"ng":[""]}]}`;
+}
 function resultText(){
-  const cnt={"말함":0,"막힘":0};RUN.items.forEach(c=>cnt[c.g]=(cnt[c.g]||0)+1);
-  const bad=RUN.items.filter(c=>c.g==="막힘");
-  let t=`[LA 통역 드릴 결과지] ${stamp()} · 세트 ${srcName(RUN.src)} · 단계 ${RUN.stage} · ${RUN.items.length}문장 · 약 ${Math.max(1,Math.round((RUN.end-RUN.start)/60000))}분\n말함 ${cnt["말함"]} · 막힘 ${cnt["막힘"]}\n`;
-  t+=`\n── 막힌 문장 (${bad.length})\n`;
-  bad.forEach((c,k)=>{const it=c.it; t+=`${k+1}) [${it.id} · ${it.type} · ${it.scene}] ${it.ko.replace(/\n/g," / ")}${c.timeout?" (시간 초과)":""}\n`; if(c.memo)t+=`   메모: ${c.memo}\n`;});
-  const memo=RUN.items.filter(c=>c.g==="말함"&&c.memo);
-  if(memo.length){t+=`\n── 말한 문장의 메모\n`;memo.forEach(c=>t+=`- [${c.it.id}] ${c.memo}\n`);}
+  const cnt=runCount();
+  const bad=RUN.items.filter(c=>c.fg==="×"||c.fg==="△");
+  let t=`[LA 통역 드릴 결과지] ${stamp()} · 세트 ${srcName(RUN.src)} · 단계 ${RUN.stage}${RUN.items.some(c=>c.listen)?" · 듣고 통역":""} · ${RUN.items.length}문장 · 약 ${Math.max(1,Math.round((RUN.end-RUN.start)/60000))}분\n○ ${cnt["○"]} · △ ${cnt["△"]} · × ${cnt["×"]} (×=막힘, △=말했지만 빠진 포인트 있음)\n`;
+  t+=`\n── 다시 볼 문장 (${bad.length})\n`;
+  bad.forEach((c,k)=>{const it=c.it; t+=`${k+1}) ${c.fg} [${it.id} · ${it.type} · ${it.scene}] ${it.ko.replace(/\n/g," / ")}${c.timeout?" (시간 초과)":""}\n`;
+    const miss=it.pts.filter((p,j)=>!c.ptsOk[j]); if(c.fg==="△"&&miss.length) t+=`   빠진 포인트: ${miss.map(plainJa).join(" / ")}\n`;
+    if(c.memo)t+=`   메모: ${c.memo}\n`;});
+  const memo=RUN.items.filter(c=>c.fg==="○"&&c.memo);
+  if(memo.length){t+=`\n── ○ 문장의 메모\n`;memo.forEach(c=>t+=`- [${c.it.id}] ${c.memo}\n`);}
   const measured=RUN.items.filter(c=>c.meas||c.heard);
   if(measured.length){
     const L=RUN.items.map(c=>c.meas&&c.meas.lat).filter(v=>v!=null);
     t+=`\n── 측정 (참고)${L.length?` · 첫마디 평균 ${sec(Math.round(L.reduce((a,b)=>a+b,0)/L.length))}`:""}\n`;
-    measured.forEach(c=>{t+=`- [${c.it.id}] ${c.g}${c.meas?` · ${measText(c.meas)}`:""}${c.heard?`\n   자동 인식: ${c.heard}`:""}${c.auto&&c.auto.length?`\n   자동 확인: ${c.auto.map(a=>(a.ok?"✓ ":"✗ ")+a.label).join(" / ")}`:""}\n`;});
+    measured.forEach(c=>{t+=`- [${c.it.id}] ${c.fg}${c.meas?` · ${measText(c.meas)}`:""}${c.heard?`\n   자동 인식: ${c.heard}`:""}${c.auto&&c.auto.length?`\n   자동 확인: ${c.auto.map(a=>(a.ok?"✓ ":"✗ ")+a.label).join(" / ")}`:""}\n`;});
   }
   if((RUN.trans||"").trim()){t+=`\n── 녹음 받아쓰기 (내가 실제로 말한 문장)\n${RUN.trans.trim()}\n`;}
   t+=`\n── 말하기 상태\n`;
-  Object.keys(SETS).forEach(k=>{const r=drillRate(k);const s=talkStatus(k);const lt=drillLat(k);t+=`${SETS[k].short}: 드릴 최근 10회 말함 ${r===null?"-":r+"%"}${lt!=null?` · 첫마디 평균 ${sec(lt)}`:""} · 대화 속 연속 안 나옴 ${s.run}/3${s.grad?" (말하기 졸업)":""}\n`;});
+  Object.keys(SETS).forEach(k=>{const r=drillRate(k);const s=talkStatus(k);const lt=drillLat(k);if(r===null&&!s.total)return;t+=`${SETS[k].short}: 드릴 최근 10회 ○ ${r===null?"-":r+"%"}${lt!=null?` · 첫마디 평균 ${sec(lt)}`:""} · 대화 속 연속 안 나옴 ${s.run}/3${s.grad?" (말하기 졸업)":""}\n`;});
   t+=`\n── 요청\n`;
+  t+=`○△×의 포인트 체크는 내가 스스로 한 것입니다. `;
   if(RUN.items.some(c=>c.heard)) t+=`자동 인식 문장은 음성 인식이 다듬어 적었을 수 있습니다. 목표 표현을 썼는지·결론을 먼저 말했는지 같은 구조는 자동 인식으로 판정하고, 조사·활용 같은 세부는 받아쓰기한 문장이 있을 때만 판정해 주세요.\n`;
   t+= (RUN.trans||"").trim()
-    ? `받아쓴 문장을 문항 번호의 모범 답·포인트 기준으로 채점해 주세요(포인트별 지킴/못 지킴, 틀림/부자연/변이 구분, 한자어는 읽기 병기). 막힌 문장은 원인을 LA-07 패턴으로 짚고, 같은 패턴으로 내용·장면이 다른 새 문장 5개를 (한국어, 모범 답, 허용 표현, 포인트) 형식으로 만들어 주세요.`
-    : `막힌 문장의 원인을 LA-07 패턴으로 짚고, 같은 패턴으로 내용·장면이 다른 새 문장 5개를 (한국어, 모범 답, 허용 표현, 포인트) 형식으로 만들어 주세요. 메모에 적은 문장이 있으면 포인트 기준으로 채점해 주세요.`;
+    ? `받아쓴 문장을 문항 번호의 모범 답·포인트 기준으로 채점해 주세요(포인트별 지킴/못 지킴, 틀림/부자연/변이 구분, 한자어는 읽기 병기). 내 포인트 체크와 다른 곳이 있으면 짚어 주세요. ×·△ 문장은 원인을 LA-07 패턴으로 짚고, 같은 패턴으로 내용·장면이 다른 새 문장 5개를 만들어 주세요.\n`
+    : `×·△ 문장의 원인을 LA-07 패턴으로 짚고, 같은 패턴으로 내용·장면이 다른 새 문장 5개를 만들어 주세요. 메모에 적은 문장이 있으면 포인트 기준으로 채점해 주세요.\n`;
+  t+=jsonAsk();
   return t;
 }
 function viewEnd(){
-  clearTimer(); asrAbort(); micOff();
-  const cnt={"말함":0,"막힘":0};RUN.items.forEach(c=>cnt[c.g]=(cnt[c.g]||0)+1);
+  clearTimer(); asrAbort(); recAbort(); micOff();
+  const cnt=runCount();
+  const recs=RUN.items.filter(c=>c.audio);
   RUN.trans=RUN.trans||"";
   $("#view").innerHTML=`
   <section class="card">
     <h2>결과</h2>
-    <div class="sum"><div><b class="ok">${cnt["말함"]}</b><span>말함</span></div><div><b class="bad">${cnt["막힘"]}</b><span>막힘</span></div><div><b>${Math.max(1,Math.round((RUN.end-RUN.start)/60000))}</b><span>분</span></div></div>
-    <p class="note">막힌 문장은 내일, 말한 문장은 3일 뒤(연속이면 7·14·30일 뒤)에 다시 나옵니다. ${RUN.stage<3&&cnt["말함"]>=Math.ceil(RUN.items.length*0.8)?"거의 다 말했으니 다음엔 한 단계 올려 보세요.":""}</p>
+    <div class="sum"><div><b class="ok">${cnt["○"]}</b><span>○</span></div><div><b class="warn">${cnt["△"]}</b><span>△ 빠진 포인트</span></div><div><b class="bad">${cnt["×"]}</b><span>× 막힘</span></div><div><b>${Math.max(1,Math.round((RUN.end-RUN.start)/60000))}</b><span>분</span></div></div>
+    <p class="note">×·△는 내일, ○는 3일 뒤(연속이면 7·14·30일 뒤)에 다시 나옵니다. ${RUN.stage<3&&cnt["○"]>=Math.ceil(RUN.items.length*0.8)?"거의 다 ○이니 다음엔 한 단계 올려 보세요.":""}</p>
+    ${recs.length?`<details><summary>내 녹음 다시 듣기 (${recs.length}) — 이 화면을 떠나면 사라집니다</summary><div style="display:grid;gap:10px">${recs.map(c=>`<div><p class="note">${c.fg} ${esc(c.it.id)} · ${esc(c.it.ko.split("\n")[0].slice(0,40))}</p>${audioHTML(c.audio)}<p class="ja s" lang="ja">${ruby(c.it.ja)}</p></div>`).join("")}</div></details>`:""}
     <h3>녹음 받아쓰기 (선택, 주 1회 권장)</h3>
-    <p class="note">연습하며 녹음했다면, 들으면서 내가 실제로 말한 문장을 그대로 받아써 붙여 넣으세요(머뭇거림·고쳐 말한 것 포함, 문장 번호를 앞에). 정확성은 Claude가 채점합니다.</p>
+    <p class="note">녹음을 들으면서 내가 실제로 말한 문장을 그대로 받아써 붙여 넣으세요(머뭇거림·고쳐 말한 것 포함, 문장 번호를 앞에). 정확성은 Claude가 채점합니다.</p>
     <textarea id="trn" lang="ja" placeholder="P01-03: 何か問題が起きたら…">${esc(RUN.trans)}</textarea>
     <h3>결과지 (Claude에게 붙여 넣기)</h3>
     <textarea readonly id="res"></textarea>
@@ -835,48 +1143,87 @@ function viewEnd(){
   upd();
   $("#trn").oninput=e=>{RUN.trans=e.target.value;upd();};
   $("#cp").onclick=e=>copyText(resultText(),e.target);
-  $("#again").onclick=()=>{RUN=null;viewDrill();};
+  $("#again").onclick=()=>{RUN=null;recClear();viewDrill();};
 }
 
 /* ===== 핸즈프리 ===== */
-let HF={src:"P01",rate:0.95,twice:false,running:false,token:0};
-function stopHands(){HF.running=false;HF.token++;if(TTS.ok)speechSynthesis.cancel();}
+let HF={src:"P01",rate:0.95,twice:false,koTwice:false,running:false,token:0,results:[],lock:null,msg:""};
+function stopHands(){
+  const was=HF.running; HF.running=false;HF.token++;if(TTS.ok)speechSynthesis.cancel();
+  if(was){measStop(true);asrAbort();recAbort();}
+  if(HF.lock){try{HF.lock.release()}catch(e){} HF.lock=null;}
+}
+function capLabel(){const a=[DB.opt.mic?"🎤 반응 시간":"",DB.opt.rec&&REC.ok?"⏺ 녹음":"",DB.opt.asr&&ASR.ok?"음성 인식":""].filter(Boolean);return a.length?a.join(" · "):"없음 (말하는 동안 아무것도 잡지 않음)";}
 function viewHands(){
   const jaV=voiceFor("ja"),koV=voiceFor("ko");
+  if(HF.src!=="MIX"&&!SETS[HF.src]) HF.src="P01";
+  const R=HF.results;
   $("#view").innerHTML=`
   <section class="card">
     <h2>핸즈프리 (이어폰용)</h2>
-    <p>한국어를 읽어 줌 → 말할 시간만큼 쉼 (그동안 일본어로 말하기) → 일본어 모범 답을 읽어 줌 → 다음 문장. 화면을 보지 않아도 됩니다. 채점은 하지 않으니, 틀린 문장은 나중에 연습 탭에서 다시 하세요.</p>
+    <p>한국어를 읽어 줌 → 말할 시간만큼 쉼 (그동안 일본어로 말하기) → 일본어 모범 답을 읽어 줌 → 다음 문장. 화면을 보지 않아도 됩니다. 끝나면 문장별로 내 녹음·자동 확인을 다시 보고 복습 대상에 넣을 수 있습니다.</p>
     ${!TTS.ok?`<p class="bad">이 브라우저는 음성 읽기를 지원하지 않습니다.</p>`:`<p class="note">음성: 일본어 ${jaV?esc(jaV.name):"<span class='warn'>찾지 못함 (기본 음성으로 시도)</span>"} · 한국어 ${koV?esc(koV.name):"<span class='warn'>찾지 못함</span>"}</p>`}
-    <div class="chips" id="hsrc">${[["P01","P-01"],["P04","P-04"],["L1","L1"],["MIX","섞어서"]].map(([k,l])=>`<button class="chip" data-k="${k}" aria-pressed="${HF.src===k}">${l}</button>`).join("")}</div>
+    <div class="chips" id="hsrc">${Object.keys(SETS).map(k=>[k,SETS[k].short]).concat([["MIX","섞어서"]]).map(([k,l])=>`<button class="chip" data-k="${k}" aria-pressed="${HF.src===k}">${esc(l)}</button>`).join("")}</div>
     <div class="row"><label class="note" for="rate">읽기 속도</label><select id="rate" style="width:auto">${[0.8,0.9,0.95,1,1.1].map(r=>`<option value="${r}" ${HF.rate===r?"selected":""}>${r}</option>`).join("")}</select>
+      <label class="note"><input type="checkbox" id="kt" ${HF.koTwice?"checked":""}> 한국어 두 번</label>
       <label class="note"><input type="checkbox" id="tw" ${HF.twice?"checked":""}> 일본어 두 번</label></div>
+    <p class="note">말하는 동안 잡는 것: <b>${capLabel()}</b> (연습 탭의 측정 옵션을 따릅니다). 스피커로 들으면 읽어 주는 소리가 마이크로 들어갈 수 있으니 이어폰을 쓰세요.</p>
     <div class="row"><button class="btn pri" id="hgo" ${TTS.ok?"":"disabled"}>${HF.running?"멈추기":"시작"}</button></div>
-    <p class="note" id="hnow" aria-live="polite"></p>
-    <p class="note">아이폰은 화면이 잠기면 읽기가 멈출 수 있습니다 (기기별 확인 필요). 쉬는 시간: 문장형 ${SETS.P01.limit}초, 보고 ${SETS.L1.limit}초.</p>
-  </section>`;
+    <p class="note" id="hnow" aria-live="polite">${esc(HF.msg)}</p>
+    <p class="note">보고형(L1)은 길어서 한 번 듣고 기억하기 어렵습니다. 처음엔 「한국어 두 번」을 켜세요. 쉬는 시간: 문장형 8~15초, 보고 25초. 화면이 잠기면 읽기가 멈추는 기기가 있습니다 — <b>기기 점검</b> 탭의 「핸즈프리 연속 재생」으로 먼저 확인하세요.</p>
+  </section>
+  ${R.length&&!HF.running?`<section class="card">
+    <h2>방금 한 문장 (${R.length})</h2>
+    <p class="note">자동 확인에 ✗가 있거나 목소리를 못 잡은 문장은 미리 체크해 두었습니다. 체크한 문장은 오늘 연습 탭 「복습 대상」에 나옵니다.</p>
+    ${R.map((x,k)=>`<div class="hfr">
+      <label class="opt"><input type="checkbox" data-hr="${k}" ${x.pick?"checked":""}><span><b>${esc(x.it.id)}</b> · ${esc(x.it.scene)}<br>${esc(x.it.ko.replace(/\n/g," / "))}</span></label>
+      ${x.meas?`<p class="note">🎤 ${esc(measText(x.meas))}</p>`:""}
+      ${x.heard!=null?`<p class="note" lang="ja">인식: ${esc(x.heard||"(없음)")}</p>${(x.auto||[]).length?`<div class="meas">${x.auto.map(a=>`<span class="${a.ok?"ok":"bad"}">${a.ok?"✓":"✗"} ${esc(a.label)}</span>`).join("")}</div>`:""}`:""}
+      ${audioHTML(x.audio)}
+      <p class="ja s" lang="ja">${ruby(x.it.ja)}</p>
+    </div>`).join("")}
+    <div class="row"><button class="btn pri" id="hdue">체크한 문장을 복습 대상에 넣기</button><button class="btn" id="hclr">목록 지우기</button></div>
+    <p class="note" id="hmsg" aria-live="polite"></p>
+  </section>`:""}`;
   document.querySelectorAll("#hsrc .chip").forEach(b=>b.onclick=()=>{if(!HF.running){HF.src=b.dataset.k;viewHands();}});
   $("#rate").onchange=e=>HF.rate=+e.target.value;
   $("#tw").onchange=e=>HF.twice=e.target.checked;
-  $("#hgo").onclick=()=>{if(HF.running){stopHands();viewHands();}else runHands();};
+  $("#kt").onchange=e=>HF.koTwice=e.target.checked;
+  $("#hgo").onclick=()=>{if(HF.running){stopHands();HF.msg="멈췄습니다.";viewHands();}else runHands();};
+  document.querySelectorAll("[data-hr]").forEach(x=>x.onchange=()=>{R[+x.dataset.hr].pick=x.checked;});
+  if($("#hdue")) $("#hdue").onclick=()=>{
+    const p=R.filter(x=>x.pick); p.forEach(x=>{const r=rec(x.it.id); r.n=Math.max(r.n,1); r.streak=0; r.due=today();}); save();
+    $("#hmsg").textContent=p.length?`${p.length}문장을 오늘 복습 대상에 넣었습니다.`:"체크한 문장이 없습니다.";
+  };
+  if($("#hclr")) $("#hclr").onclick=()=>{HF.results=[];recClear();HF.msg="";viewHands();};
 }
 async function runHands(){
+  HF.msg="";
+  if(needMic()&&!(await micStart())) HF.msg="마이크를 쓸 수 없어 측정·녹음 없이 진행합니다.";
+  recClear(); HF.results=[];
   HF.running=true;const my=++HF.token;viewHands();
+  try{ if(navigator.wakeLock) HF.lock=await navigator.wakeLock.request("screen"); }catch(e){}
   const items=shuffle(pool(HF.src));
-  const now=t=>{const el=$("#hnow");if(el)el.textContent=t;};
+  const now=t=>{HF.msg=t;const el=$("#hnow");if(el)el.textContent=t;};
   for(let i=0;i<items.length;i++){
     if(my!==HF.token)return;
-    const it=items[i],lim=SETS[it.set].limit;
+    const it=items[i],lim=limitOf(it);
     now(`${i+1}/${items.length} · ${it.id} · 한국어`);
-    await speak((it.type==="응답형"?it.scene+". ":"")+it.ko.replace(/\(메모\)\n?/,"메모. ").replace(/\n/g,", "),"ko",HF.rate);
+    await speak(koSpeech(it),"ko",HF.rate);
+    if(HF.koTwice){await wait(700);if(my!==HF.token)return;await speak(koSpeech(it),"ko",HF.rate);}
+    if(my!==HF.token)return;
+    capStart();
     for(let s=lim;s>0;s--){if(my!==HF.token)return;now(`${i+1}/${items.length} · 말하기 ${s}초`);await wait(1000);}
     if(my!==HF.token)return;
+    const o=await capStop(it);
+    if(my!==HF.token)return;
+    const x=Object.assign({it},o); x.pick=!!((x.auto||[]).some(a=>!a.ok)||(x.meas&&x.meas.lat==null)); HF.results.push(x);
     now(`${i+1}/${items.length} · 모범 답`);
     await speak(speakJa(it.ja),"ja",HF.rate);
     if(HF.twice){await wait(800);if(my!==HF.token)return;await speak(speakJa(it.ja),"ja",HF.rate);}
     await wait(2000);
   }
-  if(my===HF.token){HF.running=false;viewHands();const el=$("#hnow");if(el)el.textContent="끝. 연습 탭에서 채점하며 다시 해 보세요.";}
+  if(my===HF.token){stopHands();micOff();HF.msg="끝. 아래에서 녹음과 자동 확인을 보고 복습할 문장을 고르세요.";viewHands();}
 }
 
 /* ===== 롤플레이 ===== */
@@ -908,15 +1255,16 @@ function viewRP(){
 
 /* ===== 기록 ===== */
 function viewLog(){
-  const rows=ITEMS.map(i=>{const r=DB.items[i.id];return `<tr><td class="n">${i.id}</td><td>${esc(i.ko.split("\n")[0].replace("(메모)","메모").slice(0,28))}…</td><td>${r?r.hist.map(h=>h.g).slice(-5).join(" "):"-"}</td><td class="n">${r&&r.due?r.due:"-"}</td></tr>`;}).join("");
-  const sess=DB.sessions.slice(-10).reverse().map(s=>`<tr><td class="n">${esc(s.at)}</td><td>${esc(srcName(s.src))}</td><td>${s.stage}</td><td>${s.cnt["말함"]!=null?`말함 ${s.cnt["말함"]} · 막힘 ${s.cnt["막힘"]||0}`:`○${s.cnt["○"]||0} △${s.cnt["△"]||0} ×${s.cnt["×"]||0}`}${s.lat!=null?` · 첫마디 ${sec(s.lat)}`:""}</td></tr>`).join("");
+  const rows=ITEMS.map(i=>{const r=DB.items[i.id];return `<tr><td class="n">${esc(i.id)}</td><td>${esc(i.ko.split("\n")[0].replace("(메모)","메모").slice(0,28))}…</td><td>${r?r.hist.map(h=>h.g).slice(-5).join(" "):"-"}</td><td class="n">${r&&r.due?r.due:"-"}</td></tr>`;}).join("");
+  const sess=DB.sessions.slice(-10).reverse().map(s=>`<tr><td class="n">${esc(s.at)}</td><td>${esc(srcName(s.src))}${s.listen?" 🎧":""}</td><td>${s.stage}</td><td>${s.cnt["말함"]!=null?`말함 ${s.cnt["말함"]} · 막힘 ${s.cnt["막힘"]||0}`:`○${s.cnt["○"]||0} △${s.cnt["△"]||0} ×${s.cnt["×"]||0}`}${s.lat!=null?` · 첫마디 ${sec(s.lat)}`:""}</td></tr>`).join("");
+  const cs=Object.keys(CUSTOM.sets), ci=CUSTOM.items.length;
   $("#view").innerHTML=`
   <section class="card">
     <h2>말하기 상태</h2>
     <div class="tw"><table><thead><tr><th>패턴</th><th>글 상태 (LA-07)</th><th>드릴 1단계</th><th>드릴 2단계</th><th>섞어서</th><th>첫마디 (최근 평균)</th><th>대화 속</th></tr></thead><tbody>
-      ${Object.keys(SETS).map(k=>{const s=talkStatus(k);const f=v=>v===null?"-":v+"%";return `<tr><td><b>${SETS[k].short}</b></td><td>${({P01:"집중 (3회)",P04:"집중 (3회)",L1:"P-05 경계 (2회)"})[k]||"-"}</td><td>${f(drillRate(k,1))}</td><td>${f(drillRate(k,2))}</td><td>${f(drillRate(k,3))}</td><td>${sec(drillLat(k))}</td><td>${s.run}/3${s.grad?" 졸업":""}</td></tr>`;}).join("")}
+      ${Object.keys(SETS).map(k=>{const s=talkStatus(k);const f=v=>v===null?"-":v+"%";return `<tr><td><b>${esc(SETS[k].short)}</b></td><td>${({P01:"집중 (3회)",P04:"집중 (3회)",L1:"P-05 경계 (2회)"})[k]||"-"}</td><td>${f(drillRate(k,1))}</td><td>${f(drillRate(k,2))}</td><td>${f(drillRate(k,3))}</td><td>${sec(drillLat(k))}</td><td>${s.run}/3${s.grad?" 졸업":""}</td></tr>`;}).join("")}
     </tbody></table></div>
-    <p class="note">드릴 수치는 최근 10회의 말함 비율. 80% 안팎이면 다음 단계로. 첫마디는 🎤 측정을 켠 연습의 최근 10문장 평균으로, 줄어들수록 자동으로 나오고 있다는 뜻입니다. 글 상태는 2026-10-22 LA-07 기준(고정 표시).</p>
+    <p class="note">드릴 수치는 최근 10회 중 ○(말함 + 포인트 전부) 비율. v4까지의 '말함' 기록은 ○로 셉니다. 80% 안팎이면 다음 단계로. 첫마디는 🎤 측정을 켠 연습의 최근 10문장 평균으로, 줄어들수록 자동으로 나오고 있다는 뜻입니다. 글 상태는 2026-10-22 LA-07 기준(고정 표시).</p>
   </section>
   <section class="card">
     <h2>문장별 기록</h2>
@@ -927,14 +1275,32 @@ function viewLog(){
     ${sess?`<div class="tw"><table><thead><tr><th>시각</th><th>세트</th><th>단계</th><th>결과</th></tr></thead><tbody>${sess}</tbody></table></div>`:`<p class="note">아직 기록이 없습니다.</p>`}
   </section>
   <section class="card">
+    <h2>문제 추가하기</h2>
+    <p class="note">결과지를 보내면 Claude가 새 문장을 JSON으로 줍니다. 그 답을 통째로 붙여 넣으면 JSON 부분만 찾아 이 기기에 추가합니다 (저장소 파일에는 들어가지 않음). 같은 번호를 다시 넣으면 새 내용으로 바뀝니다.</p>
+    <p class="note">지금 추가된 문제: <b>${ci}</b>문장${cs.length?` · 추가 세트 ${cs.map(esc).join(", ")}`:""}</p>
+    <textarea id="cq" placeholder='{"items":[{"id":"H1-1026-1","set":"H1","type":"문장형","scene":"…","ko":"…","ja":"…","alt":["…"],"pts":["…"],"kw":[["…","…"]],"ng":["…"]}]}'></textarea>
+    <div class="row"><button class="btn pri" id="cqAdd">추가</button><button class="btn" id="cqFmt">형식 복사 (Claude에게 보낼 요청문)</button>${ci||cs.length?`<button class="btn" id="cqDel">추가한 문제 모두 지우기</button>`:""}</div>
+    <p class="note" id="cqMsg" aria-live="polite"></p>
+  </section>
+  <section class="card">
     <h2>백업과 옮기기</h2>
-    <p class="note">기록은 이 기기·이 브라우저에만 저장됩니다. 다른 기기로 옮길 때 백업 코드를 복사해 그쪽에서 불러오세요.</p>
+    <p class="note">기록과 추가한 문제는 이 기기·이 브라우저에만 저장됩니다. 다른 기기로 옮길 때 백업 코드를 복사해 그쪽에서 불러오세요.</p>
     <div class="row"><button class="btn" id="bk">백업 코드 복사</button></div>
     <textarea id="imp" placeholder="LAID1: 로 시작하는 백업 코드를 붙여 넣기"></textarea>
     <div class="row"><button class="btn" id="im">불러와서 합치기</button><button class="btn" id="rs">기록 모두 지우기</button></div>
     <p class="note" id="imsg" aria-live="polite"></p>
   </section>`;
-  $("#bk").onclick=e=>copyText("LAID1:"+btoa(unescape(encodeURIComponent(JSON.stringify(DB)))),e.target);
+  $("#cqAdd").onclick=()=>{
+    try{
+      const p=parseCustom($("#cq").value);
+      if(!p.items.length&&!Object.keys(p.sets).length) throw new Error("추가할 문장이 없습니다."+(p.skipped.length?" ("+p.skipped.join(" / ")+")":""));
+      mergeCustom(p); viewLog();
+      $("#cqMsg").textContent=`${p.items.length}문장${Object.keys(p.sets).length?` · 세트 ${Object.keys(p.sets).length}개`:""}를 추가했습니다.${p.skipped.length?" 건너뜀: "+p.skipped.join(" / "):""}`;
+    }catch(e){$("#cqMsg").textContent="읽지 못했습니다: "+(e&&e.message||e);}
+  };
+  $("#cqFmt").onclick=e=>copyText(jsonAsk(),e.target);
+  if($("#cqDel")) $("#cqDel").onclick=()=>{if(confirm("추가한 문제를 모두 지울까요? (기록은 남습니다)")){CUSTOM={sets:{},items:[]};saveCustom();applyCustom();viewLog();}};
+  $("#bk").onclick=e=>copyText("LAID1:"+btoa(unescape(encodeURIComponent(JSON.stringify(Object.assign({},DB,{custom:CUSTOM}))))),e.target);
   $("#im").onclick=()=>{
     const v=$("#imp").value.trim();
     try{
@@ -944,10 +1310,183 @@ function viewLog(){
       Object.entries(d.talk||{}).forEach(([k,t])=>{const m=DB.talk[k];if(!m||t.seq.length>m.seq.length)DB.talk[k]=t;});
       const seen=new Set(DB.sessions.map(s=>s.at+s.src));(d.sessions||[]).forEach(s=>{if(!seen.has(s.at+s.src))DB.sessions.push(s);});
       DB.sessions.sort((a,b)=>a.at<b.at?-1:1);
+      if(d.custom){Object.entries(d.custom.sets||{}).forEach(([k,s])=>{if(!CUSTOM.sets[k])CUSTOM.sets[k]=s;});(d.custom.items||[]).forEach(it=>{if(!CUSTOM.items.some(x=>x.id===it.id))CUSTOM.items.push(it);});saveCustom();applyCustom();}
       save();viewLog();$("#imsg").textContent="합쳤습니다.";
     }catch(e){$("#imsg").textContent="코드를 읽지 못했습니다. LAID1: 로 시작하는 코드 전체를 붙여 넣으세요.";}
   };
-  $("#rs").onclick=()=>{if(confirm("이 기기의 통역 드릴 기록을 모두 지울까요?")){DB={items:{},talk:{},sessions:[]};save();viewLog();}};
+  $("#rs").onclick=()=>{if(confirm("이 기기의 통역 드릴 기록을 모두 지울까요? (설정과 추가한 문제는 남습니다)")){DB={items:{},talk:{},sessions:[],opt:DB.opt,dev:DB.dev};save();viewLog();}};
+}
+
+/* ===== 기기 점검 (v5) =====
+   핸즈프리·듣고 통역에 필요한 기능이 이 기기에서 실제로 되는지 하나씩 확인한다. 결과는 이 기기에만 저장. */
+const CK={res:(DB.dev&&DB.dev.res)||{},at:(DB.dev&&DB.dev.at)||"",token:0,iv:null,busy:""};
+const CK_TESTS=[
+ {id:"ko",title:"① 한국어 음성 (문제 읽기)",desc:"한국어 문장을 읽어 줍니다. 실제로 쓸 상태(이어폰 등)로 들어 보세요."},
+ {id:"ja",title:"② 일본어 음성 (모범 답 읽기)",desc:"일본어 문장을 읽어 줍니다."},
+ {id:"mic",title:"③ 마이크",desc:"누른 뒤 4초 동안 「あー」 하고 소리를 내세요. 주변 소음과 목소리 크기를 비교합니다.",lvl:true},
+ {id:"echo",title:"④ 스피커 소리 새어 들어감",desc:"일본어 음성을 틀면서 그 소리가 마이크로 들어가는지 봅니다. 그동안 조용히 계세요. 들어가면 반응 시간·음성 인식이 틀어집니다.",lvl:true},
+ {id:"asr",title:"⑤ 일본어 음성 인식",desc:"누른 뒤 「お会計お願いします」라고 말하세요. 5초 뒤 멈춥니다. 인터넷 연결이 필요한 기기가 많습니다."},
+ {id:"rec",title:"⑥ 녹음 다시 듣기",desc:"누른 뒤 3초 동안 아무 말이나 하세요. 녹음을 바로 들려줍니다.",lvl:true},
+ {id:"hf",title:"⑦ 핸즈프리 연속 재생",desc:"한국어 → 5초 쉼 → 일본어를 이어서 읽습니다. 시작한 뒤 화면을 끄거나 다른 앱으로 가 보세요. 끝까지 들리면 핸즈프리를 화면을 끈 채로 쓸 수 있습니다."}
+];
+const CK_ICON={ok:["✓","ok"],warn:["△","warn"],bad:["✗","bad"],ask:["?","warn"],run:["…",""],skip:["–",""]};
+function stopCheck(){CK.token++;CK.busy="";if(CK.iv){clearInterval(CK.iv);CK.iv=null;}if(TTS.ok)speechSynthesis.cancel();asrAbort();recAbort();}
+function ckSet(id,st,msg,html){CK.res[id]={st,msg,html};if(st!=="run"&&st!=="ask"){CK.at=stamp();DB.dev={at:CK.at,res:Object.fromEntries(Object.entries(CK.res).filter(([k,v])=>v.st!=="run"&&v.st!=="ask").map(([k,v])=>[k,{st:v.st,msg:v.msg}]))};save();}if(TAB==="check")viewCheck();}
+/* ms 동안 마이크 소리 크기를 모은다. 막대(id)를 함께 움직인다 */
+function ckSample(ms,barId,my){
+  return new Promise(res=>{
+    const a=[], end=performance.now()+ms;
+    CK.iv=setInterval(()=>{
+      if(my!==CK.token||!MIC.ok){clearInterval(CK.iv);CK.iv=null;res(a);return;}
+      const r=micLevel(); a.push(r); const b=document.getElementById(barId); if(b) b.style.width=Math.min(100,r*900)+"%";
+      if(performance.now()>=end){clearInterval(CK.iv);CK.iv=null;res(a);}
+    },40);
+  });
+}
+const pct=(a,p)=>{if(!a.length)return 0;const s=a.slice().sort((x,y)=>x-y);return s[Math.min(s.length-1,Math.floor(s.length*p))];};
+const lv=v=>Math.round(v*1000);
+async function ckRun(id){
+  stopCheck(); const my=++CK.token; CK.busy=id;
+  const alive=()=>my===CK.token;
+  try{
+  if(id==="ko"||id==="ja"){
+    if(!TTS.ok) return ckSet(id,"bad","이 브라우저는 음성 읽기를 지원하지 않습니다.");
+    const v=voiceFor(id); ckSet(id,"run","읽는 중…");
+    const t0=performance.now();
+    await speak(id==="ko"?"안녕하세요. 한국어 음성 점검입니다. 잘 들리면 들림을 누르세요.":"こんにちは。日本語の音声テストです。お会計お願いします。",id);
+    if(!alive()) return;
+    const quick=performance.now()-t0<600;
+    ckSet(id,"ask",`${v?"음성: "+v.name:"이 언어 음성을 찾지 못해 기본 음성으로 읽었습니다"}${quick?" · 재생이 너무 빨리 끝났습니다 (소리가 안 났을 수 있음)":""}. 들렸나요?`);
+    CK.res[id].voice=!!v;
+  }
+  else if(id==="mic"){
+    ckSet(id,"run","마이크 권한을 요청하는 중…");
+    if(!(await micStart())) return ckSet(id,"bad","마이크를 쓸 수 없습니다 (주소창의 마이크 권한 허용, 다른 앱이 마이크를 쓰는지 확인).");
+    if(!alive()) return;
+    ckSet(id,"run","「あー」 하고 소리를 내세요 (4초)");
+    const a=await ckSample(4000,"lvl-mic",my); if(!alive()) return;
+    const floor=pct(a,.1), peak=pct(a,.95);
+    if(peak>Math.max(floor*3,.02)) ckSet(id,"ok",`목소리가 잘 잡힙니다 (소음 ${lv(floor)} · 목소리 ${lv(peak)}).`);
+    else if(peak>.012) ckSet(id,"warn",`잡히긴 하지만 소음과 차이가 작습니다 (소음 ${lv(floor)} · 목소리 ${lv(peak)}). 조용한 곳에서 쓰거나 마이크에 가까이.`);
+    else ckSet(id,"bad",`소리가 거의 들어오지 않습니다 (최대 ${lv(peak)}). 마이크 선택·음소거를 확인하세요.`);
+  }
+  else if(id==="echo"){
+    if(!TTS.ok) return ckSet(id,"skip","음성 읽기를 지원하지 않아 건너뜁니다.");
+    ckSet(id,"run","마이크 준비 중…");
+    if(!(await micStart())) return ckSet(id,"bad","마이크를 쓸 수 없어 확인하지 못했습니다.");
+    if(!alive()) return;
+    ckSet(id,"run","조용히 계세요 — 주변 소리를 재는 중");
+    const base=await ckSample(800,"lvl-echo",my); if(!alive()) return;
+    ckSet(id,"run","일본어를 트는 중 — 조용히 계세요");
+    const during=[]; let on=true;
+    const p=speak("駅には何時ごろ着きますか。確認して、改めてご連絡いたします。","ja").then(()=>{on=false;});
+    while(on&&alive()){ const s=await ckSample(200,"lvl-echo",my); during.push(...s); }
+    await p; if(!alive()) return;
+    const floor=pct(base,.5), mid=pct(during,.5);
+    if(!during.length) ckSet(id,"warn","측정하지 못했습니다. 다시 해 보세요.");
+    else if(mid>Math.max(floor*2.5,.01)) ckSet(id,"warn",`스피커 소리가 마이크로 들어옵니다 (조용할 때 ${lv(floor)} → 재생 중 ${lv(mid)}). 이어폰을 쓰세요. 스피커로 할 때는 음성 인식을 끄는 게 낫습니다.`);
+    else ckSet(id,"ok",`스피커 소리가 마이크로 거의 들어오지 않습니다 (조용할 때 ${lv(floor)} · 재생 중 ${lv(mid)}).`);
+  }
+  else if(id==="asr"){
+    if(!ASR.ok) return ckSet(id,"bad","이 브라우저는 음성 인식을 지원하지 않습니다 (크롬·사파리 최신판 권장). 음성 인식 옵션은 끄고 녹음 다시 듣기로 확인하세요.");
+    micOff(); /* 아이폰은 마이크 측정과 음성 인식을 함께 쓰면 하나가 멈출 수 있어 따로 잰다 */
+    asrStart();
+    for(let s=5;s>0;s--){ if(!alive()) return; ckSet(id,"run",`「お会計お願いします」라고 말하세요 (${s}초)`); await wait(1000); }
+    const t=(await asrStop()).trim(); if(!alive()) return;
+    const h=normJa(t);
+    if(/会計|かいけい|カイケイ/.test(h)) ckSet(id,"ok",`인식: 「${t}」`);
+    else if(h) ckSet(id,"warn",`인식은 되지만 정확하지 않습니다: 「${t}」. 자동 확인은 참고로만 보세요.`);
+    else ckSet(id,"bad","아무것도 인식하지 못했습니다 (마이크 권한·인터넷 연결 확인). 음성 인식 옵션은 끄는 게 낫습니다.");
+  }
+  else if(id==="rec"){
+    if(!REC.ok) return ckSet(id,"bad","이 브라우저는 녹음을 지원하지 않습니다. ⏺ 녹음 옵션은 끄세요.");
+    ckSet(id,"run","마이크 준비 중…");
+    if(!(await micStart())) return ckSet(id,"bad","마이크를 쓸 수 없습니다.");
+    if(!alive()) return;
+    recStart(); ckSet(id,"run","아무 말이나 하세요 (3초)");
+    await ckSample(3000,"lvl-rec",my); if(!alive()){recAbort();return;}
+    const u=await recStop(); if(!alive()) return;
+    if(!u) return ckSet(id,"bad","녹음이 비었습니다. ⏺ 녹음 옵션은 끄세요.");
+    ckSet(id,"ask","녹음을 재생해 보세요. 내 목소리가 들렸나요?",audioHTML(u));
+    const el=document.querySelector("#ck-rec audio"); if(el){try{await el.play()}catch(e){}}
+  }
+  else if(id==="hf"){
+    if(!TTS.ok) return ckSet(id,"bad","음성 읽기를 지원하지 않아 핸즈프리를 쓸 수 없습니다.");
+    let lock=null, hidden=false; const onVis=()=>{if(document.visibilityState==="hidden")hidden=true;};
+    document.addEventListener("visibilitychange",onVis);
+    try{ if(navigator.wakeLock) lock=await navigator.wakeLock.request("screen"); }catch(e){}
+    ckSet(id,"run","한국어를 읽는 중… (지금 화면을 꺼 보세요)");
+    const t0=performance.now();
+    await speak("핸즈프리 점검입니다. 오 초 뒤에 일본어가 나옵니다.","ko");
+    for(let s=5;s>0;s--){ if(!alive()) break; await wait(1000); }
+    if(alive()) await speak("これで点検は終わりです。お疲れさまでした。","ja");
+    document.removeEventListener("visibilitychange",onVis);
+    if(lock){try{lock.release()}catch(e){}}
+    if(!alive()) return;
+    const sec2=Math.round((performance.now()-t0)/1000);
+    ckSet(id,"ask",`${sec2}초 걸림 · 화면 켜짐 유지 ${navigator.wakeLock?(lock?"켜짐":"요청 실패"):"지원 안 함"} · ${hidden?"화면을 끈(다른 앱으로 간) 상태를 거쳤습니다":"화면을 켠 채로 진행됐습니다"}. 일본어까지 끝까지 들렸나요?`);
+    CK.res[id].hidden=hidden;
+  }
+  }finally{ if(my===CK.token){ CK.busy=""; if(TAB==="check") viewCheck(); } }
+}
+function ckAnswer(id,yes){
+  const r=CK.res[id]; if(!r) return;
+  if(id==="ko"||id==="ja") ckSet(id,yes?(r.voice?"ok":"warn"):"bad", yes?(r.voice?r.msg.replace(/ 들렸나요\?$/,""):"기본 음성으로 들립니다. 기기 설정에서 이 언어의 음성(TTS)을 내려받으면 발음이 좋아집니다."):"소리가 나지 않습니다. 기기 음량·무음 모드, 기기 설정의 음성(TTS) 언어를 확인하세요.");
+  else if(id==="rec") ckSet(id,yes?"ok":"bad",yes?"녹음과 재생이 됩니다.":"녹음이 들리지 않습니다. ⏺ 녹음 옵션은 끄세요.");
+  else if(id==="hf") ckSet(id,yes?"ok":"bad",yes?(r.hidden?"화면을 끈 상태에서도 끝까지 읽습니다. 핸즈프리를 화면을 끈 채로 써도 됩니다.":"끝까지 읽습니다. 화면을 끈 상태는 확인하지 않았으니, 화면을 끄고 한 번 더 해 보세요."):"도중에 멈췄습니다. 핸즈프리는 화면을 켠 채로 쓰세요.");
+}
+function ckAdvice(){
+  const R=CK.res, st=id=>R[id]&&R[id].st, a=[];
+  if(st("ko")==="bad"||st("ja")==="bad") a.push("음성 읽기가 안 되면 핸즈프리·🎧 듣고 통역을 쓸 수 없습니다. 기기 설정에서 한국어·일본어 음성(TTS)을 확인하세요.");
+  if(st("mic")==="bad") a.push("🎤 반응 시간·⏺ 녹음 옵션은 끄세요.");
+  if(st("echo")==="warn") a.push("이어폰을 쓰세요. 스피커로 할 때는 음성 인식을 끄세요.");
+  if(st("asr")==="bad") a.push("음성 인식 옵션은 끄고, ⏺ 녹음 다시 듣기로 확인하세요.");
+  if(st("asr")==="warn") a.push("음성 인식 자동 확인은 참고로만 보세요.");
+  if(st("rec")==="bad") a.push("⏺ 녹음 옵션은 끄세요.");
+  if(st("hf")==="bad") a.push("핸즈프리는 화면을 켠 채로 쓰세요.");
+  const done=CK_TESTS.filter(t=>st(t.id)&&st(t.id)!=="run"&&st(t.id)!=="ask").length;
+  if(done===CK_TESTS.length&&!a.length) a.push("모든 기능이 됩니다. 연습 탭에서 🎧·🎤·⏺·음성 인식을 모두 켜고 써도 됩니다.");
+  else if(done&&!a.length) a.push(`지금까지 한 테스트(${done}/${CK_TESTS.length})는 문제없습니다. 나머지도 해 보세요.`);
+  return {a,done};
+}
+function ckText(){
+  const {a}=ckAdvice();
+  let t=`[LA 기기 점검] ${CK.at||stamp()}\n기기: ${navigator.userAgent}\n`;
+  CK_TESTS.forEach(x=>{const r=CK.res[x.id];t+=`- ${x.title.replace(/^\S+ /,"")}: ${r?CK_ICON[r.st][0]+" "+(r.msg||""):"안 함"}\n`;});
+  if(a.length) t+=`권장: ${a.join(" / ")}\n`;
+  return t;
+}
+function viewCheck(){
+  const jaV=voiceFor("ja"),koV=voiceFor("ko");
+  const sup=(ok,l)=>`<span class="${ok?"ok":"bad"}">${ok?"✓":"✗"} ${l}</span>`;
+  const {a,done}=ckAdvice();
+  $("#view").innerHTML=`
+  <section class="card">
+    <h2>기기 점검</h2>
+    <p>핸즈프리·🎧 듣고 통역·측정을 쓰기 전에, 이 기기에서 소리·마이크·음성 인식이 실제로 되는지 확인합니다. <b>실제로 쓸 상태(이어폰을 꽂은 상태)</b>로 위에서부터 하나씩 눌러 보세요. 녹음은 저장하지 않습니다.</p>
+    <div class="meas">${sup(TTS.ok,"음성 읽기")}${sup(!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia),"마이크")}${sup(ASR.ok,"음성 인식")}${sup(REC.ok,"녹음")}${sup(!!navigator.wakeLock,"화면 켜짐 유지")}</div>
+    <p class="note">찾은 음성: 한국어 ${koV?esc(koV.name):"<span class='warn'>없음</span>"} · 일본어 ${jaV?esc(jaV.name):"<span class='warn'>없음</span>"}${TTS.ok&&!TTS.voices.length?" (음성 목록을 아직 못 받았을 수 있음 — 한 번 재생하면 채워집니다)":""}</p>
+  </section>
+  ${CK_TESTS.map(x=>{const r=CK.res[x.id], ic=r?CK_ICON[r.st]:null, busy=CK.busy===x.id;return `<section class="card ck" id="ck-${x.id}">
+    <div class="row" style="justify-content:space-between"><h2>${x.title}</h2>${ic?`<b class="${ic[1]}" style="font-size:1.2rem">${ic[0]}</b>`:""}</div>
+    <p class="note">${x.desc}</p>
+    ${x.lvl&&busy?`<div class="lvl"><i id="lvl-${x.id}"></i></div>`:""}
+    ${r&&r.msg?`<p class="${ic[1]||"note"}" aria-live="polite">${esc(r.msg)}</p>`:""}
+    ${r&&r.html?r.html:""}
+    <div class="row">
+      <button class="btn ${r&&r.st!=="run"?"":"pri"}" data-ck="${x.id}" ${CK.busy&&!busy?"disabled":""}>${busy?"멈추기":r&&r.st!=="run"?"다시 하기":"테스트"}</button>
+      ${r&&r.st==="ask"?`<button class="btn o" data-ans="${x.id}" data-v="1">${x.id==="hf"?"끝까지 들림":"들림"}</button><button class="btn x" data-ans="${x.id}" data-v="0">${x.id==="hf"?"중간에 멈춤":"안 들림"}</button>`:""}
+    </div>
+  </section>`;}).join("")}
+  <section class="card">
+    <h2>결과 (${done}/${CK_TESTS.length})${CK.at?` <span class="note">${esc(CK.at)}</span>`:""}</h2>
+    ${a.length?`<ul style="margin:0;padding-left:1.2em;display:grid;gap:4px">${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p class="note">테스트를 하면 여기에 권장 설정이 나옵니다.</p>`}
+    <div class="row"><button class="btn" id="ckcp">점검 결과 복사</button><button class="btn" id="ckclr">결과 지우기</button></div>
+  </section>`;
+  document.querySelectorAll("[data-ck]").forEach(b=>b.onclick=()=>{const id=b.dataset.ck; if(CK.busy===id){stopCheck();micOff();delete CK.res[id];viewCheck();} else ckRun(id);});
+  document.querySelectorAll("[data-ans]").forEach(b=>b.onclick=()=>ckAnswer(b.dataset.ans,b.dataset.v==="1"));
+  $("#ckcp").onclick=e=>copyText(ckText(),e.target);
+  $("#ckclr").onclick=()=>{stopCheck();CK.res={};CK.at="";DB.dev=undefined;save();viewCheck();};
 }
 
 /* ===== 사용법 ===== */
@@ -955,28 +1494,42 @@ function viewHelp(){
   $("#view").innerHTML=`
   <section class="card">
     <h2>무엇을 하는 도구인가</h2>
-    <p>한국어를 보고(듣고) 바로 일본어로 <b>소리 내어</b> 말한 뒤, 모범 답과 비교해 스스로 채점합니다. 같은 문장을 외우는 게 아니라, 한 패턴을 내용이 다른 여러 문장으로 반복해 <b>말할 때 자동으로 나오게</b> 만드는 것이 목적입니다 (LA-06 8절).</p>
+    <p>한국어를 보고(듣고) 바로 일본어로 <b>소리 내어</b> 말한 뒤, 모범 답과 비교해 채점합니다. 같은 문장을 외우는 게 아니라, 한 패턴을 내용이 다른 여러 문장으로 반복해 <b>말할 때 자동으로 나오게</b> 만드는 것이 목적입니다 (LA-06 8절).</p>
+    <p class="note">세트: P-01 명사 나열 풀기 · P-04 한국 회사 용어 · L1 결론 먼저 (업무) / H1 한자어 함정 · C1 장면별 말투 (일상·가게·격식). P-01의 한국어가 딱딱한 공문체인 것은 일부러입니다 — 그 문체를 말로 푸는 것이 훈련 목표입니다.</p>
+  </section>
+  <section class="card">
+    <h2>처음 한 번</h2>
+    <p><b>기기 점검</b> 탭에서 한국어·일본어 음성, 마이크, 스피커 소리 새어 들어감, 음성 인식, 녹음, 핸즈프리 연속 재생을 확인하세요. 결과에 맞춰 권장 설정이 나옵니다.</p>
   </section>
   <section class="card">
     <h2>순서</h2>
     <ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">
-      <li><b>1 천천히</b>: 세트의 규칙과 대체 문형을 읽고, 생각하며 말하기. 거의 다 말하면 다음 단계</li>
-      <li><b>2 빠르게</b>: 제한 시간 안에. 대체 문형이 먼저 튀어나오게</li>
+      <li><b>1 천천히</b>: 세트의 규칙과 대체 문형을 읽고, 생각하며 말하기. 거의 다 ○면 다음 단계</li>
+      <li><b>2 빠르게</b>: 제한 시간 안에. 대체 문형이 먼저 튀어나오게. 익숙해지면 🎧 듣고 통역으로</li>
       <li><b>3 섞어서</b>: 모든 세트를 섞어 예고 없이</li>
       <li><b>4 대화 속</b>: 롤플레이 탭. 3회 연속 안 나오면 말하기 졸업</li>
     </ol>
     <p class="note">4단계에서 나오면 2~3단계로 돌아갑니다. 습관 하나가 바뀌는 데는 몇 주가 걸립니다.</p>
   </section>
   <section class="card">
-    <h2>채점 방식 (v3)</h2>
-    <p>스스로는 <b>"제한 시간 안에 끝까지 말했나(말함/막힘)"</b>만 누릅니다. 정확성은 스스로 채점하면 관대해지기 쉬워서, <b>녹음을 받아써서 결과지와 함께 보내면 Claude가 포인트 기준으로 채점</b>합니다(주 1회 정도 권장).</p>
-    <p class="note">막힌 문장은 다음 날, 말한 문장은 3일 → 7일 → 14일 → 30일 뒤에 다시 나옵니다 (복습 대상).</p>
+    <h2>🎧 듣고 통역 (v5)</h2>
+    <p>한국어 글자를 가리고 소리로만 냅니다. 읽어 주는 동안에는 제한 시간이 멈추고, 다 읽은 뒤부터 잽니다. 다시 듣기 횟수(0·1·제한 없음)를 고를 수 있습니다. 긴 문장이 버거우면 1회로 시작하고, 종이에 키워드만 적으며 들어도 됩니다 (기호·키워드 메모는 오히려 직역을 줄입니다).</p>
   </section>
   <section class="card">
-    <h2>측정 (v4, 선택)</h2>
-    <p><b>🎤 반응 시간 재기</b>: 문장이 나온 뒤 첫마디까지 걸린 시간과 중간에 멈춘 횟수를 잽니다. 습관이 바뀌면 이 숫자가 줄어듭니다. 소리 크기만 보고 녹음은 저장하지 않습니다. 「한국어 듣기」를 누르면 읽어 주는 동안은 재지 않고, 다 읽은 뒤부터 잽니다.</p>
-    <p><b>음성 인식으로 목표 표현 확인 (실험)</b>: 음성 인식은 틀린 말을 그럴듯하게 다듬어 적기 때문에 오류 찾기에는 쓰지 않습니다. 다듬어져도 남는 것만 봅니다: P-01은 동사로 이었는지와 「及び·確認後」 같은 명사 나열이 나왔는지, P-04는 목표 업무어를 썼는지, L1은 결론이 앞쪽에 나왔는지. 결과지에 인식된 문장이 함께 들어가므로 받아쓰기를 안 해도 Claude가 구조는 채점할 수 있습니다.</p>
-    <p class="note">아이폰 사파리는 마이크와 음성 인식을 함께 쓰면 하나가 멈출 수 있습니다. 그럴 때는 하나만 켜세요. 처음 쓸 때 브라우저가 마이크 권한을 묻습니다.</p>
+    <h2>채점 방식 (v5)</h2>
+    <p>답을 연 뒤 두 가지를 누릅니다. ① <b>포인트 중 지킨 것만 체크</b> ② <b>끝까지 말했나(말함/막힘)</b>. 판정은 자동으로: 막힘 = ×, 말함 + 포인트 전부 = ○, 말함 + 빠진 포인트 = △. 포인트는 "동사로 이었다"처럼 예·아니오로 답할 수 있는 항목이라 스스로 해도 덜 관대해집니다. 그래도 정확성의 최종 판단은 <b>녹음을 받아써서 결과지와 함께 보내면 Claude가</b> 합니다(주 1회 정도 권장).</p>
+    <p class="note">×·△는 다음 날, ○는 3일 → 7일 → 14일 → 30일 뒤에 다시 나옵니다 (복습 대상). v4까지는 '말함'만으로 복습 간격이 늘어나 직역으로 말해도 30일 뒤로 밀렸는데, v5부터는 포인트를 다 지켜야 늘어납니다.</p>
+  </section>
+  <section class="card">
+    <h2>측정 (선택)</h2>
+    <p><b>🎤 반응 시간 재기</b>: 문장이 나온 뒤 첫마디까지 걸린 시간과 중간에 멈춘 횟수를 잽니다. 습관이 바뀌면 이 숫자가 줄어듭니다. 소리 크기만 봅니다. 한국어를 읽어 주는 동안은 재지 않습니다.</p>
+    <p><b>⏺ 녹음 다시 듣기</b>: 말한 것을 녹음해, 답을 연 뒤 모범 답과 비교해 들을 수 있습니다. 결과 화면에서도 다시 들을 수 있고, 받아쓰기할 때 씁니다. 이번 세션 동안만 기기 메모리에 있고 저장·전송하지 않습니다.</p>
+    <p><b>음성 인식으로 목표 표현 확인 (실험)</b>: 음성 인식은 틀린 말을 그럴듯하게 다듬어 적기 때문에 오류 찾기에는 쓰지 않습니다. 다듬어져도 남는 것만 봅니다: 목표 표현을 썼는지, 피할 표현(及び·確認後 같은 명사 나열, 計算·親旧 같은 음독 직역, 社長さん 같은 경어 방향 실수)이 나왔는지, L1은 결론이 앞쪽에 나왔는지.</p>
+    <p class="note">아이폰 사파리는 마이크(🎤·⏺)와 음성 인식을 함께 쓰면 하나가 멈출 수 있습니다. 그럴 때는 하나만 켜세요. 처음 쓸 때 브라우저가 마이크 권한을 묻습니다.</p>
+  </section>
+  <section class="card">
+    <h2>문제 늘리기</h2>
+    <p>결과지 끝에 새 문장을 JSON으로 달라는 요청이 들어 있습니다. Claude의 답을 <b>기록 탭 → 문제 추가하기</b>에 통째로 붙여 넣으면 이 기기에 추가됩니다. 추가한 문제는 저장소 파일에 들어가지 않고, 백업 코드에 함께 담깁니다.</p>
   </section>
   <section class="card">
     <h2>회사 PC·무료 모델에서도</h2>
