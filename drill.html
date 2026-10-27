@@ -202,7 +202,7 @@ table.heat td{animation:fade .5s ease both}
 <body>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.1 · AI 없이 동작</span></div>
+    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.2 · AI 없이 동작</span></div>
     <nav role="tablist" id="tabs">
       <button role="tab" data-tab="drill">연습</button>
       <button role="tab" data-tab="hands">핸즈프리</button>
@@ -713,21 +713,27 @@ function measText(x){ if(!x) return ""; if(x.lat==null) return "목소리를 못
 
 /* ===== 음성 인식 (실험) ===== */
 const SRC=window.SpeechRecognition||window.webkitSpeechRecognition;
-const ASR={ok:!!SRC,rec:null,keep:false};
+const ASR={ok:!!SRC,rec:null,keep:false,log:[]};
+/* 비교용: 띄어쓰기·문장부호를 빼고 본다 */
+const asrNorm=s=>(s||"").replace(/[\s、。，,．.!?！？「」]/g,"");
 function asrStart(){
   if(!ASR.ok) return; asrAbort();
   const r=new SRC(); r.lang="ja-JP"; r.continuous=true; r.interimResults=false; r.maxAlternatives=1; r._t="";
-  /* v5.1 아이폰은 같은 확정 결과를 되풀이해 보낸다: 매번 처음부터 확정 결과만 모으고, 바로 앞과 같으면 건너뛴다.
-     다시 시작(onend)하기 전까지 모은 글은 _base에 두고, 새로 시작한 뒤 첫 결과가 _base 끝과 같으면 건너뛴다. */
-  r._base="";
+  /* v5.1 아이폰은 같은 확정 결과를 되풀이해 보낸다: 매번 처음부터 확정 결과만 모으고, 이미 모은 글 끝과 같으면 건너뛴다.
+     다시 시작(onend)하기 전까지 모은 글은 _base에 둔다.
+     v5.2 띄어쓰기·문장부호 차이는 무시, 앞 조각을 이어 키운 결과는 바꿔 끼우고, 한 조각 안에 같은 말이 두 번이면 하나로. */
+  r._base=""; ASR.log=[];
   r.onresult=e=>{
-    const parts=[]; let prev=null;
+    ASR.log.push(e.resultIndex+":"+Array.from(e.results,x=>(x.isFinal?"F":"i")+x[0].transcript).join("|"));
+    if(ASR.log.length>8) ASR.log.shift();
+    const parts=[];
     for(let i=0;i<e.results.length;i++){
       if(!e.results[i].isFinal) continue;
-      const s=e.results[i][0].transcript, k=s.trim();
-      if(!k||k===prev) continue;
-      prev=k;
-      if(!parts.length&&r._base.trim().endsWith(k)) continue;
+      let s=e.results[i][0].transcript, k=asrNorm(s);
+      if(!k) continue;
+      const h=k.length/2; if(k.length%2===0&&k.slice(0,h)===k.slice(h)){ k=k.slice(0,h); s=k; }
+      if(asrNorm(r._base+parts.join("")).endsWith(k)) continue;
+      if(parts.length&&k.startsWith(asrNorm(parts[parts.length-1]))){ parts[parts.length-1]=s; continue; }
       parts.push(s);
     }
     r._t=r._base+parts.join("");
@@ -874,10 +880,11 @@ function speak(text,lang,rate){
     u.lang=lang==="ja"?"ja-JP":"ko-KR";
     const v=voiceFor(lang);if(v)u.voice=v;
     u.rate=rate||1;
-    let finished=false;const fin=()=>{if(!finished){finished=true;res();}};
-    u.onend=fin;u.onerror=fin;
+    /* 끝난 이유를 돌려준다: end(다 읽음)·error·timeout(끝 신호가 안 옴) — 기기 점검에서 쓴다 */
+    let finished=false;const fin=why=>{if(!finished){finished=true;res(why);}};
+    u.onend=()=>fin("end");u.onerror=()=>fin("error");
     speechSynthesis.speak(u);
-    setTimeout(fin,Math.max(4000,text.length*400/(rate||1)));
+    setTimeout(()=>fin("timeout"),Math.max(4000,text.length*400/(rate||1)));
   });
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1419,8 +1426,10 @@ async function ckRun(id){
     for(let s=5;s>0;s--){ if(!alive()) return; ckSet(id,"run",`「お会計お願いします」라고 말하세요 (${s}초)`); await wait(1000); }
     const t=(await asrStop()).trim(); if(!alive()) return;
     const h=normJa(t);
-    if(/会計|かいけい|カイケイ/.test(h)) ckSet(id,"ok",`인식: 「${t}」`);
-    else if(h) ckSet(id,"warn",`인식은 되지만 정확하지 않습니다: 「${t}」. 자동 확인은 참고로만 보세요.`);
+    /* v5.2 기기가 실제로 보낸 결과(원본)를 함께 적는다. F=확정, i=중간, 앞 숫자=resultIndex */
+    const raw=ASR.log.length?` · 원본(${ASR.log.length}회): ${ASR.log.join(" / ").slice(0,200)}`:"";
+    if(/会計|かいけい|カイケイ/.test(h)) ckSet(id,"ok",`인식: 「${t}」${raw}`);
+    else if(h) ckSet(id,"warn",`인식은 되지만 정확하지 않습니다: 「${t}」. 자동 확인은 참고로만 보세요.${raw}`);
     else ckSet(id,"bad","아무것도 인식하지 못했습니다 (마이크 권한·인터넷 연결 확인). 음성 인식 옵션은 끄는 게 낫습니다.");
   }
   else if(id==="rec"){
@@ -1436,29 +1445,39 @@ async function ckRun(id){
     if(!u) return ckSet(id,"bad",`녹음이 비었습니다${fmt}. ⏺ 녹음 옵션은 끄세요.`);
     ckSet(id,"ask",`녹음을 재생해 보세요${fmt}. 내 목소리가 들렸나요?`,audioHTML(u));
     CK.res[id].fmt=fmt; CK.res[id].url=u;
-    const el=document.querySelector("#ck-rec audio"); if(el){try{await el.play()}catch(e){}}
+    /* v5.2 재생 시작을 기다리지 않는다: 아이폰에서 이 약속이 끝나지 않으면 점검이 「진행 중」으로 남아 다른 테스트 버튼이 잠겼다 */
+    const el=document.querySelector("#ck-rec audio"); if(el){try{const p=el.play(); if(p&&p.catch) p.catch(()=>{});}catch(e){}}
   }
   else if(id==="hf"){
     if(!TTS.ok) return ckSet(id,"bad","음성 읽기를 지원하지 않아 핸즈프리를 쓸 수 없습니다.");
-    let lock=null, hidden=false; const onVis=()=>{if(document.visibilityState==="hidden")hidden=true;};
+    let lock=null, lockSt="지원 안 함", hidden=false; const onVis=()=>{if(document.visibilityState==="hidden")hidden=true;};
     document.addEventListener("visibilitychange",onVis);
-    try{ if(navigator.wakeLock) lock=await navigator.wakeLock.request("screen"); }catch(e){}
-    ckSet(id,"run","한국어를 읽는 중… (지금 화면을 꺼 보세요)");
+    /* v5.2 어디서 멈추는지 보이게 단계마다 표시하고, 화면 켜짐 유지 요청은 1.5초만 기다린다 */
+    ckSet(id,"run","화면 켜짐 유지를 요청하는 중…");
+    if(navigator.wakeLock){
+      lockSt="응답 없음";
+      try{ lock=await Promise.race([navigator.wakeLock.request("screen"),wait(1500).then(()=>null)]); lockSt=lock?"켜짐":"응답 없음"; }catch(e){ lockSt="요청 실패"; }
+    }
+    if(!alive()) return;
+    if(TTS.ok){ try{ speechSynthesis.cancel(); if(speechSynthesis.paused) speechSynthesis.resume(); }catch(e){} }
+    ckSet(id,"run","① 한국어를 읽는 중… (지금 화면을 꺼 보세요)");
     const t0=performance.now();
-    await speak("핸즈프리 점검입니다. 오 초 뒤에 일본어가 나옵니다.","ko");
-    for(let s=5;s>0;s--){ if(!alive()) break; await wait(1000); }
-    if(alive()) await speak("これで点検は終わりです。お疲れさまでした。","ja");
+    const how1=await speak("핸즈프리 점검입니다. 오 초 뒤에 일본어가 나옵니다.","ko");
+    for(let s=5;s>0;s--){ if(!alive()) break; ckSet(id,"run",`② 쉬는 중 ${s}초`); await wait(1000); }
+    let how2="안 함";
+    if(alive()){ ckSet(id,"run","③ 일본어를 읽는 중…"); how2=await speak("これで点検は終わりです。お疲れさまでした。","ja"); }
     document.removeEventListener("visibilitychange",onVis);
     if(lock){try{lock.release()}catch(e){}}
     if(!alive()) return;
-    const sec2=Math.round((performance.now()-t0)/1000);
-    ckSet(id,"ask",`${sec2}초 걸림 · 화면 켜짐 유지 ${navigator.wakeLock?(lock?"켜짐":"요청 실패"):"지원 안 함"} · ${hidden?"화면을 끈(다른 앱으로 간) 상태를 거쳤습니다":"화면을 켠 채로 진행됐습니다"}. 일본어까지 끝까지 들렸나요?`);
-    CK.res[id].hidden=hidden;
+    const sec2=Math.round((performance.now()-t0)/1000), hw=x=>x==="end"?"끝까지":x==="timeout"?"응답 없이 시간 초과":x==="error"?"오류":x;
+    ckSet(id,"ask",`${sec2}초 걸림 · 화면 켜짐 유지 ${lockSt} · 한국어 ${hw(how1)} · 일본어 ${hw(how2)} · ${hidden?"화면을 끈(다른 앱으로 간) 상태를 거쳤습니다":"화면을 켠 채로 진행됐습니다"}. 일본어까지 끝까지 들렸나요?`);
+    Object.assign(CK.res[id],{hidden});
   }
   }finally{ if(my===CK.token){ CK.busy=""; if(TAB==="check") viewCheck(); } }
 }
 function ckAnswer(id,yes){
   const r=CK.res[id]; if(!r) return;
+  if(CK.busy===id){ CK.token++; CK.busy=""; } /* v5.2 답을 골랐으면 그 테스트는 끝난 것으로 보고 다른 버튼을 푼다 */
   if(id==="ko"||id==="ja") ckSet(id,yes?(r.voice?"ok":"warn"):"bad", yes?(r.voice?r.msg.replace(/ 들렸나요\?$/,""):"기본 음성으로 들립니다. 기기 설정에서 이 언어의 음성(TTS)을 내려받으면 발음이 좋아집니다."):"소리가 나지 않습니다. 기기 음량·무음 모드, 기기 설정의 음성(TTS) 언어를 확인하세요.");
   else if(id==="rec"){
     const fmt=r.fmt||"";
@@ -1537,6 +1556,7 @@ function viewHelp(){
     <h2>처음 한 번</h2>
     <p><b>기기 점검</b> 탭에서 한국어·일본어 음성, 마이크, 스피커 소리 새어 들어감, 음성 인식, 녹음, 핸즈프리 연속 재생을 확인하세요. 결과에 맞춰 권장 설정이 나옵니다.</p>
     <p class="note"><b>아이폰 (v5.1)</b>: 마이크가 켜져 있으면 재생 소리가 통화용 수화부로 아주 작게 나갑니다. 그래서 내 녹음·모범 답을 재생할 때는 마이크를 잠시 끄고, 다음 문장을 시작할 때 다시 켭니다. 녹음이 안 들리면 옆면 무음 스위치와 음량을 먼저 확인하세요. 음성 인식이 같은 말을 두 번 적던 문제도 고쳤습니다.</p>
+    <p class="note"><b>v5.2</b>: 녹음 테스트 뒤 핸즈프리 테스트 버튼이 눌리지 않던 문제를 고쳤습니다. 핸즈프리 테스트는 단계(① 한국어 → ② 쉬는 중 → ③ 일본어)를 표시하고, 음성 인식 테스트 결과에는 기기가 보낸 원본을 함께 적습니다. 점검 결과를 그대로 Claude에게 붙여 넣으면 원인을 찾을 수 있습니다.</p>
   </section>
   <section class="card">
     <h2>순서</h2>
