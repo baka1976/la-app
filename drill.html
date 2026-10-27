@@ -202,7 +202,7 @@ table.heat td{animation:fade .5s ease both}
 <body>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.0 · AI 없이 동작</span></div>
+    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.1 · AI 없이 동작</span></div>
     <nav role="tablist" id="tabs">
       <button role="tab" data-tab="drill">연습</button>
       <button role="tab" data-tab="hands">핸즈프리</button>
@@ -666,17 +666,22 @@ function autoCheck(it,heard){
 
 /* ===== 마이크: 첫마디까지 걸린 시간·멈춤 (v4) =====
    소리 크기만 본다. 음성 인식이 필요 없고, 녹음을 저장하지 않는다. */
-const MIC={ok:false,stream:null,ctx:null,an:null,buf:null};
+const MIC={ok:false,stream:null,ctx:null,an:null,buf:null,paused:false};
 async function micStart(){
   if(MIC.ok){try{await MIC.ctx.resume()}catch(e){} return true;}
   try{
     MIC.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     const AC=window.AudioContext||window.webkitAudioContext; MIC.ctx=new AC(); await MIC.ctx.resume();
     const src=MIC.ctx.createMediaStreamSource(MIC.stream); MIC.an=MIC.ctx.createAnalyser(); MIC.an.fftSize=1024; src.connect(MIC.an);
-    MIC.buf=new Float32Array(MIC.an.fftSize); MIC.ok=true; return true;
+    MIC.buf=new Float32Array(MIC.an.fftSize); MIC.ok=true; MIC.paused=false; return true;
   }catch(e){micOff(); return false;}
 }
-function micOff(){measStop(true); if(MIC.stream) MIC.stream.getTracks().forEach(t=>t.stop()); if(MIC.ctx){try{MIC.ctx.close()}catch(e){}} Object.assign(MIC,{ok:false,stream:null,ctx:null,an:null,buf:null});}
+function micOff(){measStop(true); if(MIC.stream) MIC.stream.getTracks().forEach(t=>t.stop()); if(MIC.ctx){try{MIC.ctx.close()}catch(e){}} Object.assign(MIC,{ok:false,stream:null,ctx:null,an:null,buf:null,paused:false});}
+/* v5.1 아이폰: 마이크가 열려 있으면 재생 소리가 통화용 수화부로 아주 작게 나간다.
+   녹음을 재생할 때는 마이크를 닫고(paused), 다음 문장에서 측정·녹음을 시작할 때 다시 연다. */
+function micPause(){ if(!MIC.ok||MEAS||REC.mr) return; micOff(); MIC.paused=true; }
+const micOn=()=>MIC.ok||MIC.paused; /* 열려 있거나, 재생 때문에 잠시 닫아 둔 상태 */
+document.addEventListener("play",e=>{ if(e.target&&e.target.tagName==="AUDIO") micPause(); },true);
 function micLevel(){MIC.an.getFloatTimeDomainData(MIC.buf); let s=0; for(let i=0;i<MIC.buf.length;i++) s+=MIC.buf[i]*MIC.buf[i]; return Math.sqrt(s/MIC.buf.length);}
 let MEAS=null;
 function measStart(){
@@ -712,8 +717,22 @@ const ASR={ok:!!SRC,rec:null,keep:false};
 function asrStart(){
   if(!ASR.ok) return; asrAbort();
   const r=new SRC(); r.lang="ja-JP"; r.continuous=true; r.interimResults=false; r.maxAlternatives=1; r._t="";
-  r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++) if(e.results[i].isFinal) r._t+=e.results[i][0].transcript;};
-  r.onerror=()=>{}; r.onend=()=>{ if(ASR.rec===r&&ASR.keep){try{r.start()}catch(e){}} };
+  /* v5.1 아이폰은 같은 확정 결과를 되풀이해 보낸다: 매번 처음부터 확정 결과만 모으고, 바로 앞과 같으면 건너뛴다.
+     다시 시작(onend)하기 전까지 모은 글은 _base에 두고, 새로 시작한 뒤 첫 결과가 _base 끝과 같으면 건너뛴다. */
+  r._base="";
+  r.onresult=e=>{
+    const parts=[]; let prev=null;
+    for(let i=0;i<e.results.length;i++){
+      if(!e.results[i].isFinal) continue;
+      const s=e.results[i][0].transcript, k=s.trim();
+      if(!k||k===prev) continue;
+      prev=k;
+      if(!parts.length&&r._base.trim().endsWith(k)) continue;
+      parts.push(s);
+    }
+    r._t=r._base+parts.join("");
+  };
+  r.onerror=()=>{}; r.onend=()=>{ if(ASR.rec===r&&ASR.keep){r._base=r._t; try{r.start()}catch(e){}} };
   ASR.rec=r; ASR.keep=true; try{r.start()}catch(e){}
 }
 function asrAbort(){const r=ASR.rec; ASR.keep=false; ASR.rec=null; if(r){try{r.abort()}catch(e){}}}
@@ -727,12 +746,13 @@ function asrStop(){
 
 /* ===== 녹음 다시 듣기 (v5) =====
    이번 세션 동안만 메모리에 두고, 저장·전송하지 않는다. 새로 시작하거나 페이지를 닫으면 사라진다. */
-const REC={ok:!!(window.MediaRecorder&&navigator.mediaDevices),mr:null,chunks:[],urls:[]};
+const REC={ok:!!(window.MediaRecorder&&navigator.mediaDevices),mr:null,chunks:[],urls:[],type:""};
 function recStart(){
   if(!REC.ok||!MIC.stream) return; recAbort();
   try{
-    const t=["audio/webm;codecs=opus","audio/mp4","audio/webm"].find(x=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(x));
-    const mr=new MediaRecorder(MIC.stream,t?{mimeType:t}:undefined); REC.chunks=[];
+    /* v5.1 아이폰 사파리가 확실히 재생하는 mp4(AAC)를 먼저 */
+    const t=["audio/mp4","audio/webm;codecs=opus","audio/webm"].find(x=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(x));
+    const mr=new MediaRecorder(MIC.stream,t?{mimeType:t}:undefined); REC.chunks=[]; REC.type=mr.mimeType||t||"";
     mr.ondataavailable=e=>{if(e.data&&e.data.size) REC.chunks.push(e.data);};
     mr.start(); REC.mr=mr;
   }catch(e){REC.mr=null;}
@@ -747,10 +767,15 @@ function recStop(){
   });
 }
 function recClear(){recAbort(); REC.urls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}}); REC.urls=[];}
-const audioHTML=u=>u?`<audio controls preload="auto" src="${u}" style="width:100%"></audio>`:"";
+const audioHTML=u=>!u?"":!REC.urls.includes(u)?`<p class="note">이 녹음은 지워졌습니다 (연습·핸즈프리를 새로 시작하면 이전 녹음은 사라집니다).</p>`:`<audio controls playsinline preload="auto" src="${u}" style="width:100%"></audio>`;
 
 /* ===== 말하는 동안 잡기: 측정·음성 인식·녹음을 한꺼번에 켜고 끈다 ===== */
 function capStart(){ if(DB.opt.mic&&MIC.ok) measStart(); if(DB.opt.asr&&ASR.ok) asrStart(); if(DB.opt.rec&&MIC.ok) recStart(); }
+/* 녹음 재생으로 마이크를 닫아 두었으면 다시 연 뒤 시작한다 */
+async function capStartMic(alive){
+  if(needMic()&&!MIC.ok&&MIC.paused){ await micStart(); if(alive&&!alive()) return; }
+  capStart();
+}
 async function capStop(it){
   const out={};
   out.meas=DB.opt.mic&&MIC.ok?measStop():(measStop(true),null);
@@ -945,7 +970,7 @@ function viewCard(){
     <p class="note">장면: ${esc(it.scene)}</p>
     ${hideKo?`<p class="ko listen">🎧 듣고 바로 일본어로 말하세요</p>`:`<p class="ko ${memoType?"memo":""}">${esc(it.ko)}</p>`}
     ${timed?`<div class="row"><span class="big" id="sec">${lim}</span><span class="note" id="tstate">초 안에 일본어로 말하기</span></div><div class="timer"><i id="bar"></i></div>`:""}
-    ${!c.shown&&(DB.opt.mic&&MIC.ok||DB.opt.asr&&ASR.ok||DB.opt.rec&&MIC.ok)?`${MIC.ok?`<div class="lvl" title="마이크 소리 크기"><i id="lvl"></i></div>`:""}<p class="note">${[DB.opt.mic&&MIC.ok?"🎤 재는 중":"",DB.opt.rec&&MIC.ok?"⏺ 녹음 중":"",DB.opt.asr&&ASR.ok?"음성 인식 중":""].filter(Boolean).join(" · ")} — 다 말했으면 버튼을 누르세요.</p>`:""}
+    ${!c.shown&&(DB.opt.mic&&micOn()||DB.opt.asr&&ASR.ok||DB.opt.rec&&micOn())?`${micOn()?`<div class="lvl" title="마이크 소리 크기"><i id="lvl"></i></div>`:""}<p class="note">${[DB.opt.mic&&micOn()?"🎤 재는 중":"",DB.opt.rec&&micOn()?"⏺ 녹음 중":"",DB.opt.asr&&ASR.ok?"음성 인식 중":""].filter(Boolean).join(" · ")} — 다 말했으면 버튼을 누르세요.</p>`:""}
     <div class="row">
       ${TTS.ok&&!c.shown?`<button class="btn" id="sayKo" ${c.listen&&c.plays===0?"disabled":""}>${c.listen?`한 번 더 듣기${DB.opt.replay<9?` (${left()}회)`:""}`:"한국어 듣기"}</button>`:""}
       ${c.shown?"":`<button class="btn pri" id="reveal">말했어요 · 답 보기</button>`}
@@ -981,8 +1006,8 @@ function viewCard(){
   $("#reveal").onclick=()=>{close();viewCard();};
   if(c.listen){
     c.plays=1;
-    speak(koSpeech(it),"ko").then(()=>{ if(!alive()) return; capStart(); timerPause(false); sayBtn(); });
-  } else capStart();
+    speak(koSpeech(it),"ko").then(async()=>{ if(!alive()) return; await capStartMic(alive); if(!alive()) return; timerPause(false); sayBtn(); });
+  } else capStartMic(alive);
   if(TTS.ok&&$("#sayKo")) $("#sayKo").onclick=async()=>{
     if(c.listen&&left()<=0) return;
     speechSynthesis.cancel(); c.plays++; sayBtn(); $("#sayKo").disabled=true;
@@ -997,7 +1022,7 @@ function measHTML(c){
   return `<div class="meas" id="measbox"><span>🎤 <b>${esc(measText(c.meas))}</b></span>${c.meas.lat!=null?`<span class="note">말한 길이 ${sec(c.meas.spk)}</span>`:""}</div>`;
 }
 function recHTML(c){
-  if(!(DB.opt.rec&&MIC.ok)) return `<div id="myrec" class="hide"></div>`;
+  if(!(DB.opt.rec&&(micOn()||c.audio))) return `<div id="myrec" class="hide"></div>`;
   if(c.capPending) return `<div id="myrec" class="note">녹음 정리 중…</div>`;
   return `<div id="myrec" class="rec">${c.audio?`<h3>내 녹음</h3>${audioHTML(c.audio)}<p class="note">모범 답을 듣고 내 녹음과 비교해 포인트를 체크하세요.</p>`:`<p class="note">녹음이 없습니다 (마이크 권한·기기 점검 확인).</p>`}</div>`;
 }
@@ -1038,7 +1063,7 @@ function autoHTML(c){
     ${(c.auto||[]).length?`<div class="meas">${c.auto.map(a=>`<span class="${a.ok?"ok":"bad"}">${a.ok?"✓":"✗"} ${esc(a.label)}</span>`).join("")}</div>`:`<span class="note">이 문장은 자동 확인 항목이 없습니다.</span>`}</div>`;
 }
 function bindAnswer(c){
-  if(TTS.ok&&$("#sayJa"))$("#sayJa").onclick=()=>{speechSynthesis.cancel();speak(speakJa(c.it.ja),"ja");};
+  if(TTS.ok&&$("#sayJa"))$("#sayJa").onclick=()=>{speechSynthesis.cancel();micPause();speak(speakJa(c.it.ja),"ja");};
   document.querySelectorAll(".pts input").forEach(x=>x.onchange=()=>{c.ptsOk[+x.dataset.p]=x.checked;$("#fg").innerHTML=gradeNote(c);});
   document.querySelectorAll(".grade button").forEach(b=>b.onclick=()=>{
     c.g=b.dataset.g;
@@ -1406,8 +1431,11 @@ async function ckRun(id){
     recStart(); ckSet(id,"run","아무 말이나 하세요 (3초)");
     await ckSample(3000,"lvl-rec",my); if(!alive()){recAbort();return;}
     const u=await recStop(); if(!alive()) return;
-    if(!u) return ckSet(id,"bad","녹음이 비었습니다. ⏺ 녹음 옵션은 끄세요.");
-    ckSet(id,"ask","녹음을 재생해 보세요. 내 목소리가 들렸나요?",audioHTML(u));
+    micOff(); /* v5.1 아이폰: 마이크를 닫아야 재생 소리가 스피커·이어폰으로 제대로 나온다 */
+    const fmt=REC.type?` (녹음 형식 ${REC.type.split(";")[0]})`:"";
+    if(!u) return ckSet(id,"bad",`녹음이 비었습니다${fmt}. ⏺ 녹음 옵션은 끄세요.`);
+    ckSet(id,"ask",`녹음을 재생해 보세요${fmt}. 내 목소리가 들렸나요?`,audioHTML(u));
+    CK.res[id].fmt=fmt; CK.res[id].url=u;
     const el=document.querySelector("#ck-rec audio"); if(el){try{await el.play()}catch(e){}}
   }
   else if(id==="hf"){
@@ -1432,7 +1460,15 @@ async function ckRun(id){
 function ckAnswer(id,yes){
   const r=CK.res[id]; if(!r) return;
   if(id==="ko"||id==="ja") ckSet(id,yes?(r.voice?"ok":"warn"):"bad", yes?(r.voice?r.msg.replace(/ 들렸나요\?$/,""):"기본 음성으로 들립니다. 기기 설정에서 이 언어의 음성(TTS)을 내려받으면 발음이 좋아집니다."):"소리가 나지 않습니다. 기기 음량·무음 모드, 기기 설정의 음성(TTS) 언어를 확인하세요.");
-  else if(id==="rec") ckSet(id,yes?"ok":"bad",yes?"녹음과 재생이 됩니다.":"녹음이 들리지 않습니다. ⏺ 녹음 옵션은 끄세요.");
+  else if(id==="rec"){
+    const fmt=r.fmt||"";
+    if(yes) ckSet(id,"ok",`녹음과 재생이 됩니다${fmt}.`);
+    else if(!r.retried){ /* 처음 「안 들림」: 무음 스위치·음량부터 확인하게 한다 */
+      ckSet(id,"ask",`아이폰은 옆면 무음 스위치(벨/무음)가 켜져 있거나 음량이 낮으면 녹음이 안 들릴 수 있습니다. 무음을 풀고 음량을 올린 뒤 다시 재생해 보세요${fmt}. 들렸나요?`,r.url?audioHTML(r.url):"");
+      Object.assign(CK.res[id],{fmt,url:r.url,retried:true});
+    }
+    else ckSet(id,"bad",`무음·음량을 확인해도 녹음이 들리지 않습니다${fmt}. ⏺ 녹음 옵션은 끄세요.`);
+  }
   else if(id==="hf") ckSet(id,yes?"ok":"bad",yes?(r.hidden?"화면을 끈 상태에서도 끝까지 읽습니다. 핸즈프리를 화면을 끈 채로 써도 됩니다.":"끝까지 읽습니다. 화면을 끈 상태는 확인하지 않았으니, 화면을 끄고 한 번 더 해 보세요."):"도중에 멈췄습니다. 핸즈프리는 화면을 켠 채로 쓰세요.");
 }
 function ckAdvice(){
@@ -1500,6 +1536,7 @@ function viewHelp(){
   <section class="card">
     <h2>처음 한 번</h2>
     <p><b>기기 점검</b> 탭에서 한국어·일본어 음성, 마이크, 스피커 소리 새어 들어감, 음성 인식, 녹음, 핸즈프리 연속 재생을 확인하세요. 결과에 맞춰 권장 설정이 나옵니다.</p>
+    <p class="note"><b>아이폰 (v5.1)</b>: 마이크가 켜져 있으면 재생 소리가 통화용 수화부로 아주 작게 나갑니다. 그래서 내 녹음·모범 답을 재생할 때는 마이크를 잠시 끄고, 다음 문장을 시작할 때 다시 켭니다. 녹음이 안 들리면 옆면 무음 스위치와 음량을 먼저 확인하세요. 음성 인식이 같은 말을 두 번 적던 문제도 고쳤습니다.</p>
   </section>
   <section class="card">
     <h2>순서</h2>
