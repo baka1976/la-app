@@ -215,7 +215,7 @@ table.heat td{animation:fade .5s ease both}
 <body>
 <header>
   <div class="wrap">
-    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.5 · AI 없이 동작</span></div>
+    <div class="hrow"><span class="brand">LA 통역 드릴</span><span class="ver">S3-2 · v5.6 · AI 없이 동작</span></div>
     <nav role="tablist" id="tabs">
       <button role="tab" data-tab="pack">교재 팩</button>
       <button role="tab" data-tab="drill">연습</button>
@@ -942,6 +942,7 @@ function pkQueue(p){
 async function viewPack(){
   if(PK.cur&&PK.run) return viewPackRun();
   if(PK.cur&&PK.wrun) return viewPackWords();
+  if(PK.srun) return viewSent();
   if(PK.packs===null||!PK.packs.length) await pkLoad();
   const list=PK.packs||[];
   $("#view").innerHTML=`
@@ -955,6 +956,9 @@ async function viewPack(){
         <button class="btn" data-pktry="${esc(p.id)}">테스트 (2문항)</button><button class="btn" data-pkall="${esc(p.id)}">처음부터</button><button class="btn" data-pkdel="${esc(p.id)}">지우기</button></div>
         <div class="row"><button class="btn" data-pkw="${esc(p.id)}">단어 카드 (${pkWords(p).filter(w=>pkWDue(p,w)).length}/${pkWords(p).length})</button><button class="btn" data-pkwt="${esc(p.id)}">단어 테스트 (3장)</button></div></div>`;}).join("")}
     ${pkReport()?`<h3>결과지 (Claude에게 붙여 넣기)</h3><textarea readonly id="pkrep">${esc(pkReport())}</textarea><div class="row"><button class="btn" id="pkcp">결과지 복사</button></div>`:""}
+  </section>
+  ${sentSection()}
+  <section class="card">
     <h3>팩 파일 불러오기</h3>
     <label class="btn" for="pkfile" style="justify-self:start">파일 고르기 (.lapack.json)</label>
     <input type="file" id="pkfile" accept=".json,application/json" hidden>
@@ -962,6 +966,7 @@ async function viewPack(){
     <p class="note">녹음을 쓰려면 <b>기기 점검</b> 탭에서 마이크·녹음을 먼저 확인하세요. PC에서는 이어폰·헤드셋을 쓰면 원음이 녹음에 섞이지 않습니다.</p>
   </section>`;
   if($("#pkcp")) $("#pkcp").onclick=e=>copyText($("#pkrep").value,e.target);
+  sentBind();
   $("#pkfile").onchange=e=>{
     const f=e.target.files&&e.target.files[0]; if(!f) return;
     const rd=new FileReader(); $("#pkmsg").textContent="읽는 중…";
@@ -971,7 +976,7 @@ async function viewPack(){
     rd.readAsText(f);
   };
   const start=(id,all,trial)=>{const p=list.find(x=>x.id===id); if(!p) return; PK.cur=p; PK.wrun=null; recClear();
-    PK.run={trial:!!trial,queue:trial?shuffle(p.items.map(i=>i.no)).slice(0,2):all?p.items.map(i=>i.no):pkQueue(p),i:0,stage:"listen",choice:0,reasons:{},text:false,mine:"",shadow:"",recording:""}; viewPackRun();};
+    PK.run={trial:!!trial,queue:trial?shuffle(p.items.map(i=>i.no)).slice(0,2):all?p.items.map(i=>i.no):pkQueue(p),i:0,stage:"listen",choice:0,reasons:{},why:{},open:false,mineText:"",text:false,mine:"",shadow:"",recording:""}; viewPackRun();};
   document.querySelectorAll("[data-pkgo]").forEach(b=>b.onclick=()=>start(b.dataset.pkgo,false));
   document.querySelectorAll("[data-pkw]").forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.pkw); if(p) pkWStart(p,false);});
   document.querySelectorAll("[data-pkwt]").forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.pkwt); if(p) pkWStart(p,true);});
@@ -1007,7 +1012,8 @@ function viewPackRun(){
     <div class="row"><button class="btn pri" data-pkplay="${n}_q">▶ 질문 듣기</button><span class="note">${esc(it.q.who)}의 한마디</span></div>
     ${showQ?`<p class="ja" lang="ja">${esc(it.q.ja)}</p>`:""}`;
   if(st==="listen"){
-    h+=`<div class="rule"><b>먼저 내 말로 대답하기</b><p>보기를 듣기 전에, 이 말을 들은 ${esc(it.who_a)}이(가) 할 만한 대답을 일본어로 소리 내어 말해 보세요. 녹음해 두면 나중에 정답과 비교할 수 있습니다.</p></div>
+    h+=`<div class="rule"><b>먼저 내 말로 대답하기</b><p>보기를 듣기 전에, 이 말을 들은 ${esc(it.who_a)}이(가) 할 만한 대답을 일본어로 소리 내어 말해 보세요. 녹음해 두면 나중에 정답과 비교할 수 있고, 글로 적어 두면 결과지에 들어가 Claude가 맞는 대답인지 판정합니다.</p></div>
+      <textarea id="pkmine" lang="ja" style="min-height:60px" placeholder="내 대답 (일본어로, 선택)">${esc(R.mineText)}</textarea>
       <div class="row">${pkRecBtn("mine","내 대답 녹음")}<button class="btn pri" id="pknext" ${R.recording?"disabled":""}>보기 듣기로</button></div>
       ${R.mine?`<audio controls playsinline src="${R.mine}" style="width:100%"></audio>`:""}<p class="note" id="pkrmsg"></p>`;
   } else {
@@ -1018,13 +1024,15 @@ function viewPackRun(){
         ${st==="choose"?`<button class="btn" data-pkpick="${k+1}">고르기</button>`:""}</div>`;}).join("")}</div>`;
     if(st==="choose") h+=`<p class="note">보기는 소리로만 나옵니다(시험과 같음).</p>`;
     if(st==="result"){
-      const ok=R.choice===it.ans, wrong=[1,2,3].filter(k=>k!==it.ans), all=wrong.every(k=>R.reasons[k]);
+      const ok=R.choice===it.ans, wrong=[1,2,3].filter(k=>k!==it.ans), all=R.open;
       h+=`<p class="${ok?"ok":"bad"}"><b>${ok?"정답":"오답"}</b> · 정답 ${it.ans}번 (내 선택 ${R.choice}번)</p><p class="note">질문 해석: ${esc(it.q.ko)}</p>
-        <div class="pk-reasons"><b>해설 보기 전에: 나머지 보기는 왜 답이 아닐까요?</b>
-        ${wrong.map(k=>`<div><p class="note">${k}번 <span lang="ja">${esc(it.ch[k-1][0])}</span></p><div class="chips">${PK_REASONS.map(([id,l])=>`<button class="chip" data-pkr="${k}:${id}" aria-pressed="${R.reasons[k]===id}">${l}</button>`).join("")}</div></div>`).join("")}</div>`;
+        <div class="pk-reasons"><b>해설 보기 전에: 나머지 보기는 왜 답이 아닐까요? 내 말로 한 줄씩 적으세요.</b>
+        ${wrong.map(k=>`<div><p class="note">${k}번 <span lang="ja">${esc(it.ch[k-1][0])}</span></p><input type="text" data-pkwhy="${k}" value="${esc(R.why[k]||"")}" placeholder="왜 답이 아닌지 (예: 상대는 사과를 요구하는데 이건 칭찬에 대한 반응)">
+          <details style="margin-top:4px"${R.reasons[k]?" open":""}><summary class="note">유형도 고르기 (선택)</summary><div class="chips">${PK_REASONS.map(([id,l])=>`<button class="chip" data-pkr="${k}:${id}" aria-pressed="${R.reasons[k]===id}">${l}</button>`).join("")}</div></details></div>`).join("")}</div>`;
+      if(!all) h+=`<div class="row"><button class="btn pri" id="pkopen">해설 보기</button></div><p class="note" id="pkopenmsg">이유를 다 적으면(또는 유형을 고르면) 해설·단어·따라 말하기가 열립니다. 적은 이유는 결과지에 들어갑니다.</p>`;
       if(all){
         h+=`<div class="rule"><b>책 해설</b><p>${esc(it.expl)}</p></div>
-          <p class="note">오답 보기 하나하나의 이유는 책 해설에 없는 경우가 많습니다. 고른 이유가 맞는지는 기록 탭의 결과지를 Claude에게 붙여 물어보세요.</p>
+          <p class="note">오답 보기 하나하나의 이유는 책 해설에 없는 경우가 많습니다. 적은 이유와 내 대답이 맞는지는 팩 목록의 결과지를 Claude에게 붙여 물어보세요.</p>
           <div><h3>단어 (출판사 뜻)</h3><div class="chips">${it.words.split(" | ").map(w=>`<span class="chip" lang="ja" style="cursor:default">${esc(w)}</span>`).join("")}</div></div>
           <div class="rule"><b>따라 말하기</b><p>질문과 정답을 듣고 그대로 따라 말하며 녹음하세요. 녹음과 원음을 번갈아 들으며 속도·억양을 맞춥니다.</p>
             <div class="row"><button class="btn" data-pkplay="${n}_q">▶ 질문</button><button class="btn" data-pkplay="${n}_c${it.ans}">▶ 정답 ${it.ans}번</button>${pkRecBtn("shadow","따라 말하며 녹음")}</div>
@@ -1032,7 +1040,7 @@ function viewPackRun(){
             ${R.mine?`<p class="note">처음에 내 말로 한 대답</p><audio controls playsinline src="${R.mine}" style="width:100%"></audio>`:""}
             <p class="note" id="pkrmsg"></p></div>
           <div class="row"><button class="btn" data-pkdone="0" ${R.recording?"disabled":""}>헷갈림 · 내일 다시</button><button class="btn pri" data-pkdone="1" ${R.recording?"disabled":""}>알겠음 · 다음</button></div>`;
-      } else h+=`<p class="note">이유를 모두 고르면 해설·단어·따라 말하기가 열립니다.</p>`;
+      }
     }
   }
   h+=`</section>`;
@@ -1043,27 +1051,58 @@ function viewPackRun(){
   $("#pkquit").onclick=()=>{pkStopAll(); micOff(); PK.run=null; recClear(); viewPack();};
   if($("#pknext")) $("#pknext").onclick=()=>{R.stage="choose"; viewPackRun();};
   document.querySelectorAll("[data-pkpick]").forEach(b=>b.onclick=()=>{R.choice=+b.dataset.pkpick; R.stage="result"; viewPackRun();});
-  document.querySelectorAll("[data-pkr]").forEach(b=>b.onclick=()=>{const [k,id]=b.dataset.pkr.split(":"); R.reasons[k]=id; viewPackRun();});
+  document.querySelectorAll("[data-pkr]").forEach(b=>b.onclick=()=>{const [k,id]=b.dataset.pkr.split(":"); R.reasons[k]=R.reasons[k]===id?"":id; viewPackRun();});
+  if($("#pkmine")) $("#pkmine").oninput=e=>{R.mineText=e.target.value;};
+  document.querySelectorAll("[data-pkwhy]").forEach(i=>i.oninput=()=>{R.why[i.dataset.pkwhy]=i.value;});
+  if($("#pkopen")) $("#pkopen").onclick=()=>{
+    const miss=[1,2,3].filter(k=>k!==it.ans&&!String(R.why[k]||"").trim()&&!R.reasons[k]);
+    if(miss.length){$("#pkopenmsg").innerHTML=`<span class="bad">${miss.join("·")}번 보기의 이유를 적거나 유형을 고르세요.</span>`; return;}
+    R.open=true; viewPackRun();};
   document.querySelectorAll("[data-pkdone]").forEach(b=>b.onclick=()=>{
-    if(!R.trial){
-    const rec=pkRec(p.id,it.no), sure=b.dataset.pkdone==="1", ok=R.choice===it.ans;
-    rec.hist.push({at:stamp(),choice:R.choice,ok,sure,reasons:R.reasons,rec:!!(R.mine||R.shadow)});
+    const sure=b.dataset.pkdone==="1", ok=R.choice===it.ans;
+    const h1={at:stamp(),choice:R.choice,ok,sure,reasons:R.reasons,why:pkClean(R.why),mine:R.mineText.trim(),rec:!!(R.mine||R.shadow)};
+    if(R.trial){PKT.push(Object.assign({pid:p.id,no:it.no},h1)); PKT=PKT.slice(-20); pkTSave();}
+    else{
+    const rec=pkRec(p.id,it.no);
+    rec.hist.push(h1);
     if(ok&&sure){rec.box=Math.min(rec.box+1,PKGAP.length); rec.due=dayAdd(PKGAP[rec.box-1]);} else {rec.box=0; rec.due=dayAdd(1);}
     pkSave(); }
     PKP.pause();
-    Object.assign(R,{i:R.i+1,stage:"listen",choice:0,reasons:{},text:false,mine:"",shadow:"",recording:""});
+    Object.assign(R,{i:R.i+1,stage:"listen",choice:0,reasons:{},why:{},open:false,mineText:"",text:false,mine:"",shadow:"",recording:""});
     viewPackRun(); window.scrollTo(0,0);
   });
 }
+/* 결과지 (v5.6): 질문·내 대답·오답 이유(내가 쓴 글)를 담아 Claude가 판정할 수 있게 한다. 테스트로 푼 문항도 넣는다(복습 간격에는 안 들어감).
+   책 문장이 들어가므로 Claude 대화에만 붙이고 다른 곳에 올리지 않는다. */
+const PKTKEY="la-pack-test-v1";
+let PKT=[];
+try{const s=localStorage.getItem(PKTKEY); if(s) PKT=JSON.parse(s)||[];}catch(e){}
+const pkTSave=()=>{try{localStorage.setItem(PKTKEY,JSON.stringify(PKT));}catch(e){}};
+const pkClean=o=>Object.fromEntries(Object.entries(o||{}).map(([k,v])=>[k,String(v||"").trim()]).filter(([k,v])=>v));
+function pkLine(p,it,h,tag){
+  const L=[`■ ${it.no}番${tag} ${h.ok?"○":"×"}${h.sure?"":" 헷갈림"} · 선택 ${h.choice} / 정답 ${it.ans} · ${h.at}`,
+    `  질문(${it.q.who}): ${it.q.ja}`];
+  it.ch.forEach((c,k)=>L.push(`  ${k+1}. ${c[0]}${k+1===it.ans?" ← 정답":""}`));
+  L.push(`  내 대답: ${h.mine||"(안 적음)"}`);
+  [1,2,3].filter(k=>k!==it.ans).forEach(k=>{const t=(h.why||{})[k], r=(h.reasons||{})[k];
+    L.push(`  ${k}번이 답이 아닌 이유: ${t||"(안 적음)"}${r?` [유형: ${(PK_REASONS.find(x=>x[0]===r)||["",r])[1]}]`:""}`);});
+  return L.join("\n");
+}
 function pkReport(){
-  const lines=[];
-  (PK.packs||[]).forEach(p=>{const r=PKR[p.id]||{}; const done=Object.keys(r);
-    if(!done.length) return;
-    lines.push(`[${p.title}] 푼 문항 ${done.length}/${p.items.length}`);
-    p.items.filter(it=>r[it.no]).forEach(it=>{const last=r[it.no].hist[r[it.no].hist.length-1];
-      const rs=Object.entries(last.reasons||{}).map(([k,v])=>`${k}번=${(PK_REASONS.find(x=>x[0]===v)||["",v])[1]}`).join(", ");
-      lines.push(`${it.no}番 ${last.ok?"○":"×"}(선택 ${last.choice}, 정답 ${it.ans})${last.sure?"":" 헷갈림"} · 오답 이유: ${rs}`);});});
-  return lines.join("\n");
+  const out=[];
+  (PK.packs||[]).forEach(p=>{const r=PKR[p.id]||{}, done=p.items.filter(it=>r[it.no]&&r[it.no].hist.length), tr=PKT.filter(t=>t.pid===p.id);
+    if(!done.length&&!tr.length) return;
+    out.push(`[${p.title}] 푼 문항 ${done.length}/${p.items.length}${tr.length?` · 테스트 ${tr.length}회`:""}`);
+    done.forEach(it=>{const hs=r[it.no].hist; out.push(pkLine(p,it,hs[hs.length-1],""));});
+    tr.forEach(t=>{const it=p.items.find(x=>x.no===t.no); if(it) out.push(pkLine(p,it,t," (테스트)"));});
+    const miss=pkWords(p).filter(w=>{const x=(PKR[p.id+"#w"]||{})[w.jp]; return x&&x.miss;});
+    if(miss.length) out.push("틀린 단어: "+miss.map(w=>{const x=PKR[p.id+"#w"][w.jp]; return `${w.jp}(${w.ko})${x.picked&&x.picked.length?` ← 내가 고른 뜻: ${x.picked.join(", ")}`:""}`;}).join(" / "));
+  });
+  if(!out.length) return "";
+  return `[통역 드릴 교재 팩 결과지]
+판정 요청: 「내 대답」이 그 상황에서 쓸 수 있는 대답인지, 「답이 아닌 이유」가 맞는지 문항마다 판정해 주세요. 사전·문형책 등 근거를 댈 수 있으면 근거를 적고, 근거 없이 Claude가 판단한 부분은 「Claude 설명 (근거 없음)」으로 표시해 주세요. 틀린 단어가 있으면 LASENT1 예문 JSON도 함께 주세요(형식은 「예문 요청문 복사」 참고).
+
+`+out.join("\n\n");
 }
 
 /* 단어 카드 (v5.5): 팩 문항의 「단어」 칸(출판사 뜻)으로 만든다. 1 뜻 고르기 → 2 뜻 보고 떠올리기 → 3 문장 속에서 말하기(원음 확인).
@@ -1133,10 +1172,115 @@ function viewPackWords(){
   document.querySelectorAll("[data-pkplay]").forEach(b=>b.onclick=()=>pkPlay(b.dataset.pkplay));
   document.querySelectorAll("[data-pkwg]").forEach(b=>b.onclick=()=>{
     if(!W.trial){const rec=pkWRec(p,w.jp);
-      if(b.dataset.pkwg==="1"){rec.box=Math.min(rec.box+1,PKGAP.length); rec.due=dayAdd(PKGAP[rec.box-1]);} else {rec.box=0; rec.due=dayAdd(1);}
+      if(b.dataset.pkwg==="1"){rec.box=Math.min(rec.box+1,PKGAP.length); rec.due=dayAdd(PKGAP[rec.box-1]);} else {rec.box=0; rec.due=dayAdd(1); rec.miss=(rec.miss||0)+1;
+        if(W.opts&&W.ans!==null&&W.opts[W.ans]!==w.ko){rec.picked=(rec.picked||[]).filter(x=>x!==W.opts[W.ans]).concat([W.opts[W.ans]]).slice(-3);}}
       pkSave();}
     PKP.pause(); Object.assign(W,{i:W.i+1,ans:null,opts:null,shown:false}); viewPackWords();
   });
+}
+
+/* ===== 헷갈린 단어 · 문장으로 확인 (v5.6) =====
+   틀렸거나 헷갈린 단어(目に余る ↔ 身に余る처럼 비슷한 짝 포함)를 여러 문장 속에서 다시 본다.
+   예문은 결과지를 보고 Claude가 LASENT1 JSON으로 주고, 사용자가 붙여 넣어 이 기기(localStorage)에만 저장한다.
+   예문마다 출처(src)를 보여 준다: 사전 예문이 아니면 「Claude 작성 · 사전 대조 전」. */
+const SKEY="la-pack-sent-v1";
+let SENT={sets:[]};
+try{const x=localStorage.getItem(SKEY); if(x) SENT=JSON.parse(x)||{sets:[]};}catch(e){}
+const sentSave=()=>{try{localStorage.setItem(SKEY,JSON.stringify(SENT));}catch(e){}};
+const sRec=id=>(PKR["#sent"]||(PKR["#sent"]={}))[id]||(PKR["#sent"][id]={box:0,due:""});
+const sDue=id=>{const r=(PKR["#sent"]||{})[id]; return !r||!r.due||r.due<=today();};
+function sentParse(txt){
+  const a=txt.indexOf("{"), b=txt.lastIndexOf("}");
+  if(a<0||b<a) throw new Error("JSON을 찾지 못했습니다.");
+  let d; try{d=JSON.parse(txt.slice(a,b+1));}catch(e){throw new Error("JSON 형식이 아닙니다.");}
+  if(!d||d.format!=="LASENT1"||!Array.isArray(d.sets)) throw new Error("예문 JSON(LASENT1)이 아닙니다.");
+  const ok=[], skip=[];
+  d.sets.forEach(x=>{
+    if(!x||!x.id||!x.a||!x.a.jp||!x.a.ko||!Array.isArray(x.sents)){skip.push(String(x&&x.id||"?")); return;}
+    const sents=x.sents.filter(t=>t&&t.ja&&t.hit&&t.ja.includes(t.hit)&&(t.is==="a"||(t.is==="b"&&x.b)));
+    if(!sents.length){skip.push(x.id+"(예문 없음)"); return;}
+    ok.push({id:String(x.id),a:x.a,b:x.b&&x.b.jp?x.b:null,src:String(x.src||"출처 없음"),note:x.note?String(x.note):"",sents});
+  });
+  return {ok,skip};
+}
+function sentAsk(){
+  const miss=[];
+  (PK.packs||[]).forEach(p=>pkWords(p).forEach(w=>{const x=(PKR[p.id+"#w"]||{})[w.jp]; if(x&&x.miss) miss.push(`${w.jp} (책 뜻: ${w.ko}${x.picked&&x.picked.length?` / 내가 고른 뜻: ${x.picked.join(", ")}`:""})`);}));
+  return `헷갈린 단어를 문장으로 익히려고 합니다. 아래 단어마다 예문 JSON을 만들어 주세요.
+${miss.length?"- 단어 카드에서 틀린 단어: "+miss.join(" / "):"- (단어를 여기에 적기: 예) 目に余る를 身に余る와 헷갈림)"}
+
+규칙
+- 소리나 글자가 비슷해 헷갈리는 짝이 있으면 b에 넣고(예: 目に余る ↔ 身に余る, 格好つける ↔ かこつける), a·b 예문을 섞어 6~8문장. 짝이 없으면 b 없이 a 예문 4~6문장.
+- 예문은 그 단어가 실제로 자주 쓰이는 결합(연어)으로, 짧고 자연스러운 문장. hit에는 문장 안에 실제로 나오는 형태 그대로(활용형 포함)를 적는다.
+- src: 사전·코퍼스 예문을 그대로 쓴 경우만 그 이름을 적고, 직접 쓴 문장이면 "Claude 작성 · 사전 대조 전".
+- JSON만 주세요.
+
+{"format":"LASENT1","sets":[{"id":"me-ni-amaru","a":{"jp":"目に余る","yomi":"めにあまる","ko":"(정도가 지나쳐) 그냥 보아 넘길 수 없다"},"b":{"jp":"身に余る","yomi":"みにあまる","ko":"분에 넘치다"},"src":"Claude 작성 · 사전 대조 전","note":"目(눈)에 넘친다 = 보기 괴롭다 / 身(몸)에 넘친다 = 내 분수보다 크다","sents":[{"ja":"…","ko":"…","hit":"目に余る","is":"a"}]}]}`;
+}
+function sentSection(){
+  const sets=SENT.sets||[], due=sets.filter(x=>sDue(x.id)), n=due.reduce((a,x)=>a+x.sents.length,0);
+  return `<section class="card">
+    <h2>헷갈린 단어 · 문장으로 확인</h2>
+    <p>틀린 단어와 비슷해서 헷갈리는 짝을 여러 문장 속에서 다시 봅니다. 빈칸에 맞는 쪽 고르기 → 문장 듣고 따라 말하기.</p>
+    ${sets.length?`<div class="chips">${sets.map(x=>`<span class="chip" lang="ja" style="cursor:default">${esc(x.a.jp)}${x.b?" ↔ "+esc(x.b.jp):""} · ${x.sents.length}문장${sDue(x.id)?"":" ✓"}</span>`).join("")}</div>
+      <div class="row"><button class="btn pri" id="sgo" ${n?"":"disabled"}>${n?`문장 확인 시작 (${n}문장)`:"오늘 끝"}</button><button class="btn" id="sdel">예문 모두 지우기</button></div>`
+      :`<p class="note">아직 예문이 없습니다. 단어 카드에서 틀린 단어는 결과지에 모입니다. 「예문 요청문 복사」를 Claude에게 보내고, 받은 답을 아래에 붙여 넣으세요.</p>`}
+    <div class="row"><button class="btn" id="sask">예문 요청문 복사</button></div>
+    <textarea id="sin" placeholder='Claude가 준 답을 통째로 붙여 넣기 ({"format":"LASENT1",...})'></textarea>
+    <div class="row"><button class="btn" id="sadd">예문 넣기</button></div>
+    <p class="note" id="smsg" aria-live="polite">예문은 이 기기에만 저장됩니다. 같은 id를 다시 넣으면 새 예문으로 바뀝니다.</p>
+  </section>`;
+}
+function sentBind(){
+  $("#sask").onclick=e=>copyText(sentAsk(),e.target);
+  $("#sadd").onclick=()=>{
+    try{const r=sentParse($("#sin").value); if(!r.ok.length) throw new Error("넣을 예문이 없습니다."+(r.skip.length?" 건너뜀: "+r.skip.join(", "):""));
+      r.ok.forEach(x=>{SENT.sets=(SENT.sets||[]).filter(y=>y.id!==x.id).concat([x]);}); sentSave(); viewPack();
+      setTimeout(()=>{const m=$("#smsg"); if(m) m.textContent=`${r.ok.length}묶음(${r.ok.reduce((a,x)=>a+x.sents.length,0)}문장)을 넣었습니다.${r.skip.length?" 건너뜀: "+r.skip.join(", "):""}`;},0);
+    }catch(e){$("#smsg").innerHTML=`<span class="bad">${esc(e.message||"읽지 못했습니다.")}</span>`;}
+  };
+  if($("#sgo")) $("#sgo").onclick=()=>{
+    const cards=[]; (SENT.sets||[]).filter(x=>sDue(x.id)).forEach(x=>x.sents.forEach(t=>cards.push({set:x,t})));
+    PK.srun={cards:shuffle(cards).slice(0,24),i:0,ans:null,shown:false,wrong:{}}; viewSent();};
+  if($("#sdel")) $("#sdel").onclick=e=>{const b=e.target; if(b.dataset.sure!=="1"){b.dataset.sure="1"; b.textContent="한 번 더 누르면 지움"; return;} SENT={sets:[]}; sentSave(); viewPack();};
+}
+function viewSent(){
+  const S=PK.srun;
+  if(S.i>=S.cards.length){
+    const ids=[...new Set(S.cards.map(c=>c.set.id))];
+    ids.forEach(id=>{const r=sRec(id); if(S.wrong[id]){r.box=0; r.due=dayAdd(1);} else {r.box=Math.min(r.box+1,PKGAP.length); r.due=dayAdd(PKGAP[r.box-1]);}});
+    pkSave();
+    $("#view").innerHTML=`<section class="card"><h2>문장 확인 끝</h2><p>${ids.length}묶음 중 다 맞힌 묶음 ${ids.filter(id=>!S.wrong[id]).length}개. 틀린 묶음은 내일, 다 맞힌 묶음은 3·7·14·30일 뒤에 다시 나옵니다.</p>
+      <div class="row"><button class="btn pri" id="sback">팩 목록으로</button></div></section>`;
+    $("#sback").onclick=()=>{PK.srun=null; viewPack();}; return;
+  }
+  const c=S.cards[S.i], x=c.set, t=c.t, pair=!!x.b, target=t.is==="b"?x.b:x.a;
+  const blank=esc(t.ja).split(esc(t.hit)).join("＿＿＿");
+  const opts=pair?(S.order||(S.order=shuffle(["a","b"]))):null;
+  const done=pair?S.ans!==null:S.shown;
+  let h=`<section class="card"><div class="row" style="justify-content:space-between"><span class="note">${S.i+1} / ${S.cards.length} · ${esc(x.a.jp)}${pair?" ↔ "+esc(x.b.jp):""}</span><button class="chip" id="squit">그만하기</button></div>
+    <p class="note">${pair?"빈칸에 맞는 쪽을 고르세요.":`빈칸에 「${esc(x.a.jp)}」를 넣어 소리 내어 읽고, 뜻을 떠올린 뒤 확인하세요.`}</p>
+    <p class="ja" lang="ja">${done?esc(t.ja).split(esc(t.hit)).join(`<b style="color:var(--accent)">${esc(t.hit)}</b>`):blank}</p>`;
+  if(pair) h+=`<div class="pk-opts">${opts.map(k=>{const o=x[k]; const cls=S.ans===null?"":(k===t.is?"pk-ok":(k===S.ans?"pk-bad":""));
+      return `<button class="btn ${cls}" data-sopt="${k}" ${S.ans!==null?"disabled":""}><span lang="ja" class="jps">${esc(o.jp)}</span>${S.ans!==null?` <span class="note">${esc(o.yomi||"")} · ${esc(o.ko)}</span>`:""}</button>`;}).join("")}</div>`;
+  else if(!S.shown) h+=`<div class="row"><button class="btn pri" id="sshow">확인</button></div>`;
+  if(done){
+    const good=pair?S.ans===t.is:null;
+    h+=`${pair?`<p class="${good?"ok":"bad"}"><b>${good?"맞음":"틀림"}</b> · 정답 <span lang="ja">${esc(target.jp)}</span></p>`:""}
+      <p>${esc(t.ko||"")}</p>
+      <div class="rule"><b lang="ja">${esc(x.a.jp)}${x.a.yomi?` (${esc(x.a.yomi)})`:""}</b><p>${esc(x.a.ko)}</p>${pair?`<b lang="ja">${esc(x.b.jp)}${x.b.yomi?` (${esc(x.b.yomi)})`:""}</b><p>${esc(x.b.ko)}</p>`:""}${x.note?`<p class="note">${esc(x.note)}</p>`:""}</div>
+      <p class="note">출처: ${esc(x.src)}</p>
+      <div class="row">${TTS.ok?`<button class="btn" id="ssay">▶ 문장 듣기 (기기 음성)</button>`:""}${pair?`<button class="btn pri" id="snext">따라 말했음 · 다음</button>`:`<button class="btn" data-sg="0">못 떠올림</button><button class="btn pri" data-sg="1">떠올림 · 다음</button>`}</div>`;
+  }
+  h+=`</section>`;
+  $("#view").innerHTML=h;
+  const next=()=>{if(TTS.ok) speechSynthesis.cancel(); Object.assign(S,{i:S.i+1,ans:null,shown:false,order:null}); viewSent(); window.scrollTo(0,0);};
+  $("#squit").onclick=()=>{if(TTS.ok) speechSynthesis.cancel(); PK.srun=null; viewPack();};
+  document.querySelectorAll("[data-sopt]").forEach(b=>b.onclick=()=>{S.ans=b.dataset.sopt; if(S.ans!==t.is) S.wrong[x.id]=1; viewSent();});
+  if($("#sshow")) $("#sshow").onclick=()=>{S.shown=true; viewSent();};
+  if($("#ssay")) $("#ssay").onclick=()=>speak(t.ja,"ja",0.9);
+  if($("#snext")) $("#snext").onclick=next;
+  document.querySelectorAll("[data-sg]").forEach(b=>b.onclick=()=>{if(b.dataset.sg==="0") S.wrong[x.id]=1; next();});
 }
 
 /* ===== 기록 ===== */
