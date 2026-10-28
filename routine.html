@@ -323,20 +323,25 @@ render();
   const get=async()=>{const d=await idb();return new Promise(ok=>{const q=d.transaction(ST).objectStore(ST).get('cur');q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(null)})};
   const put=async v=>{const d=await idb();return new Promise((ok,ng)=>{const tx=d.transaction(ST,'readwrite');tx.objectStore(ST).put(v,'cur');tx.oncomplete=ok;tx.onerror=()=>ng(tx.error)})};
   const run=p=>{window.__PACK=p;window.__AUD=p.audio;const s=document.createElement('script');s.textContent=document.getElementById('main').textContent;document.body.appendChild(s);
-    const sub=document.getElementById('sub');if(sub)sub.insertAdjacentHTML('beforeend',` · 팩 ${p.built} <a href="#" id="repack">팩 바꾸기</a>`);
+    const sub=document.getElementById('sub');if(sub)sub.insertAdjacentHTML('beforeend',` · 문제 ${p.built} · 음원 ${Object.keys(p.audio||{}).length}개 <a href="#" id="repack">팩 추가·교체</a>`);
     const rp=document.getElementById('repack');if(rp)rp.onclick=e=>{e.preventDefault();ask(true)}};
   function ask(again){
     const v=document.getElementById('view');
     v.innerHTML=`<section class="card"><div class="kind">루틴 팩 불러오기</div>
-      <p>이 앱에는 문제가 들어 있지 않습니다. 드라이브에 보관한 <b>루틴 팩 파일</b>(LA_루틴팩_날짜.json)을 처음 한 번 골라 주세요. 이 기기에 저장되어 다음부터는 바로 열립니다.</p>
-      <input type="file" id="pf" accept=".json,application/json"><p class="note" id="pm"></p>
+      <p>이 앱에는 문제가 들어 있지 않습니다. 드라이브나 메일로 받은 <b>루틴 팩 파일</b>을 골라 주세요(여러 개 함께 골라도 됩니다). 이 기기에 저장되어 다음부터는 바로 열립니다.</p>
+      <p class="note">처음: 「LA_루틴_문제_날짜」와 「LA_루틴_음원1·2…」를 모두. 문제가 늘면 「문제」 파일 하나만 새로 고르면 되고, 음원은 새 음원 파일이 있을 때만.</p>
+      <input type="file" id="pf" accept=".json,application/json" multiple><p class="note" id="pm"></p>
       ${again?'<div class="row"><button id="pc">취소</button></div>':''}</section>`;
     const pc=document.getElementById('pc');if(pc)pc.onclick=()=>location.reload();
-    document.getElementById('pf').onchange=e=>{const f=e.target.files[0];if(!f)return;const m=document.getElementById('pm');m.textContent='읽는 중…';
-      const r=new FileReader();r.onload=async()=>{try{const p=JSON.parse(r.result);if(p.format!=='LARTN1'||!p.data)throw new Error('루틴 팩 파일이 아닙니다');
-        await put(p);m.textContent='저장했습니다.';location.reload()}catch(err){m.textContent='불러오지 못했습니다: '+err.message}};r.readAsText(f)}
+    document.getElementById('pf').onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const m=document.getElementById('pm');m.textContent='읽는 중…';
+      try{const ps=await Promise.all(fs.map(f=>f.text().then(JSON.parse)));
+        if(ps.some(p=>p.format!=='LARTN1'))throw new Error('루틴 팩 파일이 아닙니다');
+        const old=(await get())||{format:'LARTN1',audio:{}};
+        const ds=ps.filter(p=>p.data).sort((a,b)=>a.built<b.built?1:-1);
+        const all={format:'LARTN1',data:ds.length?ds[0].data:old.data,built:ds.length?ds[0].built:old.built,audio:Object.assign({},old.audio||{},...ps.map(p=>p.audio||{}))};
+        await put(all);if(!all.data){m.textContent=`음원 ${Object.keys(all.audio).length}개를 저장했습니다. 이제 문제 파일(LA_루틴_문제_날짜)을 골라 주세요.`;e.target.value='';return}const na=Object.keys(all.audio).length;m.textContent=`저장했습니다(문제 ${all.built}, 음원 ${na}개).`;setTimeout(()=>location.reload(),600)}catch(err){m.textContent='불러오지 못했습니다: '+err.message}};
   }
-  get().then(p=>p&&p.format==='LARTN1'?run(p):ask(false)).catch(()=>ask(false));
+  get().then(p=>p&&p.format==='LARTN1'&&p.data?run(p):ask(false)).catch(()=>ask(false));
 })();
 </script>
 

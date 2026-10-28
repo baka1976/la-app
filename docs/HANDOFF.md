@@ -2,7 +2,7 @@
 
 ## 2026-10-29 변경
 - v5.6을 main에 합침(사용자 결정).
-- `routine.html` 「오늘의 루틴」 추가: 매일 약 20분 통합 루틴(청해·한자·어휘·문법·문형·일역·한역·독해·회화·작문). **화면 코드만** 저장소에 있고, 문제·음원은 개인 「루틴 팩」(`format: "LARTN1"`, `data` + `audio{경로: data URI}`)으로 따로 보관(드라이브·기기만). 처음 한 번 팩 파일을 고르면 IndexedDB `la-routine`에 저장. 기록은 localStorage `la-daily-v2`.
+- `routine.html` 「오늘의 루틴」 추가: 매일 약 20분 통합 루틴(청해·한자·어휘·문법·문형·일역·한역·독해·회화·작문). **화면 코드만** 저장소에 있고, 문제·음원은 개인 「루틴 팩」으로 따로 보관(드라이브·기기만): 문제 팩 `LA_루틴_문제_날짜.json`(`format: "LARTN1"`, `kind: "data"`, `data`)과 음원 팩 `LA_루틴_음원N.json`(`kind: "audio"`, `audio{경로: data URI}`, 첨부 한도 때문에 8.5MB씩). 고른 파일은 IndexedDB `la-routine`에 있던 것과 합쳐 저장 → 문제가 늘면 문제 팩 하나만 다시 고르면 됨. 기록은 localStorage `la-daily-v2`.
 - 팩과 화면 원본은 로컬 비공개 작업 폴더(교재추출/통합루틴: template.html, build_data.py, build_repo.py)에서 만든다. 저장소에 교재 문장이 들어가지 않았는지 build_repo.py가 검사한다.
 - 회사 PC처럼 구글 시트가 막힌 곳에서도 동작(시트 기록 없음, 결과지 복사로 판정).
 
