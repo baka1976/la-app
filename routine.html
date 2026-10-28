@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LA 오늘의 루틴</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+JP:wght@500;700&display=swap">
+<style>
+/* 레이아웃: 한 장씩 넘기는 학습 카드 한 줄 + 위쪽 진행 막대. 책 출처를 카드마다 아래에 둔다. */
+:root{
+  --bg:#f3f4f1; --card:#ffffff; --fg:#1d2321; --mute:#5f6a66; --line:#d9ddd8;
+  --accent:#1f5f6b; --accent-ink:#ffffff; --ok:#2e7a46; --bad:#b4413a; --mark:#f3e3a8;
+  --jp:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;
+  --ui:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141917; --card:#1d2422; --fg:#e7ece9; --mute:#9aa6a1; --line:#33403c;
+  --accent:#6fb3bf; --accent-ink:#0f1614; --ok:#6cc58a; --bad:#ef8a80; --mark:#5b5222; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --card:#1d2422; --fg:#e7ece9; --mute:#9aa6a1; --line:#33403c;
+  --accent:#6fb3bf; --accent-ink:#0f1614; --ok:#6cc58a; --bad:#ef8a80; --mark:#5b5222; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 40px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-direction:column;gap:8px}
+h1{font-size:18px;margin:0;text-wrap:balance}
+.sub{color:var(--mute);font-size:13px}
+.bar{display:flex;gap:4px;flex-wrap:wrap}
+.bar span{font-size:11px;letter-spacing:.02em;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.bar span.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.bar span.done{color:var(--fg);border-color:var(--fg)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.kind{font-size:12px;letter-spacing:.06em;color:var(--accent);font-weight:700}
+.jp{font-family:var(--jp);font-size:19px;line-height:1.75}
+.jp.big{font-size:28px;text-align:center}
+.ko{color:var(--mute)}
+.src{font-size:12px;color:var(--mute);border-top:1px dashed var(--line);padding-top:8px}
+u{text-decoration:none;background:var(--mark);padding:0 2px;border-bottom:2px solid var(--fg)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:10px 14px;min-height:44px}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.opt{width:100%;text-align:left}
+button.okb{border-color:var(--ok);box-shadow:inset 0 0 0 2px var(--ok)}
+button.badb{border-color:var(--bad);box-shadow:inset 0 0 0 2px var(--bad)}
+button:disabled{opacity:1;cursor:default}
+.opts{display:flex;flex-direction:column;gap:8px}
+textarea{font:inherit;width:100%;box-sizing:border-box;min-height:70px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);color:var(--fg)}
+.res{font-weight:700}.res.ok{color:var(--ok)}.res.bad{color:var(--bad)}
+.turn{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start}
+.who{font-size:12px;color:var(--mute);padding-top:6px;white-space:nowrap}
+details summary{cursor:pointer;color:var(--accent)}
+.note{font-size:13px;color:var(--mute)}
+pre.out{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;max-height:320px;overflow:auto}
+@media (prefers-reduced-motion:no-preference){.card{animation:in .18s ease-out}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+</style></head><body>
+<div class="wrap">
+  <header>
+    <h1>오늘의 일본어 루틴</h1>
+    <div class="sub" id="sub">청해·한자·어휘·문법·문형·일역·한역·독해·회화·작문 · 약 20분</div>
+    <div class="bar" id="bar"></div>
+  </header>
+  <main id="view"></main>
+</div>
+<script type="text/plain" id="main">
+const D=window.__PACK?window.__PACK.data:JSON.parse(document.getElementById('data').textContent);
+const AU=p=>(window.__AUD&&window.__AUD[p])||p;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>new Date().toLocaleDateString('sv');
+const KEY='la-daily-v2';
+let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
+S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
+function take(kind,pool,n,skip=()=>false){
+  const byId=new Map(pool.map(x=>[x.id,x])),out=[],w=(S.wrong[kind]||[]).filter(id=>byId.has(id));
+  for(const id of w){if(out.length>=Math.ceil(n/2))break;const x=byId.get(id);if(!skip(x,out))out.push(x)}
+  let p=S.ptr[kind]||0;
+  let g=0;while(out.length<n&&g++<pool.length*2){const x=pool[p%pool.length];p++;if(!out.includes(x)&&!skip(x,out))out.push(x)}
+  return {items:out,next:p};
+}
+// 청해는 두 책을 번갈아
+const LISTEN=(()=>{const g=D.listen.filter(x=>x.id.startsWith('GS')),k=D.listen.filter(x=>!x.id.startsWith('GS')),o=[];
+  for(let i=0;i<Math.max(g.length,k.length);i++){if(g[i])o.push(g[i]);if(i%2===0&&k[i/2])o.push(k[i/2])}return o.concat(k.slice(Math.ceil(g.length/2)))})();
+const LISTEN_U=[...new Map(LISTEN.map(x=>[x.id,x])).values()];
+function buildSession(){
+  const s={date:today(),steps:[],next:{},res:[]};
+  const L=take('listen',LISTEN_U,3);s.next.listen=L.next;L.items.forEach(x=>s.steps.push({k:'listen',id:x.id}));
+  const K=take('kanji',D.kanji,3);s.next.kanji=K.next;K.items.forEach(x=>s.steps.push({k:'kanji',id:x.id}));
+  // 문자어휘·문법은 실전모의고사 N1에서. 유형이 고루 섞이게 유형별로 돌아가며 늘어놓음
+  const rr=a=>{const g={};a.forEach(x=>(g[x.type]=g[x.type]||[]).push(x));const q=Object.values(g),o=[];while(q.some(x=>x.length))q.forEach(x=>x.length&&o.push(x.shift()));return o};
+  const MJ=take('moji',rr(D.mock.filter(x=>['kanji_reading','context','paraphrase','usage'].includes(x.type))),5);s.next.moji=MJ.next;MJ.items.forEach(x=>s.steps.push({k:'moji',id:x.id}));
+  const GF=take('gf',D.mock.filter(x=>x.type==='grammar_form'),2),SO=take('so',D.mock.filter(x=>x.type==='sentence_order'),1);
+  s.next.gf=GF.next;s.next.so=SO.next;GF.items.concat(SO.items).forEach(x=>s.steps.push({k:'gram',id:x.id}));
+  // 오늘 문법 문항의 문형 → 문형 카드·작문
+  let pt=GF.items.concat(SO.items).find(x=>x.pattern);
+  if(!pt){const P=D.mock.filter(x=>x.pattern),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
+  s.steps.push({k:'pat2',id:pt.id});
+  const tr=(S.ptr.tr||0)%D.trans.length,a=D.trans[tr],b=D.trans[(tr+1)%D.trans.length];s.next.tr=tr+2;
+  s.steps.push({k:'ilyeok',ja:a[0],ko:a[1],src:a[2]});
+  s.steps.push({k:'hanyeok',ja:b[0],ko:b[1],src:b[2]});
+  // 글의 문법(모의고사 지문 빈칸 5문항): 남은 지문이 있을 때만. 독해는 따로 청해 문제3 대본
+  const TG=[...new Set(D.mock.filter(x=>x.type==='text_grammar').map(x=>x.passage))],tgi=S.ptr.tg||0;
+  if(tgi<TG.length){D.mock.filter(x=>x.passage===TG[tgi]).forEach(x=>s.steps.push({k:'tg',id:x.id}));s.next.tg=tgi+1}
+  const ri=(S.ptr.reading||0)%D.reading.length;s.next.reading=ri+1;s.steps.push({k:'reading',id:D.reading[ri].id});
+  const ti=(S.ptr.talk||0)%D.talk.length;s.next.talk=ti+1;s.steps.push({k:'talk',id:D.talk[ti].id});
+  s.steps.push({k:'write2',id:pt.id});
+  s.i=0;return s;
+}
+function find(k,id){if(k==='listen')return LISTEN_U.find(x=>x.id===id);if(k==='kanji')return D.kanji.find(x=>x.id===id);
+  if(k==='vocab')return D.vocab.find(x=>x.jp===id);if(k==='pat')return D.pats.find(x=>x.no===id);
+  if(k==='reading')return D.reading.find(x=>x.id===id);if(k==='mock')return D.mock.find(x=>x.id===id);if(k==='talk')return D.talk.find(x=>x.id===id)}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+let player=null;
+function play(list){if(player){player.pause()}let i=0;const nxt=()=>{if(i>=list.length)return;player=new Audio(AU(list[i++]));player.onended=()=>setTimeout(nxt,600);player.play().catch(()=>{})};nxt()}
+function rec(r){const s=S.cur;s.res[s.i]=r;save()}
+function mark(kind,id,ok){const w=new Set(S.wrong[kind]||[]);ok?w.delete(id):w.add(id);S.wrong[kind]=[...w].slice(-60)}
+function drawBar(){const s=S.cur;const kinds=s?s.steps.map(x=>x.k):[];
+  $('#bar').innerHTML=PLAN.map(([k,,name])=>{const idx=kinds.map((x,i)=>x===k?i:-1).filter(i=>i>=0);if(!idx.length)return'';
+    const done=idx.every(i=>i<s.i),on=idx.includes(s.i);return `<span class="${on?'on':done?'done':''}">${name}</span>`}).join('')}
+function card(kind,body){const f=(S.cur&&S.cur.fb||{})[S.cur?S.cur.i:-1]||'';
+  return `<section class="card"><div class="kind">${kind}</div>${body}<div class="src"><label class="note" for="fb">이 문제에 대한 질문 · 오류 · 아이디어 (결과지에 들어갑니다)</label><textarea id="fb" placeholder="없으면 비워 두세요">${esc(f)}</textarea></div></section>`}
+function bindFb(){const t=$('#fb');if(t)t.oninput=()=>{const s=S.cur;s.fb=s.fb||{};s.fb[s.i]=t.value;save()}}
+function nextBtn(label='다음'){return `<div class="row"><button class="pri" id="next">${label}</button></div>`}
+function bindNext(){const b=$('#next');if(b)b.onclick=()=>{S.cur.i++;save();render()}}
+function render(){
+  const s=S.cur;drawBar();
+  if(!s){return home()}
+  if(s.i>=s.steps.length)return finish();
+  const st=s.steps[s.i],n=s.steps.filter((x,i)=>i<s.i&&x.k===st.k).length+1,tot=s.steps.filter(x=>x.k===st.k).length;
+  const lab=PLAN.find(p=>p[0]===st.k)[2]+(tot>1?` ${n}/${tot}`:'');
+  ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2})[st.k](st,lab);bindFb();
+}
+function home(){
+  const last=S.log[S.log.length-1];
+  $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
+   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 아직 N1 독해 자료가 없어 청해 대본을 읽기 자료로 씁니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
+   ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
+   <div class="row"><button class="pri" id="start">시작하기</button></div>`);
+  $('#start').onclick=()=>{S.cur=buildSession();save();render()};
+}
+function vListen(st,lab){
+  const x=find('listen',st.id),r=S.cur.res[S.cur.i];
+  const ans=r?r.pick:null;
+  let h=`<p class="note">음성을 듣고 가장 알맞은 대답을 고르세요. 보기는 음성으로만 나옵니다.</p>
+   <div class="row"><button id="play">▶ 듣기</button></div>
+   <div class="row">${[1,2,3].map(k=>`<button data-k="${k}" class="${ans?(k===x.ans?'okb':k===ans?'badb':''):''}" ${ans?'disabled':''}>${k}</button>`).join('')}</div>`;
+  if(ans){const ok=ans===x.ans;
+    h+=`<div class="res ${ok?'ok':'bad'}">${ok?'정답':'오답'} · 정답 ${x.ans}번</div>
+     <div class="turn"><div class="who">${esc(x.q.who||'')}</div><div><div class="jp">${esc(x.q.ja)}</div><div class="ko">${esc(x.q.ko)}</div></div></div>
+     <div class="opts">${x.ch.map((c,i)=>`<div class="turn"><div class="who">${i+1}</div><div><div class="jp">${esc(c[0])}</div><div class="ko">${esc(c[1])}</div></div></div>`).join('')}</div>
+     ${x.expl?`<p class="note">책 해설: ${esc(x.expl)}</p>`:''}${x.words?`<details><summary>단어</summary><p class="note">${esc(x.words)}</p></details>`:''}
+     ${ok?'':`<label class="note" for="why">왜 ${ans}번을 골랐는지, 왜 틀렸는지 한 줄 (결과지에 들어갑니다)</label><textarea id="why">${esc(r.why||'')}</textarea>`}
+     ${nextBtn()}`}
+  $('#view').innerHTML=card('청해 · '+lab,h,x.src);
+  $('#play').onclick=()=>play(x.aud);
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;rec({k:'listen',id:x.id,pick:k,ok:k===x.ans});mark('listen',x.id,k===x.ans);render()});
+  const w=$('#why');if(w)w.oninput=()=>{S.cur.res[S.cur.i].why=w.value;save()};bindNext();
+}
+const uline=t=>esc(t).replace(/【(.+?)】/g,'<u>$1</u>');
+const filled=x=>x.stem.replace(/（\s*）/,'（'+x.choices[x.answer-1]+'）');
+function vMock(st,lab){
+  const x=find('mock',st.id),r=S.cur.res[S.cur.i],K={moji:'어휘',gram:'문법',tg:'글의 문법'}[st.k];
+  const Q={kanji_reading:'밑줄 친 말의 읽기로 가장 알맞은 것은?',context:'(　)에 들어갈 가장 알맞은 것은?',paraphrase:'밑줄 친 말과 의미가 가장 가까운 것은?',
+    usage:'다음 말의 사용법으로 가장 알맞은 것은?',grammar_form:'(　)에 들어갈 가장 알맞은 것은?',sentence_order:'★에 들어갈 가장 알맞은 것은?',text_grammar:'글의 흐름에 맞게 빈칸에 들어갈 가장 알맞은 것은?'}[x.type];
+  let h=`<p class="note">${Q}</p>`;
+  if(x.passage){const tag=x.stem.replace(/[\[\]]/g,'').split(' / ').map(t=>'['+t+']');
+    h+=`<div class="jp" style="font-size:16px">${x.passage.split('\n').map(p=>'<p>'+tag.reduce((a,t)=>a.split(esc(t)).join('<u>'+esc(t)+'</u>'),esc(p))+'</p>').join('')}</div><div><b>${esc(x.stem)}</b></div>`}
+  else h+=`<div class="jp${x.type==='usage'?' big':''}">${uline(x.stem)}</div>`;
+  h+=`<div class="opts">${x.choices.map((c,i)=>`<button class="opt ${r?(i+1===x.answer?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp" style="font-size:17px">${i+1}. ${esc(c)}</span></button>`).join('')}</div>`;
+  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${x.answer}번</div>`;
+    if(x.why)h+=`<p>${esc(x.why)}</p>`;
+    const w=Object.entries(x.wrong||{});if(w.length)h+=`<div class="opts">${w.map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}</div>`;
+    if(x.note)h+=`<p class="note">${esc(x.note)}</p>`;
+    if(x.vocab&&x.vocab.length)h+=`<details ${r.ok?'':'open'}><summary>단어</summary>${x.vocab.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v.word)}</span>${v.reading?' ('+esc(v.reading)+')':''} ${esc(v.ko)}</p>`).join('')}</details>`;
+    if(!r.ok)h+=`<label class="note" for="why">왜 ${r.pick}번을 골랐는지 한 줄 (결과지에 들어갑니다)</label><textarea id="why">${esc(r.why||'')}</textarea>`;
+    h+=nextBtn()}
+  $('#view').innerHTML=card(K+' · '+lab,h);
+  const mk=st.k==='moji'?'moji':x.type==='grammar_form'?'gf':x.type==='sentence_order'?'so':'tg';
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;rec({k:st.k,id:x.id,pick:k,ok:k===x.answer});if(mk!=='tg')mark(mk,x.id,k===x.answer);render()});
+  const w=$('#why');if(w)w.oninput=()=>{S.cur.res[S.cur.i].why=w.value;save()};bindNext();
+}
+function vPat2(st,lab){
+  const x=find('mock',st.id),p=x.pattern;
+  const ex=x.type==='grammar_form'?filled(x):'';
+  const h=`<div class="jp big">${esc(p.form)}</div><div><b>${esc(p.ko)}</b> <span class="note">${esc(p.register||'')}</span></div>
+   ${ex?`<div><div class="note">오늘 문법 문제의 문장</div><div class="jp">${esc(ex)}</div></div>`:''}
+   ${x.why?`<p>${esc(x.why)}</p>`:''}
+   <p class="note">이 문형으로 마지막에 작문을 합니다. 문장을 소리 내어 읽고 넘어가세요.</p>${nextBtn()}`;
+  $('#view').innerHTML=card('문형 · '+lab,h);bindNext();
+}
+function vWrite2(st,lab){
+  const x=find('mock',st.id),p=x.pattern,s=S.cur,r=s.res[s.i]||{};
+  const h=`<p>오늘 문형 <b class="jp">${esc(p.form)}</b>(${esc(p.ko)})을 넣어, 내 생활에 관한 일본어 문장을 하나 쓰세요.</p>
+   <p class="note">앞에 붙은 N·V-る 같은 기호는 문형 앞에 오는 말의 모양입니다(N=명사, V-る=동사 사전형, V-ず=동사 ない형에서 ない를 뺀 꼴+ず).</p>
+   <textarea id="ans" placeholder="日本語で一文">${esc(r.mine||'')}</textarea>${nextBtn('결과 보기')}`;
+  $('#view').innerHTML=card('작문 · '+lab,h);
+  const t=$('#ans');t.oninput=()=>{s.res[s.i]={k:'write2',pat:p.form,mine:t.value};save()};bindNext();
+}
+function hl(s,t){if(!t||!s.includes(t))return esc(s);const i=s.indexOf(t);return esc(s.slice(0,i))+'<u>'+esc(t)+'</u>'+esc(s.slice(i+t.length))}
+function vKanji(st,lab){
+  const x=find('kanji',st.id),r=S.cur.res[S.cur.i];
+  const q=x.sec===1?'밑줄 친 한자의 올바른 읽기는?':'밑줄 친 부분에 해당하는 한자는?';
+  let h=`<p class="note">${q}</p><div class="jp">${hl(x.s,x.t)}</div>${x.t?'':'<p class="note">밑줄 위치를 표시하지 못했습니다. 보기 두 개를 보고 해당 단어를 찾아 주세요.</p>'}
+   <div class="opts">${['a','b'].map(k=>`<button class="opt ${r?(k===x.ans?'okb':k===r.pick?'badb':''):''}" data-k="${k}" ${r?'disabled':''}><span class="jp">${k}. ${esc(x[k])}</span></button>`).join('')}</div>`;
+  if(r)h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'}</div>${x.ko?`<div class="ko">${esc(x.ko)}</div>`:''}${nextBtn()}`;
+  $('#view').innerHTML=card('한자 · '+lab,h,x.src);
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;rec({k:'kanji',id:x.id,pick:k,ok:k===x.ans});mark('kanji',x.id,k===x.ans);render()});bindNext();
+}
+function vVocab(st,lab){
+  const x=find('vocab',st.id),s=S.cur;let r=s.res[s.i];
+  if(!s.opts)s.opts={};
+  if(!s.opts[s.i]){const others=shuffle(D.vocab.filter(v=>v.ko!==x.ko)).slice(0,3).map(v=>v.ko);s.opts[s.i]=shuffle(others.concat([x.ko]));save()}
+  const o=s.opts[s.i];
+  let h=`<p class="note">뜻을 고르세요.</p><div class="jp big">${esc(x.jp)}</div>
+   <div class="opts">${o.map((t,i)=>`<button class="opt ${r?(t===x.ko?'okb':i===r.pick?'badb':''):''}" data-k="${i}" ${r?'disabled':''}>${esc(t)}</button>`).join('')}</div>`;
+  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · ${esc(x.ko)}</div>
+    ${x.ctx?`<div><div class="jp">${hl(x.ctx[0],x.jp.replace(/^[～〜]/,'').replace(/[～〜(（].*$/,''))}</div><div class="ko">${esc(x.ctx[1])}</div></div>`:''}
+    ${r.ok?`<button class="opt" id="known" ${S.known.includes(x.jp)?'disabled':''}>${S.known.includes(x.jp)?'다시 안 나옴':'이미 아는 단어 · 다시 안 내기'}</button>`:''}${nextBtn()}`}
+  $('#view').innerHTML=card('어휘 · '+lab,h,x.src+' 「단어」 칸');
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const i=+b.dataset.k,ok=o[i]===x.ko;rec({k:'vocab',id:x.jp,pick:i,ok,picked:o[i]});mark('vocab',x.jp,ok);render()});
+  const kb=$('#known');if(kb)kb.onclick=()=>{S.known.push(x.jp);save();render()};bindNext();
+}
+function vPat(st,lab){
+  const p=find('pat',st.id);
+  const h=`<div class="jp big">${esc(p.pattern)}</div><div><b>${esc(p.meaning)}</b> <span class="note">★${p.star}</span></div>
+   <div class="note">접속: ${esc(p.connect)}<br>(문형 앞에 오는 말이 어떤 모양이어야 하는지. 이 중 어느 모양이든 맞게 붙이면 됩니다)</div>
+   <div class="opts">${p.ex.map((e,i)=>`<div class="turn"><div class="who">${i+1}</div><div><div class="jp">${esc(e[0])}</div><div class="ko">${esc(e[1])}</div></div></div>`).join('')}</div>
+   ${p.notes.map(n=>`<p>${esc(n)}</p>`).join('')}
+   ${p.marked.length?`<div>${p.marked.map(m=>`<div class="jp">${esc(m.mark)} ${esc(m.ja)}</div>`).join('')}<p class="note">× 표시는 책이 틀린 문장으로 든 예입니다. 왜 틀렸는지 위 해설에서 찾아 소리 내어 말해 보세요.</p></div>`:''}
+   ${p.see.length?`<p class="note">참고 문형: ${esc(p.see.join(' · '))}</p>`:''}
+   <p class="note">예문을 하나씩 소리 내어 읽은 뒤 다음으로 넘어가세요. 다음 두 단계에서 이 예문으로 일역·한역을 합니다.</p>${nextBtn()}`;
+  $('#view').innerHTML=card('문형 · '+lab,h,p.src);bindNext();
+}
+function vTrans(st,lab){
+  const s=S.cur,r=s.res[s.i]||{},il=st.k==='ilyeok';
+  const q=il?st.ja:st.ko,a=il?st.ko:st.ja;
+  let h=`<p class="note">${il?'일본어를 한국어로 옮겨 쓰세요.':'한국어를 일본어로 옮겨 쓰세요. 쓰기 전에 먼저 소리 내어 말해 보세요.'}</p>
+   <div class="${il?'jp':''}">${esc(q)}</div><textarea id="ans" placeholder="${il?'한국어로':'日本語で'}">${esc(r.mine||'')}</textarea>`;
+  if(r.shown){h+=`<div><div class="note">교재의 ${il?'번역':'원문'}</div><div class="${il?'':'jp'}">${esc(a)}</div></div>
+     <p class="note">책 문장과 다른 부분은 틀린 것이 아닐 수 있습니다. 결과지로 Claude에게 판정을 받으세요.</p>${nextBtn()}`}
+  else h+=`<div class="row"><button class="pri" id="show">책 ${il?'번역':'원문'}과 비교</button></div>`;
+  $('#view').innerHTML=card((il?'일역':'한역')+' · '+lab,h,st.src);
+  const t=$('#ans');t.oninput=()=>{s.res[s.i]={...(s.res[s.i]||{}),k:st.k,mine:t.value,q,a};save()};
+  const b=$('#show');if(b)b.onclick=()=>{s.res[s.i]={...(s.res[s.i]||{}),k:st.k,mine:t.value,q,a,shown:true};save();render()};bindNext();
+}
+function vReading(st,lab){
+  const x=find('reading',st.id),r=S.cur.res[S.cur.i];
+  let h=`<p class="note">${esc(x.intro.ja)}</p><div class="opts">${x.text.map(l=>`<div class="jp">${esc(l.ja)}</div>`).join('')}</div>
+   <div><b class="jp">${esc(x.q.ja)}</b></div>
+   <div class="opts">${x.ch.map((c,i)=>`<button class="opt ${r?(i+1===x.ans?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp">${i+1}. ${esc(c[0])}</span></button>`).join('')}</div>`;
+  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${x.ans}번</div>
+    <details><summary>한국어 번역 보기</summary>${x.text.map(l=>`<p class="ko">${esc(l.ko)}</p>`).join('')}<p class="ko">${esc(x.q.ko)}</p>${x.ch.map((c,i)=>`<p class="ko">${i+1}. ${esc(c[1])}</p>`).join('')}</details>
+    ${r.ok?'':`<label class="note" for="why">왜 ${r.pick}번을 골랐는지 한 줄</label><textarea id="why">${esc(r.why||'')}</textarea>`}${nextBtn()}`}
+  $('#view').innerHTML=card('독해 · '+lab,h,x.src+' (청해 스크립트를 읽기 자료로 사용)');
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;rec({k:'reading',id:x.id,pick:k,ok:k===x.ans});render()});
+  const w=$('#why');if(w)w.oninput=()=>{S.cur.res[S.cur.i].why=w.value;save()};bindNext();
+}
+function vTalk(st,lab){
+  const x=find('talk',st.id),s=S.cur,r=s.res[s.i]||{k:'talk',id:x.id,step:0},me=x.lines[1].who;
+  const upto=r.step;let h=`<p class="note">${esc(x.intro.ko)}</p><p class="note">당신은 「${esc(me)}」입니다. 상대 말을 읽고, 내 차례에는 한국어를 보고 일본어로 소리 내어 말한 뒤 [확인]을 누르세요.</p><div class="opts">`;
+  let pending=null;
+  for(let i=0;i<x.lines.length;i++){const l=x.lines[i];
+    if(l.who!==me){if(i<=upto)h+=`<div class="turn"><div class="who">${esc(l.who)}</div><div><div class="jp">${esc(l.ja)}</div><details><summary>뜻</summary><div class="ko">${esc(l.ko)}</div></details></div></div>`;else break}
+    else{if(i<upto)h+=`<div class="turn"><div class="who">나</div><div><div class="ko">${esc(l.ko)}</div><div class="jp">${esc(l.ja)}</div></div></div>`;
+      else{h+=`<div class="turn"><div class="who">나</div><div><div class="ko">${esc(l.ko)}</div></div></div>`;pending=i;break}}
+  }
+  h+='</div>';
+  if(pending!==null)h+=`<div class="row"><button class="pri" id="reveal">확인</button></div>`;
+  else h+=`<p class="note">대화 끝. 한 번 더 소리 내어 처음부터 읽어 보세요.</p>${nextBtn()}`;
+  $('#view').innerHTML=card('회화 · '+lab,h,x.src);
+  if(pending===null&&upto<x.lines.length){}
+  const b=$('#reveal');if(b)b.onclick=()=>{let nx=pending+1;while(nx<x.lines.length&&x.lines[nx].who!==me)nx++;s.res[s.i]={...r,step:nx};save();render()};
+  if(!s.res[s.i]){let first=0;while(first<x.lines.length&&x.lines[first].who!==me)first++;s.res[s.i]={...r,step:first};save();render();return}
+  bindNext();
+}
+function vWrite(st,lab){
+  const p=find('pat',st.pat),s=S.cur,r=s.res[s.i]||{};
+  const h=`<p>오늘 문형 <b class="jp">${esc(p.pattern)}</b>(${esc(p.meaning)})을 넣어, 내 생활에 관한 일본어 문장을 하나 쓰세요.</p>
+   <p class="note">접속: ${esc(p.connect)} — 앞말을 이 모양으로 붙이세요(어느 모양이든 하나면 됨). 문형 해설의 제약(뒤에 오는 말 등)도 판정에 들어갑니다.</p><textarea id="ans" placeholder="日本語で一文">${esc(r.mine||'')}</textarea>
+   <p class="note">판정은 결과지를 받은 Claude가 문형책 해설을 근거로 합니다.</p>${nextBtn('결과 보기')}`;
+  $('#view').innerHTML=card('작문 · '+lab,h,p.src);
+  const t=$('#ans');t.oninput=()=>{s.res[s.i]={k:'write',pat:p.pattern,mine:t.value};save()};bindNext();
+}
+function report(s){
+  const L=[`[LA 오늘의 일본어 결과지] ${s.date}`];
+  const mc=s.res.filter(r=>r&&'ok' in r),ok=mc.filter(r=>r.ok).length;
+  L.push(`객관식 ${ok}/${mc.length} 정답`);
+  s.steps.forEach((st,i)=>{const r=s.res[i];if(!r)return;
+    if(st.k==='listen'&&!r.ok){const x=find('listen',st.id);L.push(`\n[청해 오답] ${x.src}\n질문: ${x.q.ja}\n보기: ${x.ch.map((c,j)=>(j+1)+') '+c[0]).join(' / ')}\n정답 ${x.ans} · 내 선택 ${r.pick}\n내 이유: ${r.why||'(없음)'}`)}
+    if(st.k==='kanji'&&!r.ok){const x=find('kanji',st.id);L.push(`\n[한자 오답] ${x.s} (밑줄 ${x.t||'?'}) · 정답 ${x[x.ans]} · 내 선택 ${x[r.pick]}`)}
+    if(st.k==='vocab'&&!r.ok){const x=find('vocab',st.id);L.push(`\n[어휘 오답] ${x.jp} = ${x.ko} · 내가 고른 뜻: ${r.picked}`)}
+    if(st.k==='reading'&&!r.ok){const x=find('reading',st.id);L.push(`\n[독해 오답] ${x.src} · 정답 ${x.ans} · 내 선택 ${r.pick}\n내 이유: ${r.why||'(없음)'}`)}
+    if(st.k==='ilyeok'||st.k==='hanyeok')L.push(`\n[${st.k==='ilyeok'?'일역':'한역'}]\n문제: ${r.q}\n내 답: ${r.mine||'(안 씀)'}\n교재: ${r.a}`);
+    if(st.k==='write'||st.k==='write2')L.push(`\n[작문] 문형 ${r.pat}\n내 문장: ${r.mine||'(안 씀)'}`);
+    if(['moji','gram','tg'].includes(st.k)&&!r.ok){const x=find('mock',st.id);L.push(`\n[${{moji:'어휘',gram:'문법',tg:'글의 문법'}[st.k]} 오답] ${x.id}\n문제: ${x.stem}\n보기: ${x.choices.map((c,j)=>(j+1)+') '+c).join(' / ')}\n정답 ${x.answer} · 내 선택 ${r.pick}\n내 이유: ${r.why||'(없음)'}`)}
+  });
+  Object.entries(s.fb||{}).filter(([,v])=>v&&v.trim()).forEach(([i,v])=>{const st=s.steps[i];if(!st)return;
+    const name=PLAN.find(p=>p[0]===st.k)[2],x=['moji','gram','tg','pat2','write2'].includes(st.k)?find('mock',st.id):null;
+    const q=x?`${x.id} ${x.stem}`:st.k==='listen'?find('listen',st.id).q.ja:st.k==='kanji'?find('kanji',st.id).s:st.k==='talk'?st.id:(st.ja||st.id||'');
+    L.push(`\n[질문·의견 · ${name}] ${q}\n${v.trim()}`)});
+  L.push('\n요청: 일역·한역·작문을 판정해 주세요(교재 문장과 다른 표현도 맞으면 맞다고, 틀리면 근거와 함께). 오답 이유와 질문·의견에도 답해 주세요.');
+  return {text:L.join('\n'),ok,n:mc.length};
+}
+function finish(){
+  const s=S.cur,rp=report(s);
+  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n});S.log=S.log.slice(-60);s.closed=true;save()}
+  $('#view').innerHTML=card('결과',`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
+   <p>아래 결과지를 복사해 Claude에게 붙여 넣으세요. 일역·한역·작문과 오답 이유를 판정받습니다.</p>
+   <pre class="out" id="out">${esc(rp.text)}</pre>
+   <div class="row"><button class="pri" id="copy">결과지 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>`);
+  $('#copy').onclick=()=>{navigator.clipboard.writeText(rp.text).then(()=>$('#msg').textContent='복사했습니다.',()=>{const r=document.createRange();r.selectNodeContents($('#out'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#msg').textContent='복사 버튼이 막혀 있어 결과지를 선택해 두었습니다. 길게 눌러 복사하세요.'})};
+  $('#again').onclick=()=>{S.cur=null;save();render()};
+}
+if(S.cur&&S.cur.date!==today()&&!S.cur.closed){/* 어제 하다 만 것은 이어서 */}
+if(S.cur&&S.cur.closed&&S.cur.date!==today())S.cur=null;
+render();
+</script>
+<script>
+/* 루틴 팩(LARTN1)을 기기(IndexedDB)에서 꺼내 본 화면을 실행. 없으면 파일을 고르게 한다. 팩은 저장소에 없음 */
+(function(){
+  const DB='la-routine',ST='pack';
+  const idb=()=>new Promise((ok,ng)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore(ST);r.onsuccess=()=>ok(r.result);r.onerror=()=>ng(r.error)});
+  const get=async()=>{const d=await idb();return new Promise(ok=>{const q=d.transaction(ST).objectStore(ST).get('cur');q.onsuccess=()=>ok(q.result);q.onerror=()=>ok(null)})};
+  const put=async v=>{const d=await idb();return new Promise((ok,ng)=>{const tx=d.transaction(ST,'readwrite');tx.objectStore(ST).put(v,'cur');tx.oncomplete=ok;tx.onerror=()=>ng(tx.error)})};
+  const run=p=>{window.__PACK=p;window.__AUD=p.audio;const s=document.createElement('script');s.textContent=document.getElementById('main').textContent;document.body.appendChild(s);
+    const sub=document.getElementById('sub');if(sub)sub.insertAdjacentHTML('beforeend',` · 팩 ${p.built} <a href="#" id="repack">팩 바꾸기</a>`);
+    const rp=document.getElementById('repack');if(rp)rp.onclick=e=>{e.preventDefault();ask(true)}};
+  function ask(again){
+    const v=document.getElementById('view');
+    v.innerHTML=`<section class="card"><div class="kind">루틴 팩 불러오기</div>
+      <p>이 앱에는 문제가 들어 있지 않습니다. 드라이브에 보관한 <b>루틴 팩 파일</b>(LA_루틴팩_날짜.json)을 처음 한 번 골라 주세요. 이 기기에 저장되어 다음부터는 바로 열립니다.</p>
+      <input type="file" id="pf" accept=".json,application/json"><p class="note" id="pm"></p>
+      ${again?'<div class="row"><button id="pc">취소</button></div>':''}</section>`;
+    const pc=document.getElementById('pc');if(pc)pc.onclick=()=>location.reload();
+    document.getElementById('pf').onchange=e=>{const f=e.target.files[0];if(!f)return;const m=document.getElementById('pm');m.textContent='읽는 중…';
+      const r=new FileReader();r.onload=async()=>{try{const p=JSON.parse(r.result);if(p.format!=='LARTN1'||!p.data)throw new Error('루틴 팩 파일이 아닙니다');
+        await put(p);m.textContent='저장했습니다.';location.reload()}catch(err){m.textContent='불러오지 못했습니다: '+err.message}};r.readAsText(f)}
+  }
+  get().then(p=>p&&p.format==='LARTN1'?run(p):ask(false)).catch(()=>ask(false));
+})();
+</script>
+
+</body></html>
