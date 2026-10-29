@@ -68,7 +68,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const today=()=>new Date().toLocaleDateString('sv');
 const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
-S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];
+S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
@@ -113,7 +113,42 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor
 let player=null;
 function play(list){if(player){player.pause()}let i=0;const nxt=()=>{if(i>=list.length)return;player=new Audio(AU(list[i++]));player.onended=()=>setTimeout(nxt,600);player.play().catch(()=>{})};nxt()}
 function rec(r){const s=S.cur;s.res[s.i]=r;save()}
-function mark(kind,id,ok){const w=new Set(S.wrong[kind]||[]);ok?w.delete(id):w.add(id);S.wrong[kind]=[...w].slice(-60)}
+function mark(kind,id,ok){const w=new Set(S.wrong[kind]||[]);ok?w.delete(id):w.add(id);S.wrong[kind]=[...w].slice(-60);S.seen[kind+'|'+id]={t:Date.now(),ok}}
+// 오답노트: 틀린 객관식, 주관식 답, 질문·의견을 문항별로 쌓는다(기기 사이에 합칠 수 있게 t=시각을 붙임)
+function addNotes(s){s.steps.forEach((st,i)=>{const r=s.res[i];if(!r)return;
+  const fb=((s.fb||{})[i]||'').trim(),sub=['ilyeok','hanyeok','write','write2'].includes(st.k);
+  if(!sub&&r.ok!==false&&!fb)return;
+  const key=st.k+'|'+(st.id??(s.date+'#'+i)),e=S.notes[key]||(S.notes[key]={k:st.k,id:st.id??null,a:[]});
+  const at={d:s.date,t:Date.now()*100+i};
+  for(const f of ['ok','pick','picked','why','mine','q','a','pat'])if(r[f]!==undefined&&r[f]!=='')at[f]=r[f];
+  if(fb)at.fb=fb;e.a.push(at)})}
+const recDump=()=>({fmt:'LAREC1',at:new Date().toISOString(),ptr:S.ptr,wrong:S.wrong,log:S.log,known:S.known,notes:S.notes,seen:S.seen});
+const recCode=()=>'LAREC1:'+btoa(unescape(encodeURIComponent(JSON.stringify(recDump()))));
+function recParse(t){t=t.trim();if(t.startsWith('LAREC1:'))t=decodeURIComponent(escape(atob(t.slice(7).replace(/\s+/g,''))));const o=JSON.parse(t);if(!o||o.fmt!=='LAREC1')throw new Error('LA 기록 코드가 아닙니다');return o}
+// 합치기: 지우지 않고 더한다. 같은 문항을 두 기기에서 풀었으면 나중 결과(seen.t)를 따른다
+function recMerge(o){
+  for(const[k,v]of Object.entries(o.seen||{})){const c=S.seen[k];if(!c||v.t>c.t)S.seen[k]=v}
+  for(const[k,v]of Object.entries(o.notes||{})){const c=S.notes[k];if(!c){S.notes[k]=v;continue}
+    const have=new Set(c.a.map(x=>x.t));v.a.forEach(x=>{if(!have.has(x.t))c.a.push(x)});c.a.sort((a,b)=>a.t-b.t)}
+  for(const k of new Set([...Object.keys(S.wrong),...Object.keys(o.wrong||{})])){
+    S.wrong[k]=[...new Set([...(S.wrong[k]||[]),...((o.wrong||{})[k]||[])])].filter(id=>{const v=S.seen[k+'|'+id];return !v||!v.ok}).slice(-120)}
+  const lk=x=>x.date+'|'+x.ok+'|'+x.n,lg=new Map(S.log.map(x=>[lk(x),x]));(o.log||[]).forEach(x=>lg.has(lk(x))||lg.set(lk(x),x));
+  S.log=[...lg.values()].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).slice(-60);
+  S.known=[...new Set([...S.known,...(o.known||[])])];
+  for(const[k,v]of Object.entries(o.ptr||{}))S.ptr[k]=Math.max(S.ptr[k]||0,v);
+  save()}
+function recUI(){return `<details class="note" style="margin-top:12px"><summary>기록 옮기기 · 오답노트 ${Object.keys(S.notes).length}문항</summary>
+  <p>회사·집 기기의 기록을 합칩니다. 한쪽에서 「내보내기」 한 코드(또는 파일)를 다른 쪽에서 「합치기」 하면 오답노트·틀린 문항·진도가 합쳐집니다. 지워지는 기록은 없습니다. 기록 파일에는 내 답과 이유가 들어 있으니 개인 드라이브·메일에만 두세요.</p>
+  <div class="row"><button id="rexp">내보내기 (코드 복사 + 파일 저장)</button></div>
+  <textarea id="rin" placeholder="다른 기기에서 내보낸 코드를 여기에 붙여 넣으세요"></textarea>
+  <div class="row"><button id="rimp">붙여 넣은 코드 합치기</button></div>
+  <p>또는 기록 파일 고르기: <input type="file" id="rfile" accept=".json,.txt"></p><p class="note" id="rmsg"></p></details>`}
+function bindRec(after){const m=t=>$('#rmsg').textContent=t,done=()=>{m('합쳤습니다. 오답노트 '+Object.keys(S.notes).length+'문항.');setTimeout(after,1200)};
+  $('#rexp').onclick=()=>{const c=recCode();
+    try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(recDump())],{type:'application/json'}));a.download='LA_기록_'+today()+'.json';a.click()}catch(e){}
+    navigator.clipboard.writeText(c).then(()=>m('코드를 복사하고 파일도 저장했습니다.'),()=>{const t=$('#rin');t.value=c;t.select();m('복사가 막혀 있어 코드를 위 칸에 넣고 선택해 두었습니다. 직접 복사하세요(파일은 저장됨).')})};
+  $('#rimp').onclick=()=>{try{recMerge(recParse($('#rin').value));done()}catch(e){m('합치지 못했습니다: '+e.message)}};
+  $('#rfile').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{recMerge(recParse(t));done()}catch(er){m('합치지 못했습니다: '+er.message)}})}}
 function drawBar(){const s=S.cur;const kinds=s?s.steps.map(x=>x.k):[];
   $('#bar').innerHTML=PLAN.map(([k,,name])=>{const idx=kinds.map((x,i)=>x===k?i:-1).filter(i=>i>=0);if(!idx.length)return'';
     const done=idx.every(i=>i<s.i),on=idx.includes(s.i);return `<span class="${on?'on':done?'done':''}">${name}</span>`}).join('')}
@@ -135,8 +170,8 @@ function home(){
   $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
    <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 아직 N1 독해 자료가 없어 청해 대본을 읽기 자료로 씁니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
    ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
-   <div class="row"><button class="pri" id="start">시작하기</button></div>`);
-  $('#start').onclick=()=>{S.cur=buildSession();save();render()};
+   <div class="row"><button class="pri" id="start">시작하기</button></div>${recUI()}`);
+  $('#start').onclick=()=>{S.cur=buildSession();save();render()};bindRec(render);
 }
 function vListen(st,lab){
   const x=find('listen',st.id),r=S.cur.res[S.cur.i];
@@ -303,11 +338,11 @@ function report(s){
 }
 function finish(){
   const s=S.cur,rp=report(s);
-  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n});S.log=S.log.slice(-60);s.closed=true;save()}
+  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n});S.log=S.log.slice(-60);addNotes(s);s.closed=true;save()}
   $('#view').innerHTML=card('결과',`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
    <p>아래 결과지를 복사해 Claude에게 붙여 넣으세요. 일역·한역·작문과 오답 이유를 판정받습니다.</p>
    <pre class="out" id="out">${esc(rp.text)}</pre>
-   <div class="row"><button class="pri" id="copy">결과지 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>`);
+   <div class="row"><button class="pri" id="copy">결과지 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>${recUI()}`);bindRec(()=>{});
   $('#copy').onclick=()=>{navigator.clipboard.writeText(rp.text).then(()=>$('#msg').textContent='복사했습니다.',()=>{const r=document.createRange();r.selectNodeContents($('#out'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#msg').textContent='복사 버튼이 막혀 있어 결과지를 선택해 두었습니다. 길게 눌러 복사하세요.'})};
   $('#again').onclick=()=>{S.cur=null;save();render()};
 }
