@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LA 기록 동기화 시험</title>
+<style>
+:root{--bg:#f7f6f2;--fg:#222;--muted:#666;--ok:#1d7a3a;--bad:#b3261e;--line:#ddd}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1d;--fg:#eee;--muted:#aaa;--ok:#6fcf8a;--bad:#ff8a80;--line:#333}}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,sans-serif;margin:0;padding:20px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:auto}
+button{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;cursor:pointer}
+input{font:inherit;width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+.r{margin:6px 0 16px;padding:10px;border-left:4px solid var(--line);white-space:pre-wrap}
+.ok{border-color:var(--ok)}.bad{border-color:var(--bad)}.note{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body><main>
+<h1>LA 기록 동기화 시험</h1>
+<p class="note">이 기기에서 GitHub에 기록을 저장할 수 있는지 확인합니다. 아무것도 저장하지 않고, 입력한 토큰은 이 페이지를 닫으면 사라집니다.</p>
+
+<h2>1단계: GitHub 서버 접속</h2>
+<button id="t1">접속 확인</button>
+<div id="r1" class="r">아직 확인 안 함</div>
+
+<h2>2단계: 기록 저장소 읽기 (토큰을 만든 뒤)</h2>
+<p class="note">저장소 이름(예: baka1976/la-records)과 그 저장소 하나에만 권한을 준 토큰을 넣으세요.</p>
+<p><input id="repo" placeholder="계정/저장소" autocomplete="off"></p>
+<p><input id="tok" type="password" placeholder="토큰" autocomplete="off"></p>
+<button id="t2">읽기 확인</button>
+<div id="r2" class="r">아직 확인 안 함</div>
+
+<script>
+const show=(id,ok,msg)=>{const e=document.getElementById(id);e.className='r '+(ok?'ok':'bad');e.textContent=msg};
+document.getElementById('t1').onclick=async()=>{
+  show('r1',true,'확인 중…');
+  try{const r=await fetch('https://api.github.com/rate_limit',{cache:'no-store'});
+    show('r1',r.ok,r.ok?'성공: 이 기기에서 GitHub 서버에 접속됩니다. 자동 동기화를 쓸 수 있습니다.':'응답은 왔지만 오류 코드 '+r.status+'입니다. 결과 화면을 캡처해 알려 주세요.')}
+  catch(e){show('r1',false,'실패: GitHub 서버(api.github.com)에 접속하지 못했습니다. 회사 보안에서 막혀 있을 가능성이 큽니다.\n('+e.message+')')}
+};
+document.getElementById('t2').onclick=async()=>{
+  const repo=document.getElementById('repo').value.trim(),tok=document.getElementById('tok').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!tok)return show('r2',false,'저장소 이름(계정/저장소)과 토큰을 모두 넣어 주세요.');
+  show('r2',true,'확인 중…');
+  try{const r=await fetch('https://api.github.com/repos/'+repo,{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'},cache:'no-store'});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok)show('r2',true,'성공: 저장소 '+j.full_name+'에 접근됩니다'+(j.private?' (비공개 저장소)':' — 주의: 공개 저장소입니다. 비공개로 바꿔 주세요')+'. 쓰기 권한: '+(j.permissions&&j.permissions.push?'있음':'없음(토큰 권한에 Contents 읽기·쓰기 필요)'));
+    else show('r2',false,'실패 ('+r.status+'): '+(r.status===401?'토큰이 올바르지 않습니다.':r.status===404?'저장소를 찾지 못했습니다. 이름이나 토큰 권한을 확인하세요.':(j.message||'')))}
+  catch(e){show('r2',false,'실패: 접속하지 못했습니다.\n('+e.message+')')}
+};
+</script>
+</main></body>
+</html>
