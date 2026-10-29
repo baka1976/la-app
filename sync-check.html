@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LA 동기화 확인</title>
+<style>
+:root{--bg:#f7f6f2;--fg:#222;--muted:#666;--ok:#1d7a3a;--bad:#b3261e;--run:#8a6d00;--line:#ccc}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1b1d;--fg:#eee;--muted:#aaa;--ok:#6fcf8a;--bad:#ff8a80;--run:#e6c84f;--line:#444}}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,sans-serif;margin:0;padding:20px max(16px,env(safe-area-inset-left))}
+main{max-width:640px;margin:auto}
+label{display:block;margin-top:14px;font-weight:600}
+input{font:inherit;width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit}
+button{font:inherit;font-weight:700;margin-top:18px;width:100%;padding:14px;border:0;border-radius:10px;background:#2f5fd0;color:#fff;cursor:pointer}
+button:disabled{opacity:.6}
+#out{margin-top:18px;padding:14px;border:2px solid var(--line);border-radius:10px;white-space:pre-wrap;min-height:3em}
+.ok{border-color:var(--ok)!important}.bad{border-color:var(--bad)!important}.run{border-color:var(--run)!important}
+.note{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body><main>
+<h1>LA 동기화 확인 <span class="note">v2</span></h1>
+<p class="note">GitHub 접속 → 저장소 읽기 → 쓰기 권한을 한 번에 확인합니다. 아무것도 저장하지 않으며, 토큰은 이 페이지를 닫으면 사라집니다.</p>
+<label for="repo">저장소 (계정/저장소 또는 주소 그대로)</label>
+<input id="repo" placeholder="baka1976/la-records" autocomplete="off" spellcheck="false">
+<label for="tok">토큰</label>
+<input id="tok" type="password" placeholder="github_pat_로 시작" autocomplete="off" spellcheck="false">
+<button id="go" type="button">확인하기</button>
+<div id="out">아직 확인하지 않았습니다. 위 칸을 채우고 「확인하기」를 누르세요.</div>
+<script>
+const out=document.getElementById('out'),go=document.getElementById('go');
+const say=(cls,msg)=>{out.className=cls;out.textContent=msg};
+window.onerror=(m)=>say('bad','페이지 오류: '+m);
+function repoOf(v){v=v.trim().replace(/^https?:\/\/(www\.)?github\.com\//,'').replace(/\.git$/,'').replace(/\/+$/,'');const p=v.split('/');return p.length>=2&&p[0]&&p[1]?p[0]+'/'+p[1]:''}
+go.addEventListener('click',async()=>{
+  const repo=repoOf(document.getElementById('repo').value),tok=document.getElementById('tok').value.replace(/\s+/g,'');
+  go.disabled=true;go.textContent='확인 중…';const lines=[];const step=m=>{lines.push(m);say('run',lines.join('\n'))};
+  try{
+    step('1) GitHub 서버 접속 확인 중…');
+    const a=await fetch('https://api.github.com/rate_limit',{cache:'no-store'});
+    if(!a.ok)throw new Error('GitHub 서버 응답 오류 '+a.status);
+    lines[0]='1) GitHub 서버 접속: 성공';
+    if(!repo||!tok){say('bad',lines.join('\n')+'\n2) 저장소와 토큰을 모두 넣어 주세요.');return}
+    step('2) 저장소 '+repo+' 읽기 확인 중…');
+    const r=await fetch('https://api.github.com/repos/'+repo.split('/').map(encodeURIComponent).join('/'),{headers:{Authorization:'Bearer '+tok,Accept:'application/vnd.github+json'},cache:'no-store'});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok){lines[1]='2) 저장소 읽기: 실패 ('+r.status+') — '+(r.status===401?'토큰 값이 올바르지 않습니다(복사 누락·만료).':r.status===404||r.status===403?'토큰이 이 저장소에 연결되지 않았거나 저장소 이름이 다릅니다.':(j.message||''));say('bad',lines.join('\n'));return}
+    lines[1]='2) 저장소 읽기: 성공 — '+j.full_name+(j.private?' (비공개)':' (주의: 공개 저장소)');
+    const w=j.permissions&&j.permissions.push;
+    lines.push('3) 쓰기 권한: '+(w?'있음':'없음 — 토큰의 Contents 권한을 Read and write로 바꿔 주세요.'));
+    say(w&&j.private?'ok':'bad',lines.join('\n')+(w&&j.private?'\n\n모두 준비되었습니다.':''));
+  }catch(e){lines.push('접속 실패: '+e.message+'\n(회사 보안·브라우저 확장 프로그램이 막고 있을 수 있습니다)');say('bad',lines.join('\n'))}
+  finally{go.disabled=false;go.textContent='확인하기'}
+});
+</script>
+</main></body>
+</html>
