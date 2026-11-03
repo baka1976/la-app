@@ -70,7 +70,7 @@ const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
 S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
+const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
   const byId=new Map(pool.map(x=>[x.id,x])),out=[],w=(S.wrong[kind]||[]).filter(id=>byId.has(id));
   for(const id of w){if(out.length>=Math.ceil(n/2))break;const x=byId.get(id);if(!skip(x,out))out.push(x)}
@@ -94,6 +94,10 @@ function buildSession(){
   // 오늘 문법 문항의 문형 → 문형 카드·작문
   let pt=GF.items.concat(SO.items).find(x=>x.pattern);
   if(!pt){const P=D.mock.filter(x=>x.pattern),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
+  // 필수어휘 5000(800급, 예문 있는 것) 3개
+  if(D.v5&&D.v5.length){const V=take('v5',D.v5.filter(v=>!S.known.includes(v.jp)),3);s.next.v5=V.next;V.items.forEach(x=>s.steps.push({k:'v5',id:x.id}))}
+  // 문형 630: N1·N2(본문 ★1·★2) 문형을 책 순서대로 하루 1개, 모른다고 한 문형은 먼저
+  if(D.p630&&D.p630.length){const P6=take('p630',D.p630,1);s.next.p630=P6.next;P6.items.forEach(x=>s.steps.push({k:'p630',id:x.id}))}
   s.steps.push({k:'pat2',id:pt.id});
   const tr=(S.ptr.tr||0)%D.trans.length,a=D.trans[tr],b=D.trans[(tr+1)%D.trans.length];s.next.tr=tr+2;
   s.steps.push({k:'ilyeok',ja:a[0],ko:a[1],src:a[2]});
@@ -101,14 +105,16 @@ function buildSession(){
   // 글의 문법(모의고사 지문 빈칸 5문항): 남은 지문이 있을 때만. 독해는 따로 청해 문제3 대본
   const TG=[...new Set(D.mock.filter(x=>x.type==='text_grammar').map(x=>x.passage))],tgi=S.ptr.tg||0;
   if(tgi<TG.length){D.mock.filter(x=>x.passage===TG[tgi]).forEach(x=>s.steps.push({k:'tg',id:x.id}));s.next.tg=tgi+1}
-  const ri=(S.ptr.reading||0)%D.reading.length;s.next.reading=ri+1;s.steps.push({k:'reading',id:D.reading[ri].id});
+  // 독해: 급소공략 N1 독해. 지문 하나(단문 1문항, 중문 3, 장문 4 …)를 하루에
+  const RU=[];D.reading.forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.ids.push(x.id);else RU.push({pid:x.pid,ids:[x.id]})});
+  const ri=(S.ptr.reading||0)%RU.length;s.next.reading=ri+1;RU[ri].ids.forEach(id=>s.steps.push({k:'reading',id}));
   const ti=(S.ptr.talk||0)%D.talk.length;s.next.talk=ti+1;s.steps.push({k:'talk',id:D.talk[ti].id});
   s.steps.push({k:'write2',id:pt.id});
   s.i=0;return s;
 }
 function find(k,id){if(k==='listen')return LISTEN_U.find(x=>x.id===id);if(k==='kanji')return D.kanji.find(x=>x.id===id);
   if(k==='vocab')return D.vocab.find(x=>x.jp===id);if(k==='pat')return D.pats.find(x=>x.no===id);
-  if(k==='reading')return D.reading.find(x=>x.id===id);if(k==='mock')return D.mock.find(x=>x.id===id);if(k==='talk')return D.talk.find(x=>x.id===id)}
+  if(k==='reading')return D.reading.find(x=>x.id===id);if(k==='mock')return D.mock.find(x=>x.id===id);if(k==='talk')return D.talk.find(x=>x.id===id);if(k==='v5')return(D.v5||[]).find(x=>x.id===id);if(k==='p630')return(D.p630||[]).find(x=>x.id===id)}
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let player=null;
 function play(list){if(player){player.pause()}let i=0;const nxt=()=>{if(i>=list.length)return;player=new Audio(AU(list[i++]));player.onended=()=>setTimeout(nxt,600);player.play().catch(()=>{})};nxt()}
@@ -178,8 +184,8 @@ function bindJudge(d){const b=$('#jds');if(!b)return;b.onclick=()=>{const t=$('#
   $('#jdm').textContent='저장했습니다.'+(SY.repo?' 동기화 중…':'');syncNow().then(r=>{if(r!=='off')$('#jdm').textContent=r==='ok'?'저장하고 동기화했습니다.':'저장했지만 동기화 실패: '+SY.err})}}
 
 // 오답노트: 첫 화면에서 모아 보기
-const KN={listen:'청해',kanji:'한자',vocab:'어휘',moji:'어휘(모의고사)',gram:'문법',tg:'글의 문법',reading:'독해',ilyeok:'일역',hanyeok:'한역',write:'작문',write2:'작문',pat2:'문형',pat:'문형',talk:'회화'};
-const OBJ=['listen','kanji','vocab','moji','gram','tg','reading'];
+const KN={v5:'어휘',p630:'문형(630)',listen:'청해',kanji:'한자',vocab:'어휘',moji:'어휘(모의고사)',gram:'문법',tg:'글의 문법',reading:'독해',ilyeok:'일역',hanyeok:'한역',write:'작문',write2:'작문',pat2:'문형',pat:'문형',talk:'회화'};
+const OBJ=['listen','kanji','vocab','v5','p630','moji','gram','tg','reading'];
 function seenKey(e){if(['moji','gram','tg'].includes(e.k)){const x=find('mock',e.id);if(!x)return null;return(e.k==='moji'?'moji':x.type==='grammar_form'?'gf':x.type==='sentence_order'?'so':'tg')+'|'+e.id}return e.k+'|'+e.id}
 function noteStat(e){if(e.st&&e.st.v==='done')return 'done';if(!OBJ.includes(e.k))return 'open';
   const sk=seenKey(e),v=sk&&S.seen[sk],last=e.a[e.a.length-1];
@@ -190,8 +196,10 @@ function noteQ(e){const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):O
   if(['moji','gram','tg'].includes(e.k)&&x)return{t:x.stem,h:`<div class="jp">${uline(x.stem)}</div><div class="opts">${x.choices.map((c,i)=>`<p class="${i+1===x.answer?'res ok':'note'}">${i+1}. ${esc(c)}</p>`).join('')}</div>${x.why?`<p>${esc(x.why)}</p>`:''}${Object.entries(x.wrong||{}).map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}${x.note?`<p class="note">${esc(x.note)}</p>`:''}`};
   if(e.k==='listen'&&x)return{t:x.q.ja,h:`<p class="note">${esc(x.src||'')}</p><div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
   if(e.k==='kanji'&&x)return{t:x.s,h:`<div class="jp">${esc(x.s)}</div><p class="res ok">정답: ${esc(x[x.ans])}</p>${x.ko?`<p class="ko">${esc(x.ko)}</p>`:''}`};
+  if(e.k==='v5'&&x)return{t:x.jp,h:`<div class="jp">${esc(x.jp)} <span class="note">${esc(x.yomi)}</span></div><p class="res ok">${esc(x.ko)}</p>${x.ctx?`<div class="jp">${esc(x.ctx[0])}</div><p class="ko">${esc(x.ctx[1])}</p>`:''}`};
+  if(e.k==='p630'&&x)return{t:x.pattern+' '+x.meaning,h:`<div class="jp">${esc(x.pattern)}</div><p class="res ok">${esc(x.meaning)}</p>${x.ex.map(a=>`<div class="jp">${esc(a[0])}</div>${a[1]?`<p class="ko">${esc(a[1])}</p>`:''}`).join('')}${x.notes.map(n=>`<p class="note">${esc(n)}</p>`).join('')}`};
   if(e.k==='vocab'&&x)return{t:x.jp,h:`<div class="jp">${esc(x.jp)}</div><p class="res ok">${esc(x.ko)}</p>`};
-  if(e.k==='reading'&&x)return{t:x.q.ja,h:`<p class="note">${esc(x.src||'')}</p><div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
+  if(e.k==='reading'&&x)return{t:x.q.ja,h:`${x.note?`<p class="note">${esc(x.note)}</p>`:''}<div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
   if(a0.q)return{t:a0.q,h:`<div class="jp">${esc(a0.q)}</div>${a0.a?`<p class="note">교재: ${esc(a0.a)}</p>`:''}`};
   if(a0.pat)return{t:'문형 '+a0.pat,h:`<p>문형 ${esc(a0.pat)}</p>`};
   return{t:e.id||'(문항)',h:''}}
@@ -246,12 +254,12 @@ function render(){
   if(s.i>=s.steps.length)return finish();
   const st=s.steps[s.i],n=s.steps.filter((x,i)=>i<s.i&&x.k===st.k).length+1,tot=s.steps.filter(x=>x.k===st.k).length;
   const lab=PLAN.find(p=>p[0]===st.k)[2]+(tot>1?` ${n}/${tot}`:'');
-  ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2})[st.k](st,lab);bindFb();
+  ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2,v5:vV5,p630:vP630})[st.k](st,lab);bindFb();
 }
 function home(){
   const last=S.log[S.log.length-1];
   $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
-   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 아직 N1 독해 자료가 없어 청해 대본을 읽기 자료로 씁니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
+   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 급소공략 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급), 문형 카드는 일본어문형 630의 N1·N2 문형입니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
    ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
    <div class="row"><button class="pri" id="start">시작하기</button><button id="notes">오답노트 (미해결 ${Object.values(S.notes).filter(e=>noteStat(e)==='open').length})</button></div>
    <p class="note">${esc(syncLine())}</p>${syncUI()}${recUI()}`);
@@ -362,15 +370,45 @@ function vTrans(st,lab){
   const t=$('#ans');t.oninput=()=>{s.res[s.i]={...(s.res[s.i]||{}),k:st.k,mine:t.value,q,a};save()};
   const b=$('#show');if(b)b.onclick=()=>{s.res[s.i]={...(s.res[s.i]||{}),k:st.k,mine:t.value,q,a,shown:true};save();render()};bindNext();
 }
+function vV5(st,lab){
+  const x=find('v5',st.id),s=S.cur;let r=s.res[s.i];if(!s.opts)s.opts={};
+  if(!s.opts[s.i]){const others=shuffle(D.v5.filter(v=>v.ko!==x.ko)).slice(0,3).map(v=>v.ko);s.opts[s.i]=shuffle(others.concat([x.ko]));save()}
+  const o=s.opts[s.i];
+  let h=`<p class="note">뜻을 고르세요.</p><div class="jp big">${esc(x.jp)}</div>
+   <div class="opts">${o.map((t,i)=>`<button class="opt ${r?(t===x.ko?'okb':i===r.pick?'badb':''):''}" data-k="${i}" ${r?'disabled':''}>${esc(t)}</button>`).join('')}</div>`;
+  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · ${esc(x.ko)}</div><div class="jp">${esc(x.jp)} <span class="note">${esc(x.yomi)}</span></div>
+    ${x.ctx?`<div><div class="jp">${hl(x.ctx[0],x.jp.replace(/[だな]$/,''))}</div><div class="ko">${esc(x.ctx[1])}</div></div>`:''}
+    ${(x.rel||[]).length?`<details ${r.ok?'':'open'}><summary>함께 외울 말</summary>${x.rel.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v[0])}</span>${v[1]?' ('+esc(v[1])+')':''} ${esc(v[2])}</p>`).join('')}</details>`:''}
+    ${r.ok?`<button class="opt" id="known" ${S.known.includes(x.jp)?'disabled':''}>${S.known.includes(x.jp)?'다시 안 나옴':'이미 아는 단어 · 다시 안 내기'}</button>`:''}${nextBtn()}`}
+  $('#view').innerHTML=card('어휘 · '+lab,h);
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const i=+b.dataset.k,ok=o[i]===x.ko;rec({k:'v5',id:x.id,pick:i,ok,picked:o[i]});mark('v5',x.id,ok);render()});
+  const kb=$('#known');if(kb)kb.onclick=()=>{S.known.push(x.jp);save();render()};bindNext();
+}
+function vP630(st,lab){
+  const x=find('p630',st.id),r=S.cur.res[S.cur.i];
+  let h=`<div class="jp big">${esc(x.pattern)}</div><div><b>${esc(x.meaning)}</b> <span class="note">${x.star?'★'+x.star:''}</span></div>
+   ${x.connect?`<p class="note">접속: ${esc(x.connect)}</p>`:''}
+   <p class="note">예문을 소리 내어 읽고, 이 문형을 이미 알고 있었는지 고르세요. 모른다고 하면 오답노트에 남고 다음에 다시 나옵니다.</p>
+   <div class="opts">${x.ex.slice(0,r?99:2).map(e=>`<div><div class="jp">${esc(e[0])}</div>${r&&e[1]?`<div class="ko">${esc(e[1])}</div>`:''}</div>`).join('')}</div>`;
+  if(!r)h+=`<div class="row"><button class="pri" data-k="1">알고 있었다</button><button data-k="0">몰랐다 · 헷갈린다</button></div>`;
+  else h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'알고 있음':'다시 볼 문형'}</div>
+    ${x.notes.length?`<details open><summary>설명</summary>${x.notes.map(n=>`<p class="note">${esc(n)}</p>`).join('')}</details>`:''}
+    ${x.words.length?`<details><summary>단어</summary>${x.words.map(w=>`<p class="note">${esc(w)}</p>`).join('')}</details>`:''}
+    <p class="note">${x.src==='claude'?'원본 대조 완료':'다른 AI가 옮긴 자료입니다. 이상한 곳이 있으면 아래 칸에 적어 주세요.'}</p>${nextBtn()}`;
+  $('#view').innerHTML=card('문형 · '+lab,h);
+  document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const ok=b.dataset.k==='1';rec({k:'p630',id:x.id,ok});mark('p630',x.id,ok);render()});bindNext();
+}
 function vReading(st,lab){
-  const x=find('reading',st.id),r=S.cur.res[S.cur.i];
-  let h=`<p class="note">${esc(x.intro.ja)}</p><div class="opts">${x.text.map(l=>`<div class="jp">${esc(l.ja)}</div>`).join('')}</div>
+  const x=find('reading',st.id),r=S.cur.res[S.cur.i],P=x.pid?(D.rpass||{})[x.pid]:x,intro=P.intro||x.intro,text=P.text||x.text||[];
+  let h=`<p class="note">${esc(intro.ja)}</p><div class="opts">${text.map(l=>`<div class="jp">${esc(l.ja)}</div>`).join('')}</div>
    <div><b class="jp">${esc(x.q.ja)}</b></div>
    <div class="opts">${x.ch.map((c,i)=>`<button class="opt ${r?(i+1===x.ans?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp">${i+1}. ${esc(c[0])}</span></button>`).join('')}</div>`;
   if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${x.ans}번</div>
-    <details><summary>한국어 번역 보기</summary>${x.text.map(l=>`<p class="ko">${esc(l.ko)}</p>`).join('')}<p class="ko">${esc(x.q.ko)}</p>${x.ch.map((c,i)=>`<p class="ko">${i+1}. ${esc(c[1])}</p>`).join('')}</details>
+    ${x.note?`<p class="note">${esc(x.note)}</p>`:''}
+    ${(P.vocab||[]).length?`<details><summary>단어</summary>${P.vocab.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v[0])}</span>${v[1]?' ('+esc(v[1])+')':''} ${esc(v[2])}</p>`).join('')}</details>`:''}
+    <details><summary>한국어 번역 보기</summary>${text.map(l=>`<p class="ko">${esc(l.ko)}</p>`).join('')}<p class="ko">${esc(x.q.ko)}</p>${x.ch.map((c,i)=>`<p class="ko">${i+1}. ${esc(c[1])}</p>`).join('')}</details>
     ${r.ok?'':`<label class="note" for="why">왜 ${r.pick}번을 골랐는지 한 줄</label><textarea id="why">${esc(r.why||'')}</textarea>`}${nextBtn()}`}
-  $('#view').innerHTML=card('독해 · '+lab,h,x.src+' (청해 스크립트를 읽기 자료로 사용)');
+  $('#view').innerHTML=card('독해 · '+(x.type||'')+' · '+lab,h);
   document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;rec({k:'reading',id:x.id,pick:k,ok:k===x.ans});render()});
   const w=$('#why');if(w)w.oninput=()=>{S.cur.res[S.cur.i].why=w.value;save()};bindNext();
 }
@@ -408,6 +446,8 @@ function report(s){
     if(st.k==='listen'&&!r.ok){const x=find('listen',st.id);L.push(`\n[청해 오답] ${x.src}\n질문: ${x.q.ja}\n보기: ${x.ch.map((c,j)=>(j+1)+') '+c[0]).join(' / ')}\n정답 ${x.ans} · 내 선택 ${r.pick}\n내 이유: ${r.why||'(없음)'}`)}
     if(st.k==='kanji'&&!r.ok){const x=find('kanji',st.id);L.push(`\n[한자 오답] ${x.s} (밑줄 ${x.t||'?'}) · 정답 ${x[x.ans]} · 내 선택 ${x[r.pick]}`)}
     if(st.k==='vocab'&&!r.ok){const x=find('vocab',st.id);L.push(`\n[어휘 오답] ${x.jp} = ${x.ko} · 내가 고른 뜻: ${r.picked}`)}
+    if(st.k==='v5'&&!r.ok){const x=find('v5',st.id);L.push(`\n[어휘 오답] ${x.jp}(${x.yomi}) = ${x.ko} · 내가 고른 뜻: ${r.picked}`)}
+    if(st.k==='p630'&&!r.ok){const x=find('p630',st.id);L.push(`\n[모르는 문형] ${x.pattern} = ${x.meaning}`)}
     if(st.k==='reading'&&!r.ok){const x=find('reading',st.id);L.push(`\n[독해 오답] ${x.src} · 정답 ${x.ans} · 내 선택 ${r.pick}\n내 이유: ${r.why||'(없음)'}`)}
     if(st.k==='ilyeok'||st.k==='hanyeok')L.push(`\n[${st.k==='ilyeok'?'일역':'한역'}]\n문제: ${r.q}\n내 답: ${r.mine||'(안 씀)'}\n교재: ${r.a}`);
     if(st.k==='write'||st.k==='write2')L.push(`\n[작문] 문형 ${r.pat}\n내 문장: ${r.mine||'(안 씀)'}`);
@@ -445,13 +485,27 @@ syncNow().then(r=>{if(r==='ok'&&!S.cur)render()});
   const run=p=>{window.__PACK=p;window.__AUD=p.audio;const s=document.createElement('script');s.textContent=document.getElementById('main').textContent;document.body.appendChild(s);
     const sub=document.getElementById('sub');if(sub)sub.insertAdjacentHTML('beforeend',` · 문제 ${p.built} · 음원 ${Object.keys(p.audio||{}).length}개 <a href="#" id="repack">팩 추가·교체</a>`);
     const rp=document.getElementById('repack');if(rp)rp.onclick=e=>{e.preventDefault();ask(true)}};
+  // 비공개 기록 저장소(packs/manifest.json)에서 팩 자동 받기. 저장소·토큰은 앱의 자동 동기화 설정과 같은 값(la-sync-v1)
+  let SY;try{SY=JSON.parse(localStorage.getItem('la-sync-v1'))||{}}catch(e){SY={}}
+  const raw=async path=>{const r=await fetch('https://api.github.com/repos/'+SY.repo+'/contents/'+encodeURI(path),{cache:'no-store',headers:{Authorization:'Bearer '+SY.token,Accept:'application/vnd.github.raw'}});if(!r.ok)throw new Error(path+' ('+r.status+')');return r.json()};
+  async function fromRepo(old,say){const man=await raw('packs/manifest.json');old=old||{format:'LARTN1',audio:{}};
+    const all={format:'LARTN1',data:old.data,built:old.built,audio:Object.assign({},old.audio||{}),av:Object.assign({},old.av||{})};let ch=false;
+    if(man.built!==old.built){say&&say('문제 팩 받는 중…');const p=await raw(man.data);all.data=p.data;all.built=p.built;ch=true}
+    for(const a of man.audio){if(all.av[a.path]!==a.v){say&&say('음원 받는 중… ('+a.path.replace('packs/','')+')');const p=await raw(a.path);Object.assign(all.audio,p.audio);all.av[a.path]=a.v;ch=true}}
+    if(ch)await put(all);return{all,ch}}
   function ask(again){
     const v=document.getElementById('view');
     v.innerHTML=`<section class="card"><div class="kind">루틴 팩 불러오기</div>
       <p>이 앱에는 문제가 들어 있지 않습니다. 드라이브나 메일로 받은 <b>루틴 팩 파일</b>을 골라 주세요(여러 개 함께 골라도 됩니다). 이 기기에 저장되어 다음부터는 바로 열립니다.</p>
       <p class="note">처음: 「LA_루틴_문제_날짜」와 「LA_루틴_음원1·2…」를 모두. 문제가 늘면 「문제」 파일 하나만 새로 고르면 되고, 음원은 새 음원 파일이 있을 때만.</p>
       <input type="file" id="pf" accept=".json,application/json" multiple><p class="note" id="pm"></p>
+      <details ${SY.repo?'':'open'}><summary>기록 저장소에서 자동으로 받기</summary><p class="note">앱의 「자동 동기화 설정」과 같은 저장소·토큰입니다. 한 번 넣으면 새 팩이 올라올 때마다 자동으로 받습니다.</p>
+      <input id="ar" value="${SY.repo||'baka1976/la-records'}" autocomplete="off" spellcheck="false"><input id="at" type="password" placeholder="토큰" autocomplete="off" spellcheck="false">
+      <div class="row"><button class="pri" id="ag">저장소에서 받기</button></div></details>
       ${again?'<div class="row"><button id="pc">취소</button></div>':''}</section>`;
+    document.getElementById('ag').onclick=async()=>{const m=document.getElementById('pm');const repo=document.getElementById('ar').value.trim(),tok=document.getElementById('at').value.replace(/\s+/g,'');
+      if(!repo||(!tok&&!SY.token)){m.textContent='저장소와 토큰을 넣어 주세요.';return}SY.repo=repo;if(tok)SY.token=tok;try{localStorage.setItem('la-sync-v1',JSON.stringify(SY))}catch(e){}
+      try{await fromRepo(await get(),t=>m.textContent=t);m.textContent='받았습니다.';setTimeout(()=>location.reload(),500)}catch(err){m.textContent='받지 못했습니다: '+err.message}};
     const pc=document.getElementById('pc');if(pc)pc.onclick=()=>location.reload();
     document.getElementById('pf').onchange=async e=>{const fs=[...e.target.files];if(!fs.length)return;const m=document.getElementById('pm');m.textContent='읽는 중…';
       try{const ps=await Promise.all(fs.map(f=>f.text().then(JSON.parse)));
@@ -461,7 +515,11 @@ syncNow().then(r=>{if(r==='ok'&&!S.cur)render()});
         const all={format:'LARTN1',data:ds.length?ds[0].data:old.data,built:ds.length?ds[0].built:old.built,audio:Object.assign({},old.audio||{},...ps.map(p=>p.audio||{}))};
         await put(all);if(!all.data){m.textContent=`음원 ${Object.keys(all.audio).length}개를 저장했습니다. 이제 문제 파일(LA_루틴_문제_날짜)을 골라 주세요.`;e.target.value='';return}const na=Object.keys(all.audio).length;m.textContent=`저장했습니다(문제 ${all.built}, 음원 ${na}개).`;setTimeout(()=>location.reload(),600)}catch(err){m.textContent='불러오지 못했습니다: '+err.message}};
   }
-  get().then(p=>p&&p.format==='LARTN1'&&p.data?run(p):ask(false)).catch(()=>ask(false));
+  get().then(async p=>{
+    if(p&&p.format==='LARTN1'&&p.data){run(p);
+      if(SY.repo&&SY.token)fromRepo(p).then(r=>{if(r.ch){const sub=document.getElementById('sub');if(sub)sub.insertAdjacentHTML('beforeend',' · <b>새 팩을 받았습니다</b> <a href="#" onclick="location.reload();return false">새로고침</a>')}}).catch(()=>{});return}
+    if(SY.repo&&SY.token){try{const v=document.getElementById('view');v.innerHTML='<section class="card"><p id="pm">기록 저장소에서 팩을 받는 중…</p></section>';const r=await fromRepo(p,t=>{const m=document.getElementById('pm');if(m)m.textContent=t});run(r.all);return}catch(e){}}
+    ask(false)}).catch(()=>ask(false));
 })();
 </script>
 
