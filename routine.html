@@ -82,7 +82,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const today=()=>new Date().toLocaleDateString('sv');
 const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
-S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];S.hist=S.hist||[];S.ux=S.ux||[];S.tests=S.tests||[];S.pref=S.pref||{};
+S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];S.hist=S.hist||[];S.ux=S.ux||[];S.tests=S.tests||[];S.wsc=S.wsc||{};S.pref=S.pref||{};
 // 보기 설정(이 기기만): 글자 크기, 화면 테마
 const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
@@ -153,7 +153,7 @@ function addNotes(s){s.steps.forEach((st,i)=>{const r=s.res[i];if(!r)return;
   const at={d:s.date,t:Date.now()*100+i};
   for(const f of ['ok','pick','picked','why','mine','q','a','pat','conf','ms'])if(r[f]!==undefined&&r[f]!=='')at[f]=r[f];
   if(fb)at.fb=fb;e.a.push(at)})}
-const recDump=()=>({fmt:'LAREC1',at:new Date().toISOString(),ptr:S.ptr,wrong:S.wrong,log:S.log,known:S.known,notes:S.notes,seen:S.seen,judges:S.judges,hist:S.hist,ux:S.ux,tests:S.tests});
+const recDump=()=>({fmt:'LAREC1',at:new Date().toISOString(),ptr:S.ptr,wrong:S.wrong,log:S.log,known:S.known,notes:S.notes,seen:S.seen,judges:S.judges,hist:S.hist,ux:S.ux,tests:S.tests,wsc:S.wsc});
 const recCode=()=>'LAREC1:'+btoa(unescape(encodeURIComponent(JSON.stringify(recDump()))));
 function recParse(t){t=t.trim();if(t.startsWith('LAREC1:'))t=decodeURIComponent(escape(atob(t.slice(7).replace(/\s+/g,''))));const o=JSON.parse(t);if(!o||o.fmt!=='LAREC1')throw new Error('LA 기록 코드가 아닙니다');return o}
 // 합치기: 지우지 않고 더한다. 같은 문항을 두 기기에서 풀었으면 나중 결과(seen.t)를 따른다
@@ -171,6 +171,7 @@ function recMerge(o){
   for(const[k,v]of Object.entries(o.ptr||{}))S.ptr[k]=Math.max(S.ptr[k]||0,v);
   {const hk=x=>x.t+'|'+x.k+'|'+x.id,h=new Map(S.hist.map(x=>[hk(x),x]));(o.hist||[]).forEach(x=>h.has(hk(x))||h.set(hk(x),x));S.hist=[...h.values()].sort((a,b)=>a.t-b.t).slice(-20000)}
   {const m=new Map(S.tests.map(x=>[x.t,x]));(o.tests||[]).forEach(x=>m.has(x.t)||m.set(x.t,x));S.tests=[...m.values()].sort((a,b)=>a.t-b.t)}
+  for(const[d,v]of Object.entries(o.wsc||{})){const c=S.wsc[d];if(!c||v.t>c.t)S.wsc[d]=v}
   {const u=new Map(S.ux.map(x=>[x.t,x]));(o.ux||[]).forEach(x=>u.has(x.t)||u.set(x.t,x));S.ux=[...u.values()].sort((a,b)=>a.t-b.t)}
   save()}
 // 자동 동기화: 비공개 GitHub 저장소의 records.json을 받아 합치고 다시 올린다. 저장소·토큰은 이 기기에만 저장
@@ -208,8 +209,11 @@ function bindSync(after){const m=t=>{const e=$('#sym');if(e)e.textContent=t};
 function judgeUI(d){const j=S.judges[d];return `<details ${j?'':'open'}><summary>AI 판정 붙여넣기 (${esc(d)})${j?' · 저장됨':''}</summary>
   <p class="note">결과지를 AI(유료·무료 어느 쪽이든)에게 보내고 받은 판정 답변을 그대로 붙여 넣으세요. 오답노트에 그날 기록과 함께 저장됩니다.</p>
   <textarea id="jd" rows="6">${esc(j?j.text:'')}</textarea><div class="row"><button id="jds">판정 저장</button></div><p class="note" id="jdm"></p></details>`}
-function bindJudge(d){const b=$('#jds');if(!b)return;b.onclick=()=>{const t=$('#jd').value.trim();if(!t)return;S.judges[d]={t:Date.now(),text:t};save();
-  $('#jdm').textContent='저장했습니다.'+(SY.repo?' 동기화 중…':'');syncNow().then(r=>{if(r!=='off')$('#jdm').textContent=r==='ok'?'저장하고 동기화했습니다.':'저장했지만 동기화 실패: '+SY.err})}}
+// 쓰기 점수: AI 판정문 안의 「쓰기점수: 문법 a/5 · 문형 b/5 · 자연스러움 c/5」 줄을 모두 읽어 날짜별로 저장(JLPT 점수와 별도)
+function parseW(t){const re=/쓰기\s*점수\s*[:：]\s*문법\s*(\d(?:\.\d)?)\s*\/\s*5[^\d]*?(\d(?:\.\d)?)\s*\/\s*5[^\d]*?(\d(?:\.\d)?)\s*\/\s*5/g,o=[];let m;while((m=re.exec(t)))o.push([+m[1],+m[2],+m[3]].map(v=>Math.min(5,v)));return o}
+function bindJudge(d){const b=$('#jds');if(!b)return;b.onclick=()=>{const t=$('#jd').value.trim();if(!t)return;S.judges[d]={t:Date.now(),text:t};
+  const w=parseW(t);if(w.length)S.wsc[d]={t:Date.now(),items:w,test:!!(S.cur&&S.cur.test&&S.cur.date===d)};save();
+  $('#jdm').textContent='저장했습니다.'+(w.length?' 쓰기 점수 '+w.length+'개를 읽었습니다(실력 탭).':'')+(SY.repo?' 동기화 중…':'');syncNow().then(r=>{if(r!=='off')$('#jdm').textContent=r==='ok'?'저장하고 동기화했습니다.':'저장했지만 동기화 실패: '+SY.err})}}
 
 // 오답노트: 첫 화면에서 모아 보기
 const KN={v5:'어휘',p630:'문형(630)',listen:'청해',kanji:'한자',vocab:'어휘',moji:'어휘(모의고사)',gram:'문법',tg:'글의 문법',reading:'독해',ilyeok:'일역',hanyeok:'한역',write:'작문',write2:'작문',pat2:'문형',pat:'문형',talk:'회화'};
@@ -570,6 +574,7 @@ function report(s){
     const q=x?`${x.id} ${x.stem}`:st.k==='listen'?find('listen',st.id).q.ja:st.k==='kanji'?find('kanji',st.id).s:st.k==='talk'?st.id:(st.ja||st.id||'');
     L.push(`\n[질문·의견 · ${name}] ${q}\n${v.trim()}`)});
   L.push('\n요청: 일역·한역·작문을 판정해 주세요(교재 문장과 다른 표현도 맞으면 맞다고, 틀리면 근거와 함께). 오답 이유와 질문·의견에도 답해 주세요.');
+  if(s.steps.some(st=>['ilyeok','hanyeok','write','write2'].includes(st.k)))L.push('또한 일역·한역·작문 하나하나의 판정 끝에 반드시 이 형식의 한 줄을 넣어 주세요(앱이 점수를 읽습니다): 「쓰기점수: 문법 ○/5 · 문형 ○/5 · 자연스러움 ○/5」 — 문법=문법·표기가 맞는가, 문형=요구한 문형(번역은 원문 의미)을 바르게 살렸는가, 자연스러움=일본어(한국어)로 자연스러운가. 5=완벽, 3=뜻은 통하나 고칠 곳 있음, 1=크게 틀림.');
   return {text:L.join('\n'),ok,n:mc.length};
 }
 // ── 내 실력: JLPT 채점처럼 언어지식·독해·청해 각 60점으로 환산한 추정 점수 ──
@@ -608,9 +613,10 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
    ${SEC.map(([s,n])=>`<div class="row" style="align-items:center;justify-content:space-between"><span>${n} <span class="note">${e[s].n}문항</span></span><span>${bar(e[s].sc)}</span></div>`).join('')}
    <div class="res ${e.total!=null&&e.total>=pass?'ok':''}">${e.total==null?'세 영역 모두 기록이 쌓이면 합계가 나와요':`합계 ${e.total} / 180 · 합격선 ${pass} ${e.total>=pass?'넘음':'까지 '+(pass-e.total)+'점'}`}</div>
    ${enough<3?'<p class="note">영역마다 10문항 이상 풀면 숫자가 안정됩니다. 「레벨 테스트」로 한 번에 기준점을 잡을 수 있어요.</p>':''}
-   <button class="pri start" id="ltest">레벨 테스트 (${lv} · 약 30문항)</button>
+   <button class="pri start" id="ltest">레벨 테스트 (${lv} · 객관식 약 30 + 쓰기 2)</button>
    <div><b>주별 추세</b></div>${w.length?chart(w.slice(-12),T):'<p class="note">이번 주부터 기록이 쌓입니다.</p>'}
    ${T.length?`<details><summary>레벨 테스트 기록 ${T.length}</summary>${T.map(t=>`<p class="note"><b>${esc(t.date)}</b> 언어지식 ${t.sc.lang} · 독해 ${t.sc.read} · 청해 ${t.sc.listen} · 합계 ${t.sc.lang+t.sc.read+t.sc.listen}/180</p>`).join('')}</details>`:''}
+   ${wView()}
    <div><b>약한 유형</b> <span class="note">(최근 40문항, 3문항 이상)</span></div>
    ${ty.length?ty.slice(0,6).map(t=>`<div class="row" style="justify-content:space-between"><span>${esc(t.t)} <span class="note">${t.n}문항 · 평균 ${Math.round(t.ms/1000)}초</span></span><b>${pct(t.p)}</b></div>`).join(''):'<p class="note">기록이 더 필요해요.</p>'}
    <div><b>확신도</b> <span class="note">(최근 ${cb.n}문항)</span></div>
@@ -621,9 +627,19 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
   document.querySelectorAll('[data-lvv]').forEach(b=>b.onclick=()=>{LV_SEL=b.dataset.lvv;levelView()});
   $('#ltest').onclick=()=>{const steps=buildTest(lv);if(!steps.length)return;startSession({date:today(),steps,next:{},res:[],i:0,custom:true,test:true,lv})};
   $('#lrep').onclick=()=>{const t=levelReport(lv);navigator.clipboard.writeText(t).then(()=>$('#lmsg').textContent='복사했습니다. AI 채팅에 붙여 넣으세요.',()=>{const d=$('#lout').closest('details');d.open=true;const r=document.createRange();r.selectNodeContents($('#lout'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#lmsg').textContent='복사가 막혀 있어 내용을 선택해 두었습니다.'})}}
+// 쓰기 점수(JLPT 환산과 별도): 날짜별 평균(15점 만점)과 항목별 평균(최근 10일)
+function wSeries(){return Object.entries(S.wsc).sort(([a],[b])=>a<b?-1:1).map(([d,v])=>({d,test:v.test,n:v.items.length,avg:v.items.reduce((a,x)=>a+x[0]+x[1]+x[2],0)/v.items.length}))}
+function wAvg(i){const L=Object.entries(S.wsc).sort(([a],[b])=>a<b?-1:1).slice(-10).flatMap(([,v])=>v.items);return L.length?(L.reduce((a,x)=>a+x[i],0)/L.length).toFixed(1):'—'}
+function wView(){const W=wSeries();
+  return `<div><b>쓰기 점수</b> <span class="note">(AI 판정 · JLPT 점수와 별도 · 15점 만점)</span></div>
+   ${W.length?`<div class="stat"><span>최근 ${W[W.length-1].avg.toFixed(1)} / 15</span><span>문법 ${wAvg(0)}/5</span><span>문형·의미 ${wAvg(1)}/5</span><span>자연스러움 ${wAvg(2)}/5</span></div>
+   <p class="note">${W.slice(-8).map(w=>`${w.d.slice(5)} ${w.avg.toFixed(1)}${w.test?'(테스트)':''}`).join(' → ')}</p>`
+   :'<p class="note">작문·번역을 한 날, 결과 화면의 판정 요청문을 AI에게 보내고 받은 답을 「판정 붙여넣기」에 넣으면 점수가 쌓입니다(AI가 「쓰기점수: 문법 ○/5 · 문형 ○/5 · 자연스러움 ○/5」 줄을 쓰도록 요청문에 들어 있음).</p>'}`}
 let LV_SEL=null;
 // 레벨 테스트: 고른 레벨 문항으로 실제 시험 비율을 줄인 30문항 안팎(문자·어휘 10, 문법 6, 글의 문법 1지문, 독해 3지문, 청해 5). 안 푼 문제 먼저
-function buildTest(lv){const keep=S.levels;S.levels=[lv];try{return [...pickSteps('moji',10),...pickSteps('gram',6),...pickSteps('tg',1),...pickSteps('reading',3),...pickSteps('listen',5)]}finally{S.levels=keep}}
+function buildTest(lv){const keep=S.levels;S.levels=[lv];try{const st=[...pickSteps('moji',10),...pickSteps('gram',6),...pickSteps('tg',1),...pickSteps('reading',3),...pickSteps('listen',5)];
+  const g=st.filter(x=>x.k==='gram').map(x=>find('mock',x.id)).find(x=>x&&x.pattern)||shuffle(lvPool(D.mock.filter(x=>x.pattern)))[0],tr=D.trans[Math.floor(Math.random()*D.trans.length)];
+  if(g)st.push({k:'write2',id:g.id});if(tr)st.push({k:'hanyeok',ja:tr[0],ko:tr[1],src:tr[2]});return st}finally{S.levels=keep}}
 function testScore(s){const r={};for(const[k,,ks]of SEC){const L=s.steps.map((st,i)=>({st,r:s.res[i]})).filter(o=>ks.includes(o.st.k)&&o.r&&'ok' in o.r);r[k]=L.length?Math.round(L.reduce((a,o)=>a+(o.r.ok?(o.r.conf==='unsure'?0.5:1):0),0)/L.length*60):0;r[k+'_n']=L.length}return r}
 // AI에게 보낼 실력 리포트(무료 모델용): 숫자와 약점, 최근 오답 예를 묶고 분석·계획을 요청
 function levelReport(lv){const e=estimate(lv),ty=typeStats(lv),cb=calib(lv),w=weekly(lv).slice(-8),T=S.tests.filter(t=>t.lv===lv).slice(-3);
@@ -634,6 +650,7 @@ function levelReport(lv){const e=estimate(lv),ty=typeStats(lv),cb=calib(lv),w=we
   if(T.length)L.push(`레벨 테스트: `+T.map(t=>`${t.date} ${t.sc.lang}/${t.sc.read}/${t.sc.listen}`).join(', '));
   if(ty.length)L.push(`\n유형별 정답률(낮은 순): `+ty.slice(0,8).map(t=>`${t.t} ${pct(t.p)}(${t.n}문항, 평균 ${Math.round(t.ms/1000)}초)`).join(' / '));
   L.push(`확신도: 확신했는데 틀림 ${pct(cb.wrongSure)} · 애매했는데 맞힘 ${pct(cb.rightUnsure)} · 애매 비율 ${pct(cb.unsureRate)}`);
+  {const W=wSeries();if(W.length)L.push(`쓰기 점수(AI 판정, 15점 만점 평균): `+W.slice(-6).map(w=>`${w.d.slice(5)} ${w.avg.toFixed(1)}`).join(' → ')+` · 항목 평균 문법 ${wAvg(0)}/5 · 문형 ${wAvg(1)}/5 · 자연스러움 ${wAvg(2)}/5`)}
   const days=new Set(S.log.filter(l=>!l.kind).map(l=>l.date));L.push(`학습 일수 ${days.size}일 · 연속 ${streak()}일 · 복습 대기 ${Object.values(S.notes).filter(x=>noteStat(x)==='open').length}문제`);
   const wr=S.hist.filter(h=>!h.ok&&h.m!=='rv').slice(-8).map(h=>{const x=hItem(h);if(!x)return null;const t=x.stem||x.q&&x.q.ja||'';return `- [${KN[h.k]||h.k}${x.type&&TYN[x.type]&&TYN[x.type]!==KN[h.k]?' · '+TYN[x.type]:''}] ${String(t).replace(/[【】]/g,'').slice(0,60)}`}).filter(Boolean);
   if(wr.length)L.push(`\n최근 틀린 문제 예:\n`+wr.join('\n'));
