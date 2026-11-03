@@ -29,6 +29,7 @@ h1{font-size:18px;margin:0;text-wrap:balance}
 .bar span.done{color:var(--fg);border-color:var(--fg)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
 .kind{font-size:12px;letter-spacing:.06em;color:var(--accent);font-weight:700}
+.lvb{display:inline-block;margin-left:6px;padding:0 7px;border:1px solid var(--accent);border-radius:999px;font-size:11px;letter-spacing:0}
 .jp{font-family:var(--jp);font-size:19px;line-height:1.75}
 .jp.big{font-size:28px;text-align:center}
 .ko{color:var(--mute)}
@@ -68,7 +69,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const today=()=>new Date().toLocaleDateString('sv');
 const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
-S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};
+S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
@@ -78,35 +79,40 @@ function take(kind,pool,n,skip=()=>false){
   let g=0;while(out.length<n&&g++<pool.length*2){const x=pool[p%pool.length];p++;if(!out.includes(x)&&!skip(x,out))out.push(x)}
   return {items:out,next:p};
 }
+// 출제 레벨(JLPT N1~N5): 고른 레벨의 문항만 낸다. 레벨 구분이 없는 자료(lv 없음)는 항상 포함.
+// 고른 레벨에 자료가 하나도 없는 영역은 전체에서 낸다(예: 청해·독해는 지금 N1 자료뿐)
+const LVS=['N1','N2','N3','N4','N5'];
+const inLv=x=>!x||x.lv==null||S.levels.includes(x.lv);
+const lvPool=a=>{const f=a.filter(inLv);return f.length?f:a};
 // 청해는 두 책을 번갈아
 const LISTEN=(()=>{const g=D.listen.filter(x=>x.id.startsWith('GS')),k=D.listen.filter(x=>!x.id.startsWith('GS')),o=[];
   for(let i=0;i<Math.max(g.length,k.length);i++){if(g[i])o.push(g[i]);if(i%2===0&&k[i/2])o.push(k[i/2])}return o.concat(k.slice(Math.ceil(g.length/2)))})();
 const LISTEN_U=[...new Map(LISTEN.map(x=>[x.id,x])).values()];
 function buildSession(){
   const s={date:today(),steps:[],next:{},res:[]};
-  const L=take('listen',LISTEN_U,3);s.next.listen=L.next;L.items.forEach(x=>s.steps.push({k:'listen',id:x.id}));
+  const L=take('listen',lvPool(LISTEN_U),3);s.next.listen=L.next;L.items.forEach(x=>s.steps.push({k:'listen',id:x.id}));
   const K=take('kanji',D.kanji,3);s.next.kanji=K.next;K.items.forEach(x=>s.steps.push({k:'kanji',id:x.id}));
   // 문자어휘·문법은 실전모의고사 N1에서. 유형이 고루 섞이게 유형별로 돌아가며 늘어놓음
   const rr=a=>{const g={};a.forEach(x=>(g[x.type]=g[x.type]||[]).push(x));const q=Object.values(g),o=[];while(q.some(x=>x.length))q.forEach(x=>x.length&&o.push(x.shift()));return o};
-  const MJ=take('moji',rr(D.mock.filter(x=>['kanji_reading','context','paraphrase','usage'].includes(x.type))),5);s.next.moji=MJ.next;MJ.items.forEach(x=>s.steps.push({k:'moji',id:x.id}));
-  const GF=take('gf',D.mock.filter(x=>x.type==='grammar_form'),2),SO=take('so',D.mock.filter(x=>x.type==='sentence_order'),1);
+  const MJ=take('moji',rr(lvPool(D.mock.filter(x=>['kanji_reading','orthography','word_formation','context','paraphrase','usage'].includes(x.type)))),5);s.next.moji=MJ.next;MJ.items.forEach(x=>s.steps.push({k:'moji',id:x.id}));
+  const GF=take('gf',lvPool(D.mock.filter(x=>x.type==='grammar_form')),2),SO=take('so',lvPool(D.mock.filter(x=>x.type==='sentence_order')),1);
   s.next.gf=GF.next;s.next.so=SO.next;GF.items.concat(SO.items).forEach(x=>s.steps.push({k:'gram',id:x.id}));
   // 오늘 문법 문항의 문형 → 문형 카드·작문
   let pt=GF.items.concat(SO.items).find(x=>x.pattern);
-  if(!pt){const P=D.mock.filter(x=>x.pattern),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
+  if(!pt){const P=lvPool(D.mock.filter(x=>x.pattern)),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
   // 필수어휘 5000(800급, 예문 있는 것) 3개
-  if(D.v5&&D.v5.length){const V=take('v5',D.v5.filter(v=>!S.known.includes(v.jp)),3);s.next.v5=V.next;V.items.forEach(x=>s.steps.push({k:'v5',id:x.id}))}
+  if(D.v5&&D.v5.length){const V=take('v5',lvPool(D.v5).filter(v=>!S.known.includes(v.jp)),3);s.next.v5=V.next;V.items.forEach(x=>s.steps.push({k:'v5',id:x.id}))}
   // 문형 630: N1·N2(본문 ★1·★2) 문형을 책 순서대로 하루 1개, 모른다고 한 문형은 먼저
-  if(D.p630&&D.p630.length){const P6=take('p630',D.p630,1);s.next.p630=P6.next;P6.items.forEach(x=>s.steps.push({k:'p630',id:x.id}))}
+  if(D.p630&&D.p630.length){const P6=take('p630',lvPool(D.p630),1);s.next.p630=P6.next;P6.items.forEach(x=>s.steps.push({k:'p630',id:x.id}))}
   s.steps.push({k:'pat2',id:pt.id});
   const tr=(S.ptr.tr||0)%D.trans.length,a=D.trans[tr],b=D.trans[(tr+1)%D.trans.length];s.next.tr=tr+2;
   s.steps.push({k:'ilyeok',ja:a[0],ko:a[1],src:a[2]});
   s.steps.push({k:'hanyeok',ja:b[0],ko:b[1],src:b[2]});
   // 글의 문법(모의고사 지문 빈칸 5문항): 남은 지문이 있을 때만. 독해는 따로 청해 문제3 대본
-  const TG=[...new Set(D.mock.filter(x=>x.type==='text_grammar').map(x=>x.passage))],tgi=S.ptr.tg||0;
+  const TG=[...new Set(lvPool(D.mock.filter(x=>x.type==='text_grammar')).map(x=>x.passage))],tgi=S.ptr.tg||0;
   if(tgi<TG.length){D.mock.filter(x=>x.passage===TG[tgi]).forEach(x=>s.steps.push({k:'tg',id:x.id}));s.next.tg=tgi+1}
   // 독해: 급소공략 N1 독해. 지문 하나(단문 1문항, 중문 3, 장문 4 …)를 하루에
-  const RU=[];D.reading.forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.ids.push(x.id);else RU.push({pid:x.pid,ids:[x.id]})});
+  const RU=[];lvPool(D.reading).forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.ids.push(x.id);else RU.push({pid:x.pid,ids:[x.id]})});
   const ri=(S.ptr.reading||0)%RU.length;s.next.reading=ri+1;RU[ri].ids.forEach(id=>s.steps.push({k:'reading',id}));
   const ti=(S.ptr.talk||0)%D.talk.length;s.next.talk=ti+1;s.steps.push({k:'talk',id:D.talk[ti].id});
   s.steps.push({k:'write2',id:pt.id});
@@ -216,7 +222,8 @@ function notesView(){
   if(!list.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
   for(const[g,ns]of Object.entries(groups)){h+=`<h3>${esc(g)} <span class="note">${ns.length}</span></h3>`;
     h+=ns.map(n=>{const q=noteQ(n.e),ds=[...new Set(n.e.a.map(a=>a.d))];
-      return `<details><summary><b>${STN[n.st]}</b> · <span class="jp" style="font-size:15px">${esc(q.t.replace(/[【】]/g,'').slice(0,40))}</span> <span class="note">${n.e.a.length}회 · ${esc(ds[ds.length-1])}</span></summary>${q.h}
+      const lv=(['moji','gram','tg'].includes(n.e.k)?find('mock',n.e.id):OBJ.includes(n.e.k)?find(n.e.k,n.e.id):null);
+      return `<details><summary><b>${STN[n.st]}</b>${lv&&lv.lv?' · '+lv.lv:''} · <span class="jp" style="font-size:15px">${esc(q.t.replace(/[【】]/g,'').slice(0,40))}</span> <span class="note">${n.e.a.length}회 · ${esc(ds[ds.length-1])}</span></summary>${q.h}
        ${n.e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' 오답':a.ok?' 정답':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}${a.why?'<br>내 이유: '+esc(a.why):''}${a.mine?'<br>내 답: '+esc(a.mine):''}${a.fb?'<br>질문·의견: '+esc(a.fb):''}</div>`).join('')}
        ${ds.filter(d=>S.judges[d]).map(d=>`<details><summary>AI 판정 (${esc(d)})</summary><pre class="out">${esc(S.judges[d].text)}</pre></details>`).join('')}
        <div class="row"><button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div></details>`}).join('')}
@@ -243,8 +250,9 @@ function bindRec(after){const m=t=>$('#rmsg').textContent=t,done=()=>{m('합쳤�
 function drawBar(){const s=S.cur;const kinds=s?s.steps.map(x=>x.k):[];
   $('#bar').innerHTML=PLAN.map(([k,,name])=>{const idx=kinds.map((x,i)=>x===k?i:-1).filter(i=>i>=0);if(!idx.length)return'';
     const done=idx.every(i=>i<s.i),on=idx.includes(s.i);return `<span class="${on?'on':done?'done':''}">${name}</span>`}).join('')}
+let CURLV=null;
 function card(kind,body){const f=(S.cur&&S.cur.fb||{})[S.cur?S.cur.i:-1]||'';
-  return `<section class="card"><div class="kind">${kind}</div>${body}<div class="src"><label class="note" for="fb">이 문제에 대한 질문 · 오류 · 아이디어 (결과지에 들어갑니다)</label><textarea id="fb" placeholder="없으면 비워 두세요">${esc(f)}</textarea></div></section>`}
+  return `<section class="card"><div class="kind">${kind}${CURLV?` <span class="lvb">${CURLV}</span>`:''}</div>${body}<div class="src"><label class="note" for="fb">이 문제에 대한 질문 · 오류 · 아이디어 (결과지에 들어갑니다)</label><textarea id="fb" placeholder="없으면 비워 두세요">${esc(f)}</textarea></div></section>`}
 function bindFb(){const t=$('#fb');if(t)t.oninput=()=>{const s=S.cur;s.fb=s.fb||{};s.fb[s.i]=t.value;save()}}
 function nextBtn(label='다음'){return `<div class="row"><button class="pri" id="next">${label}</button></div>`}
 function bindNext(){const b=$('#next');if(b)b.onclick=()=>{S.cur.i++;save();render()}}
@@ -252,18 +260,25 @@ function render(){
   const s=S.cur;drawBar();
   if(!s){return home()}
   if(s.i>=s.steps.length)return finish();
+  {const t=s.steps[s.i];const it=t&&t.id!=null?(['moji','gram','tg','pat2','write2'].includes(t.k)?find('mock',t.id):['listen','kanji','v5','p630','reading'].includes(t.k)?find(t.k,t.id):null):null;CURLV=it&&it.lv||null}
   const st=s.steps[s.i],n=s.steps.filter((x,i)=>i<s.i&&x.k===st.k).length+1,tot=s.steps.filter(x=>x.k===st.k).length;
   const lab=PLAN.find(p=>p[0]===st.k)[2]+(tot>1?` ${n}/${tot}`:'');
   ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2,v5:vV5,p630:vP630})[st.k](st,lab);bindFb();
 }
+function lvSummary(){const c=(a,l)=>a.filter(x=>x.lv===l).length;
+  const parts=S.levels.map(l=>`${l}: 모의고사 ${c(D.mock,l)} · 문형 ${c(D.p630||[],l)} · 어휘 ${c(D.v5||[],l)} · 청해 ${c(LISTEN_U,l)} · 독해 ${c(D.reading,l)}`);
+  return parts.join(' / ')+' — 고른 레벨에 자료가 없는 영역(예: N2의 청해·독해)은 지금 있는 N1 자료로 냅니다. 한자 퀴즈는 레벨 구분이 없는 혼합 자료입니다. 어휘 레벨은 JPT 급수 기준 추정입니다.'}
 function home(){
   const last=S.log[S.log.length-1];
   $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
    <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 급소공략 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급), 문형 카드는 일본어문형 630의 N1·N2 문형입니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
    ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
+   <div><b>출제 레벨</b> <span class="note">(여러 개 고를 수 있습니다 · 다음 학습부터 적용)</span></div>
+   <div class="row">${LVS.map(l=>`<button data-lv="${l}" class="${S.levels.includes(l)?'pri':''}">${l}</button>`).join('')}</div>
+   <p class="note">${lvSummary()}</p>
    <div class="row"><button class="pri" id="start">시작하기</button><button id="notes">오답노트 (미해결 ${Object.values(S.notes).filter(e=>noteStat(e)==='open').length})</button></div>
    <p class="note">${esc(syncLine())}</p>${syncUI()}${recUI()}`);
-  $('#start').onclick=()=>{S.cur=buildSession();save();render()};$('#notes').onclick=()=>notesView();bindRec(render);bindSync(render);
+  $('#start').onclick=()=>{S.cur=buildSession();save();render()};$('#notes').onclick=()=>notesView();document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});bindRec(render);bindSync(render);
 }
 function vListen(st,lab){
   const x=find('listen',st.id),r=S.cur.res[S.cur.i];
@@ -288,7 +303,7 @@ const filled=x=>x.stem.replace(/（\s*）/,'（'+x.choices[x.answer-1]+'）');
 function vMock(st,lab){
   const x=find('mock',st.id),r=S.cur.res[S.cur.i],K={moji:'어휘',gram:'문법',tg:'글의 문법'}[st.k];
   const Q={kanji_reading:'밑줄 친 말의 읽기로 가장 알맞은 것은?',context:'(　)에 들어갈 가장 알맞은 것은?',paraphrase:'밑줄 친 말과 의미가 가장 가까운 것은?',
-    usage:'다음 말의 사용법으로 가장 알맞은 것은?',grammar_form:'(　)에 들어갈 가장 알맞은 것은?',sentence_order:'★에 들어갈 가장 알맞은 것은?',text_grammar:'글의 흐름에 맞게 빈칸에 들어갈 가장 알맞은 것은?'}[x.type];
+    usage:'다음 말의 사용법으로 가장 알맞은 것은?',orthography:'밑줄 친 말을 한자로 쓸 때 가장 알맞은 것은?',word_formation:'(　)에 들어갈 가장 알맞은 것은?',grammar_form:'(　)에 들어갈 가장 알맞은 것은?',sentence_order:'★에 들어갈 가장 알맞은 것은?',text_grammar:'글의 흐름에 맞게 빈칸에 들어갈 가장 알맞은 것은?'}[x.type];
   let h=`<p class="note">${Q}</p>`;
   if(x.passage){const tag=x.stem.replace(/[\[\]]/g,'').split(' / ').map(t=>'['+t+']');
     h+=`<div class="jp" style="font-size:16px">${x.passage.split('\n').map(p=>'<p>'+tag.reduce((a,t)=>a.split(esc(t)).join('<u>'+esc(t)+'</u>'),esc(p))+'</p>').join('')}</div><div><b>${esc(x.stem)}</b></div>`}
@@ -376,7 +391,7 @@ function vV5(st,lab){
   const o=s.opts[s.i];
   let h=`<p class="note">뜻을 고르세요.</p><div class="jp big">${esc(x.jp)}</div>
    <div class="opts">${o.map((t,i)=>`<button class="opt ${r?(t===x.ko?'okb':i===r.pick?'badb':''):''}" data-k="${i}" ${r?'disabled':''}>${esc(t)}</button>`).join('')}</div>`;
-  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · ${esc(x.ko)}</div><div class="jp">${esc(x.jp)} <span class="note">${esc(x.yomi)}</span></div>
+  if(r){h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · ${esc(x.ko)}</div><div class="jp">${esc(x.jp)} <span class="note">${esc(x.yomi)} · ${esc(x.lv_note||'')}</span></div>
     ${x.ctx?`<div><div class="jp">${hl(x.ctx[0],x.jp.replace(/[だな]$/,''))}</div><div class="ko">${esc(x.ctx[1])}</div></div>`:''}
     ${(x.rel||[]).length?`<details ${r.ok?'':'open'}><summary>함께 외울 말</summary>${x.rel.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v[0])}</span>${v[1]?' ('+esc(v[1])+')':''} ${esc(v[2])}</p>`).join('')}</details>`:''}
     ${r.ok?`<button class="opt" id="known" ${S.known.includes(x.jp)?'disabled':''}>${S.known.includes(x.jp)?'다시 안 나옴':'이미 아는 단어 · 다시 안 내기'}</button>`:''}${nextBtn()}`}
