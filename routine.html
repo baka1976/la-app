@@ -271,7 +271,7 @@ function lvSummary(){const c=(a,l)=>a.filter(x=>x.lv===l).length;
 function home(){
   const last=S.log[S.log.length-1];
   $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
-   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 급소공략 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급), 문형 카드는 일본어문형 630의 N1·N2 문형입니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
+   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 급소공략 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장, 문형 카드는 일본어문형 630의 N1·N2 문형입니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
    ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
    <div><b>출제 레벨</b> <span class="note">(여러 개 고를 수 있습니다 · 다음 학습부터 적용)</span></div>
    <div class="row">${LVS.map(l=>`<button data-lv="${l}" class="${S.levels.includes(l)?'pri':''}">${l}</button>`).join('')}</div>
