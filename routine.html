@@ -52,11 +52,24 @@ details summary{cursor:pointer;color:var(--accent)}
 .note{font-size:13px;color:var(--mute)}
 pre.out{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;max-height:320px;overflow:auto}
 @media (prefers-reduced-motion:no-preference){.card{animation:in .18s ease-out}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+/* 2026-11-04 개편: 위쪽 탭(오늘·복습·골라 풀기·설정), 큰 시작 버튼, 확신도 칩, 글자 크기 */
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{flex:1;min-height:40px;padding:6px 8px}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.tabs button.gear{flex:0 0 auto;min-width:48px}
+button.start{width:100%;font-size:18px;padding:16px;min-height:60px}
+.chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chips button{min-height:32px;padding:3px 12px;font-size:13px;border-radius:99px}
+.chips button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.stat{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:var(--mute)}
+input{font:inherit;box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--fg)}
+:root[data-fs="s"] body{font-size:14px}:root[data-fs="s"] .jp{font-size:17px}
+:root[data-fs="l"] body{font-size:17px}:root[data-fs="l"] .jp{font-size:22px}:root[data-fs="l"] .jp.big{font-size:32px}
 </style></head><body>
 <div class="wrap">
   <header>
-    <h1>오늘의 일본어 루틴</h1>
-    <div class="sub" id="sub">청해·한자·어휘·문법·문형·일역·한역·독해·회화·작문 · 약 20분</div>
+    <h1>LA 오늘의 일본어</h1>
+    <nav class="tabs" id="tabs"></nav>
     <div class="bar" id="bar"></div>
   </header>
   <main id="view"></main>
@@ -69,7 +82,9 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const today=()=>new Date().toLocaleDateString('sv');
 const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
-S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];
+S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];S.hist=S.hist||[];S.ux=S.ux||[];S.pref=S.pref||{};
+// 보기 설정(이 기기만): 글자 크기, 화면 테마
+const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
@@ -124,17 +139,21 @@ function find(k,id){if(k==='listen')return LISTEN_U.find(x=>x.id===id);if(k==='k
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let player=null;
 function play(list){if(player){player.pause()}let i=0;const nxt=()=>{if(i>=list.length)return;player=new Audio(AU(list[i++]));player.onended=()=>setTimeout(nxt,600);player.play().catch(()=>{})};nxt()}
-function rec(r){const s=S.cur;s.res[s.i]=r;if((r.k==='reading'||r.k==='tg')&&r.id!=null)S.seen[r.k+'|'+r.id]={t:Date.now(),ok:r.ok};save()}
+// 답 기록: 걸린 시간(ms, 10분까지)·확신도(conf)를 붙이고, 객관식은 풀이 이력(hist)에도 한 줄씩 남긴다(난이도 측정용)
+function rec(r){const s=S.cur;r.ms=Math.min(Date.now()-(s.t0||Date.now()),600000);if(CONF_K.includes(r.k))r.conf=(s.conf||{})[s.i]||'sure';s.res[s.i]=r;
+  if((r.k==='reading'||r.k==='tg')&&r.id!=null)S.seen[r.k+'|'+r.id]={t:Date.now(),ok:r.ok};
+  if('ok' in r&&r.id!=null){S.hist.push({t:Date.now(),d:s.date,k:r.k,id:r.id,ok:r.ok,ms:r.ms,...(r.conf?{c:r.conf}:{}),...(s.review?{m:'rv'}:s.custom?{m:'pk'}:{})});if(S.hist.length>20000)S.hist=S.hist.slice(-20000)}
+  save()}
 function mark(kind,id,ok){const w=new Set(S.wrong[kind]||[]);ok?w.delete(id):w.add(id);S.wrong[kind]=[...w].slice(-60);S.seen[kind+'|'+id]={t:Date.now(),ok}}
 // 오답노트: 틀린 객관식, 주관식 답, 질문·의견을 문항별로 쌓는다(기기 사이에 합칠 수 있게 t=시각을 붙임)
 function addNotes(s){s.steps.forEach((st,i)=>{const r=s.res[i];if(!r)return;
   const fb=((s.fb||{})[i]||'').trim(),sub=['ilyeok','hanyeok','write','write2'].includes(st.k);
-  if(!sub&&r.ok!==false&&!fb)return;
+  if(!sub&&r.ok!==false&&r.conf!=='unsure'&&!fb)return;
   const key=st.k+'|'+(st.id??(s.date+'#'+i)),e=S.notes[key]||(S.notes[key]={k:st.k,id:st.id??null,a:[]});
   const at={d:s.date,t:Date.now()*100+i};
-  for(const f of ['ok','pick','picked','why','mine','q','a','pat'])if(r[f]!==undefined&&r[f]!=='')at[f]=r[f];
+  for(const f of ['ok','pick','picked','why','mine','q','a','pat','conf','ms'])if(r[f]!==undefined&&r[f]!=='')at[f]=r[f];
   if(fb)at.fb=fb;e.a.push(at)})}
-const recDump=()=>({fmt:'LAREC1',at:new Date().toISOString(),ptr:S.ptr,wrong:S.wrong,log:S.log,known:S.known,notes:S.notes,seen:S.seen,judges:S.judges});
+const recDump=()=>({fmt:'LAREC1',at:new Date().toISOString(),ptr:S.ptr,wrong:S.wrong,log:S.log,known:S.known,notes:S.notes,seen:S.seen,judges:S.judges,hist:S.hist,ux:S.ux});
 const recCode=()=>'LAREC1:'+btoa(unescape(encodeURIComponent(JSON.stringify(recDump()))));
 function recParse(t){t=t.trim();if(t.startsWith('LAREC1:'))t=decodeURIComponent(escape(atob(t.slice(7).replace(/\s+/g,''))));const o=JSON.parse(t);if(!o||o.fmt!=='LAREC1')throw new Error('LA 기록 코드가 아닙니다');return o}
 // 합치기: 지우지 않고 더한다. 같은 문항을 두 기기에서 풀었으면 나중 결과(seen.t)를 따른다
@@ -150,6 +169,8 @@ function recMerge(o){
   for(const[k,v]of Object.entries(o.notes||{})){const c=S.notes[k];if(c&&v.st&&(!c.st||v.st.t>c.st.t))c.st=v.st}
   S.known=[...new Set([...S.known,...(o.known||[])])];
   for(const[k,v]of Object.entries(o.ptr||{}))S.ptr[k]=Math.max(S.ptr[k]||0,v);
+  {const hk=x=>x.t+'|'+x.k+'|'+x.id,h=new Map(S.hist.map(x=>[hk(x),x]));(o.hist||[]).forEach(x=>h.has(hk(x))||h.set(hk(x),x));S.hist=[...h.values()].sort((a,b)=>a.t-b.t).slice(-20000)}
+  {const u=new Map(S.ux.map(x=>[x.t,x]));(o.ux||[]).forEach(x=>u.has(x.t)||u.set(x.t,x));S.ux=[...u.values()].sort((a,b)=>a.t-b.t)}
   save()}
 // 자동 동기화: 비공개 GitHub 저장소의 records.json을 받아 합치고 다시 올린다. 저장소·토큰은 이 기기에만 저장
 const SK='la-sync-v1';let SY;try{SY=JSON.parse(localStorage.getItem(SK))||{}}catch(e){SY={}}
@@ -168,7 +189,7 @@ function syncNow(){if(!SY.repo||!SY.token)return Promise.resolve('off');if(syncP
     throw new Error('다른 기기와 동시에 올려 충돌이 계속됨')})()
    .catch(e=>{SY.err=e.message;saveSY();return 'err'}).finally(()=>setTimeout(()=>{syncP=null},0));
   return syncP}
-const syncLine=()=>!SY.repo?'자동 동기화 꺼짐 (아래 「자동 동기화 설정」)':SY.err?'동기화 실패: '+SY.err:SY.last?'동기화됨 · '+new Date(SY.last).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'동기화 대기 중';
+const syncLine=()=>!SY.repo?'자동 동기화 꺼짐 (⚙ 설정 → 자동 동기화 설정)':SY.err?'동기화 실패: '+SY.err:SY.last?'동기화됨 · '+new Date(SY.last).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'동기화 대기 중';
 function syncUI(){return `<details class="note"><summary>자동 동기화 설정 · ${esc(syncLine())}</summary>
   <p>비공개 GitHub 저장소에 기록·오답노트를 자동으로 저장합니다. 앱을 열 때 받아 오고, 학습을 끝내거나 판정을 붙여 넣을 때 올립니다. 저장소와 토큰은 이 기기에만 저장됩니다.</p>
   <label class="note" for="syr">저장소</label><input id="syr" value="${esc(SY.repo||'baka1976/la-records')}" autocomplete="off" spellcheck="false">
@@ -196,8 +217,10 @@ function seenKey(e){if(['moji','gram','tg'].includes(e.k)){const x=find('mock',e
 function noteStat(e){if(e.st&&e.st.v==='done')return 'done';if(!OBJ.includes(e.k))return 'open';
   const sk=seenKey(e),v=sk&&S.seen[sk],last=e.a[e.a.length-1];
   if(v&&v.ok&&v.t>(Math.floor((last?last.t:0)/100)))return 'fixed';
-  return e.a.some(a=>a.ok===false)?'open':'memo'}
+  return e.a.some(a=>a.ok===false||a.conf==='unsure')?'open':'memo'}
 const STN={open:'미해결',fixed:'다시 맞힘',done:'해결',memo:'메모'};
+// 복습 화면은 두 묶음만: 아직(미해결·메모) / 알았다(다시 맞힘·해결)
+const NG={todo:['open','memo'],known:['fixed','done']};
 function noteQ(e){const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?find(e.k,e.id):null,a0=e.a[e.a.length-1]||{};
   if(['moji','gram','tg'].includes(e.k)&&x)return{t:x.stem,h:`<div class="jp">${uline(x.stem)}</div><div class="opts">${x.choices.map((c,i)=>`<p class="${i+1===x.answer?'res ok':'note'}">${i+1}. ${esc(c)}</p>`).join('')}</div>${x.why?`<p>${esc(x.why)}</p>`:''}${Object.entries(x.wrong||{}).map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}${x.note?`<p class="note">${esc(x.note)}</p>`:''}`};
   if(e.k==='listen'&&x)return{t:x.q.ja,h:`<p class="note">${esc(x.src||'')}</p><div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
@@ -209,30 +232,29 @@ function noteQ(e){const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):O
   if(a0.q)return{t:a0.q,h:`<div class="jp">${esc(a0.q)}</div>${a0.a?`<p class="note">교재: ${esc(a0.a)}</p>`:''}`};
   if(a0.pat)return{t:'문형 '+a0.pat,h:`<p>문형 ${esc(a0.pat)}</p>`};
   return{t:e.id||'(문항)',h:''}}
-let NF='open';
+let NF='todo';
 function notesView(){
   const all=Object.entries(S.notes).map(([key,e])=>({key,e,st:noteStat(e),t:Math.max(...e.a.map(a=>a.t))})).sort((a,b)=>b.t-a.t);
-  const cnt=Object.fromEntries(['open','fixed','done','memo'].map(k=>[k,all.filter(n=>n.st===k).length]));
-  const list=all.filter(n=>NF==='all'||n.st===NF),rev=all.filter(n=>n.st==='open'&&OBJ.includes(n.e.k));
+  const inG=(n,g)=>g==='all'||NG[g].includes(n.st);
+  const list=all.filter(n=>inG(n,NF)),rev=all.filter(n=>n.st==='open'&&OBJ.includes(n.e.k));
   const groups={};list.forEach(n=>(groups[KN[n.e.k]||n.e.k]=groups[KN[n.e.k]||n.e.k]||[]).push(n));
   const dates=[...new Set(S.log.map(l=>l.date))].reverse(),jd=dates[0]||today();
-  let h=`<div class="row">${['open','fixed','done','memo','all'].map(k=>`<button data-nf="${k}" class="${NF===k?'pri':''}">${k==='all'?'전체 '+all.length:STN[k]+' '+cnt[k]}</button>`).join('')}</div>
-   <div class="row"><button class="pri" id="nrev" ${rev.length?'':'disabled'}>미해결 다시 풀기 (${Math.min(rev.length,10)}문항)</button><button id="nback">처음으로</button></div>
-   <p class="note">${esc(syncLine())}</p>`;
+  let h=`<button class="pri start" id="nrev" ${rev.length?'':'disabled'}>${rev.length?`틀린 문제 다시 풀기 (${Math.min(rev.length,10)}문항)`:'다시 풀 문제가 없어요'}</button>
+   <div class="chips">${[['todo','아직'],['known','알았다'],['all','전체']].map(([k,n])=>`<button data-nf="${k}" class="${NF===k?'on':''}">${n} ${all.filter(x=>inG(x,k)).length}</button>`).join('')}</div>
+   <p class="note">「아직」: 틀렸거나 애매했던 문제, 질문을 남긴 문제. 다시 맞히면 자동으로 「알았다」로 옮겨 갑니다. 주관식(일역·한역·작문)은 직접 「해결로 표시」하세요.</p>`;
   if(!list.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
   for(const[g,ns]of Object.entries(groups)){h+=`<h3>${esc(g)} <span class="note">${ns.length}</span></h3>`;
     h+=ns.map(n=>{const q=noteQ(n.e),ds=[...new Set(n.e.a.map(a=>a.d))];
       const lv=(['moji','gram','tg'].includes(n.e.k)?find('mock',n.e.id):OBJ.includes(n.e.k)?find(n.e.k,n.e.id):null);
       return `<details><summary><b>${STN[n.st]}</b>${lv&&lv.lv?' · '+lv.lv:''} · <span class="jp" style="font-size:15px">${esc(q.t.replace(/[【】]/g,'').slice(0,40))}</span> <span class="note">${n.e.a.length}회 · ${esc(ds[ds.length-1])}</span></summary>${q.h}
-       ${n.e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' 오답':a.ok?' 정답':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}${a.why?'<br>내 이유: '+esc(a.why):''}${a.mine?'<br>내 답: '+esc(a.mine):''}${a.fb?'<br>질문·의견: '+esc(a.fb):''}</div>`).join('')}
+       ${n.e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' 오답':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}${a.why?'<br>내 이유: '+esc(a.why):''}${a.mine?'<br>내 답: '+esc(a.mine):''}${a.fb?'<br>질문·의견: '+esc(a.fb):''}</div>`).join('')}
        ${ds.filter(d=>S.judges[d]).map(d=>`<details><summary>AI 판정 (${esc(d)})</summary><pre class="out">${esc(S.judges[d].text)}</pre></details>`).join('')}
        <div class="row"><button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div></details>`}).join('')}
   h+=judgeUI(jd);
-  $('#view').innerHTML=card('오답노트',h);
+  $('#view').innerHTML=card('복습 · 오답노트',h);
   document.querySelectorAll('[data-nf]').forEach(b=>b.onclick=()=>{NF=b.dataset.nf;notesView()});
   document.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const e=S.notes[b.dataset.nd];e.st={v:e.st&&e.st.v==='done'?'':'done',t:Date.now()};save();notesView();syncNow()});
-  $('#nback').onclick=()=>{NF='open';render()};
-  $('#nrev').onclick=()=>{const steps=rev.slice(0,10).map(n=>({k:n.e.k,id:n.e.id}));S.cur={date:today(),steps,next:{},res:[],i:0,review:true};save();render()};
+  $('#nrev').onclick=()=>{const steps=rev.slice(0,10).map(n=>({k:n.e.k,id:n.e.id}));startSession({date:today(),steps,next:{},res:[],i:0,review:true})};
   bindJudge(jd)}
 
 function recUI(){return `<details class="note" style="margin-top:12px"><summary>기록 옮기기 · 오답노트 ${Object.keys(S.notes).length}문항</summary>
@@ -251,35 +273,109 @@ function drawBar(){const s=S.cur;const kinds=s?s.steps.map(x=>x.k):[];
   $('#bar').innerHTML=PLAN.map(([k,,name])=>{const idx=kinds.map((x,i)=>x===k?i:-1).filter(i=>i>=0);if(!idx.length)return'';
     const done=idx.every(i=>i<s.i),on=idx.includes(s.i);return `<span class="${on?'on':done?'done':''}">${name}</span>`}).join('')}
 let CURLV=null;
-function card(kind,body){const f=(S.cur&&S.cur.fb||{})[S.cur?S.cur.i:-1]||'';
-  return `<section class="card"><div class="kind">${kind}${CURLV?` <span class="lvb">${CURLV}</span>`:''}</div>${body}<div class="src"><label class="note" for="fb">이 문제에 대한 질문 · 오류 · 아이디어 (결과지에 들어갑니다)</label><textarea id="fb" placeholder="없으면 비워 두세요">${esc(f)}</textarea></div></section>`}
-function bindFb(){const t=$('#fb');if(t)t.oninput=()=>{const s=S.cur;s.fb=s.fb||{};s.fb[s.i]=t.value;save()}}
+// 문제 카드: 질문·오류 메모는 접어 두고(쓴 내용이 있으면 펼침), 「이상해요」 버튼은 메모 칸에 표시를 붙인다
+function card(kind,body){const inS=VIEW==='sess'&&S.cur,f=(inS&&S.cur.fb||{})[inS?S.cur.i:-1]||'';
+  const fbx=inS?`<details class="src" ${f?'open':''}><summary class="note">⋯ 질문 · 오류 메모 · 이상해요${f?' (적음)':''}</summary>
+   <div class="row" style="margin:6px 0"><button data-odd="정답이 이상해요">정답이 이상해요</button><button data-odd="번역·해설이 이상해요">번역·해설이 이상해요</button><button data-odd="같은 문제가 또 나와요">또 나와요</button></div>
+   <textarea id="fb" placeholder="질문이나 오류를 적으면 결과지·오답노트에 들어갑니다">${esc(f)}</textarea></details>`:'';
+  return `<section class="card"><div class="kind">${kind}${CURLV?` <span class="lvb">${CURLV}</span>`:''}</div>${body}${fbx}</section>`}
+function bindFb(){const t=$('#fb');if(!t)return;const put=()=>{const s=S.cur;s.fb=s.fb||{};s.fb[s.i]=t.value;save()};t.oninput=put;
+  document.querySelectorAll('[data-odd]').forEach(b=>b.onclick=()=>{const tag='['+b.dataset.odd+']';if(!t.value.includes(tag))t.value=(tag+' '+t.value).trim();put();b.disabled=true})}
 function nextBtn(label='다음'){return `<div class="row"><button class="pri" id="next">${label}</button></div>`}
 function bindNext(){const b=$('#next');if(b)b.onclick=()=>{S.cur.i++;save();render()}}
+// 화면 상태: today·review·pick·set(탭) / sess(문제 풀이 중)
+let VIEW='today';
+function tabs(){const t=$('#tabs');
+  if(VIEW==='sess'){const s=S.cur,nm=s&&s.review?'복습':s&&s.custom?'골라 풀기':'오늘 학습';
+    t.innerHTML=`<button id="quit" style="flex:0 0 auto">← 그만하기</button><span class="note" style="align-self:center">${nm} · ${s?Math.min(s.i+1,s.steps.length):0} / ${s?s.steps.length:0} · 나중에 이어서 할 수 있어요</span>`;
+    $('#quit').onclick=()=>{VIEW=s&&s.review?'review':s&&s.custom?'pick':'today';render()};return}
+  t.innerHTML=[['today','오늘'],['review','복습'],['pick','골라 풀기'],['set','⚙']].map(([k,n])=>`<button data-tab="${k}" class="${VIEW===k?'on':''}${k==='set'?' gear':''}" ${k==='set'?'aria-label="설정" title="설정"':''}>${n}</button>`).join('');
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{VIEW=b.dataset.tab;render()})}
+const active=s=>s&&!s.closed&&s.i<s.steps.length;
+// 새 풀이 시작: 오늘 학습을 하던 중에 복습·골라 풀기를 시작하면 오늘 학습은 잠시 보관했다가 끝나면 되돌린다
+function startSession(sess){if(active(S.cur)&&!S.cur.review&&!S.cur.custom&&(sess.review||sess.custom))S.pause=S.cur;S.cur=sess;VIEW='sess';save();render()}
 function render(){
+  tabs();
+  if(VIEW!=='sess'){$('#bar').innerHTML='';CURLV=null;return ({today:home,review:notesView,pick:pickView,set:setView})[VIEW]()}
   const s=S.cur;drawBar();
-  if(!s){return home()}
+  if(!s){VIEW='today';return render()}
   if(s.i>=s.steps.length)return finish();
+  if(s.t0i!==s.i){s.t0=Date.now();s.t0i=s.i}
   {const t=s.steps[s.i];const it=t&&t.id!=null?(['moji','gram','tg','pat2','write2'].includes(t.k)?find('mock',t.id):['listen','kanji','v5','p630','reading'].includes(t.k)?find(t.k,t.id):null):null;CURLV=it&&it.lv||null}
   const st=s.steps[s.i],n=s.steps.filter((x,i)=>i<s.i&&x.k===st.k).length+1,tot=s.steps.filter(x=>x.k===st.k).length;
   const lab=PLAN.find(p=>p[0]===st.k)[2]+(tot>1?` ${n}/${tot}`:'');
   ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2,v5:vV5,p630:vP630})[st.k](st,lab);bindFb();
+  // 확신도: 답하기 전 객관식에만. 누르지 않으면 「확실」. 애매하게 맞힌 문항도 복습에 들어간다
+  if(CONF_K.includes(st.k)&&!s.res[s.i]){const k=$('.card .kind'),c=(s.conf||{})[s.i]||'sure';
+    k.insertAdjacentHTML('afterend',`<div class="chips"><span class="note">답할 때 느낌</span>${[['sure','확실'],['unsure','애매 · 찍음']].map(([v,n])=>`<button data-cf="${v}" class="${c===v?'on':''}">${n}</button>`).join('')}</div>`);
+    document.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{s.conf=s.conf||{};s.conf[s.i]=b.dataset.cf;save();document.querySelectorAll('[data-cf]').forEach(x=>x.classList.toggle('on',x===b))})}
 }
+const CONF_K=['listen','kanji','vocab','v5','moji','gram','tg','reading'];
 function lvSummary(){const c=(a,l)=>a.filter(x=>x.lv===l).length;
   const parts=S.levels.map(l=>`${l}: 모의고사 ${c(D.mock,l)} · 문형 ${c(D.p630||[],l)} · 어휘 ${c(D.v5||[],l)} · 청해 ${c(LISTEN_U,l)} · 독해 ${c(D.reading,l)}`);
   return parts.join(' / ')+' — 고른 레벨에 자료가 없는 영역(예: N2의 청해·독해)은 지금 있는 N1 자료로 냅니다. 한자 퀴즈는 레벨 구분이 없는 혼합 자료입니다. 어휘 레벨은 JPT 급수 기준 추정입니다.'}
+// 오늘: 큰 버튼 하나 + 짧은 현황. 레벨·동기화·기록 옮기기는 ⚙ 설정으로
+const MOJI_T=['kanji_reading','orthography','word_formation','context','paraphrase','usage'];
+function streak(){const ds=new Set(S.log.filter(l=>!l.kind).map(l=>l.date));let n=0,d=new Date();if(!ds.has(today()))d.setDate(d.getDate()-1);
+  while(ds.has(d.toLocaleDateString('sv'))){n++;d.setDate(d.getDate()-1)}return n}
 function home(){
-  const last=S.log[S.log.length-1];
-  $('#view').innerHTML=card('오늘',`<p>오늘 순서: 청해 3 → 한자 3 → 어휘 5 → 문법 3 → 문형 1 → 일역·한역 → (글의 문법 5) → 독해 → 회화 → 작문. 약 20~25분 걸립니다.</p>
-   <p class="note">어휘·문법·글의 문법은 실전모의고사 N1 문제입니다. 독해는 급소공략 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3, 문형 카드는 일본어문형 630의 N1·N2 문형입니다. 문제마다 아래 칸에 질문·오류·아이디어를 적으면 결과지에 함께 들어갑니다. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
-   ${last?`<p class="note">지난 학습: ${esc(last.date)} · 객관식 ${last.ok}/${last.n} 정답</p>`:''}
-   <div><b>출제 레벨</b> <span class="note">(여러 개 고를 수 있습니다 · 다음 학습부터 적용)</span></div>
+  const last=S.log.filter(l=>!l.kind).slice(-1)[0],open=Object.values(S.notes).filter(e=>noteStat(e)==='open').length;
+  const cur=active(S.cur)?S.cur:null,daily=cur&&!cur.review&&!cur.custom?cur:(active(S.pause)?S.pause:null),other=cur&&(cur.review||cur.custom)?cur:null;
+  const doneToday=S.log.some(l=>l.date===today()&&!l.kind);
+  let main;
+  if(daily)main=`<button class="pri start" id="resume">오늘 학습 이어서 하기 (${daily.i+1} / ${daily.steps.length})</button>`;
+  else if(doneToday)main=`<div class="res ok">오늘 학습을 마쳤어요 ✓</div><div class="row"><button id="start">새 루틴 한 번 더</button></div>`;
+  else main=`<button class="pri start" id="start">오늘 학습 시작</button>`;
+  $('#view').innerHTML=card('오늘',`${main}
+   ${other?`<div class="row"><button id="other">하던 ${other.review?'복습':'골라 풀기'} 이어서 (${other.i+1} / ${other.steps.length})</button></div>`:''}
+   <div class="stat"><span>연속 ${streak()}일</span>${last?`<span>지난 학습 ${esc(last.date)} · 객관식 ${last.ok}/${last.n}</span>`:''}<span>복습할 문제 ${open}</span><span>출제 레벨 ${esc(S.levels.join('·'))}</span></div>
+   <p class="note">순서: 청해 → 한자 → 어휘 → 문법 → 문형 → 일역·한역 → (글의 문법) → 독해 → 회화 → 작문. 틀린 문항은 다음 날 먼저 다시 나옵니다.</p>
+   <p class="note">${esc(syncLine())}</p>`);
+  const st=$('#start');if(st)st.onclick=()=>{S.pause=null;startSession(buildSession())};
+  const rs=$('#resume');if(rs)rs.onclick=()=>{if(S.cur!==daily){S.cur=daily;S.pause=null}VIEW='sess';save();render()};
+  const ot=$('#other');if(ot)ot.onclick=()=>{VIEW='sess';render()};
+}
+// 골라 풀기: 영역과 개수를 골라 원하는 만큼. 안 푼 문제 → 오래전에 푼 문제 순서로 낸다(오늘 루틴 진도는 건드리지 않음)
+const PICK=[
+  ['moji','어휘 (모의고사)',()=>lvPool(D.mock.filter(x=>MOJI_T.includes(x.type))).map(x=>({k:'moji',id:x.id,sk:'moji|'+x.id}))],
+  ['v5','어휘 카드',()=>lvPool(D.v5||[]).filter(v=>!S.known.includes(v.jp)).map(x=>({k:'v5',id:x.id,sk:'v5|'+x.id}))],
+  ['gram','문법 (모의고사)',()=>lvPool(D.mock.filter(x=>x.type==='grammar_form'||x.type==='sentence_order')).map(x=>({k:'gram',id:x.id,sk:(x.type==='grammar_form'?'gf|':'so|')+x.id}))],
+  ['p630','문형 카드',()=>lvPool(D.p630||[]).map(x=>({k:'p630',id:x.id,sk:'p630|'+x.id}))],
+  ['kanji','한자',()=>D.kanji.map(x=>({k:'kanji',id:x.id,sk:'kanji|'+x.id}))],
+  ['listen','청해',()=>lvPool(LISTEN_U).map(x=>({k:'listen',id:x.id,sk:'listen|'+x.id}))],
+  ['reading','독해 (지문 단위)',()=>{const RU=[];lvPool(D.reading).forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.g.push({k:'reading',id:x.id});else RU.push({pid:x.pid,sk:'reading|'+x.id,g:[{k:'reading',id:x.id}]})});return RU}],
+  ['tg','글의 문법 (지문 단위)',()=>{const m=new Map();lvPool(D.mock.filter(x=>x.type==='text_grammar')).forEach(x=>{if(!m.has(x.passage))m.set(x.passage,{sk:'tg|'+x.id,g:[]});m.get(x.passage).g.push({k:'tg',id:x.id})});return [...m.values()]}],
+  ['trans','일역 · 한역',()=>D.trans.map((a,i)=>({k:i%2?'hanyeok':'ilyeok',ja:a[0],ko:a[1],src:a[2],sk:'tr|'+i}))],
+  ['talk','회화',()=>D.talk.map(x=>({k:'talk',id:x.id,sk:'talk|'+x.id}))]];
+let PK={a:'moji',n:10};
+function pickSteps(a,n){const pool=PICK.find(p=>p[0]===a)[2](),age=x=>{const v=S.seen[x.sk];return v?v.t:0};
+  const ord=shuffle(pool).sort((x,y)=>age(x)-age(y)),out=[];for(const x of ord){if(out.length>=n)break;(x.g||[x]).forEach(s=>{const{sk,...st}=s;out.push(st)})}return out}
+function pickView(){const unit=['reading','tg'].includes(PK.a)?'지문':'문항',ns=unit==='지문'?[1,2,3]:[5,10,20];if(!ns.includes(PK.n))PK.n=ns[1];
+  const cnt=a=>PICK.find(p=>p[0]===a)[2]().length;
+  $('#view').innerHTML=card('골라 풀기',`<p class="note">영역을 고르고 개수를 정하세요. 아직 안 푼 문제부터, 그다음 오래전에 푼 문제 순서로 나옵니다. 틀린 문제는 복습에 들어갑니다(오늘 루틴의 순서에는 영향 없음).</p>
+   <div class="opts">${PICK.map(([k,n])=>`<button class="opt ${PK.a===k?'okb':''}" data-pa="${k}">${n} <span class="note">· ${cnt(k)}${['reading','tg'].includes(k)?'지문':''}</span></button>`).join('')}</div>
+   <div class="chips"><span class="note">개수</span>${ns.map(n=>`<button data-pn="${n}" class="${PK.n===n?'on':''}">${n}${unit}</button>`).join('')}</div>
+   <button class="pri start" id="pgo">풀기 시작</button><p class="note">출제 레벨 ${esc(S.levels.join('·'))} (⚙ 설정에서 바꿈)</p>`);
+  document.querySelectorAll('[data-pa]').forEach(b=>b.onclick=()=>{PK.a=b.dataset.pa;pickView()});
+  document.querySelectorAll('[data-pn]').forEach(b=>b.onclick=()=>{PK.n=+b.dataset.pn;pickView()});
+  $('#pgo').onclick=()=>{const steps=pickSteps(PK.a,PK.n);if(!steps.length)return;startSession({date:today(),steps,next:{},res:[],i:0,custom:true,area:PK.a})}}
+// 설정: 출제 레벨 · 보기 · 동기화 · 기록 옮기기 · 자료 안내 · 불편 메모
+function setView(){
+  $('#view').innerHTML=card('설정',`<div><b>출제 레벨</b> <span class="note">(여러 개 고를 수 있음 · 다음 학습부터)</span></div>
    <div class="row">${LVS.map(l=>`<button data-lv="${l}" class="${S.levels.includes(l)?'pri':''}">${l}</button>`).join('')}</div>
    <p class="note">${lvSummary()}</p>
-   <div class="row"><button class="pri" id="start">시작하기</button><button id="notes">오답노트 (미해결 ${Object.values(S.notes).filter(e=>noteStat(e)==='open').length})</button></div>
-   <p class="note">${esc(syncLine())}</p>${syncUI()}${recUI()}`);
-  $('#start').onclick=()=>{S.cur=buildSession();save();render()};$('#notes').onclick=()=>notesView();document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});bindRec(render);bindSync(render);
-}
+   <div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
+   <div><b>화면</b></div><div class="chips">${[['','기기 설정대로'],['light','밝게'],['dark','어둡게']].map(([v,n])=>`<button data-th="${v}" class="${(S.pref.theme||'')===v?'on':''}">${n}</button>`).join('')}</div>
+   <div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
+   <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
+   ${S.ux.length?`<details><summary>저장된 메모 보기</summary>${S.ux.slice().reverse().map(u=>`<p class="note"><b>${esc(new Date(u.t).toLocaleDateString('sv'))}</b> ${esc(u.text)}</p>`).join('')}</details>`:''}
+   ${syncUI()}${recUI()}
+   <details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`);
+  document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});
+  document.querySelectorAll('[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
+  document.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
+  $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
+  bindRec(render);bindSync(render)}
 function vListen(st,lab){
   const x=find('listen',st.id),r=S.cur.res[S.cur.i];
   const ans=r?r.pick:null;
@@ -475,20 +571,29 @@ function report(s){
   L.push('\n요청: 일역·한역·작문을 판정해 주세요(교재 문장과 다른 표현도 맞으면 맞다고, 틀리면 근거와 함께). 오답 이유와 질문·의견에도 답해 주세요.');
   return {text:L.join('\n'),ok,n:mc.length};
 }
+// 끝 화면: 점수 + 틀린 것만 + 버튼 두 개(판정 요청문 복사 · 처음으로). 판정 붙여넣기는 그 아래
 function finish(){
-  const s=S.cur,rp=report(s);
-  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n});S.log=S.log.slice(-60);addNotes(s);s.closed=true;save();syncNow().then(r=>{const e=$('#fsync');if(e&&r!=='off')e.textContent=r==='ok'?'기록을 동기화했습니다.':'동기화 실패: '+SY.err})}
-  $('#view').innerHTML=card('결과',`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
-   <p>아래 결과지를 복사해 Claude에게 붙여 넣으세요. 일역·한역·작문과 오답 이유를 판정받습니다.</p>
-   <pre class="out" id="out">${esc(rp.text)}</pre>
-   <div class="row"><button class="pri" id="copy">결과지 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p><p class="note" id="fsync">${SY.repo?'동기화 중…':''}</p>${judgeUI(s.date)}${recUI()}`);bindRec(()=>{});bindJudge(s.date);
-  $('#copy').onclick=()=>{navigator.clipboard.writeText(rp.text).then(()=>$('#msg').textContent='복사했습니다.',()=>{const r=document.createRange();r.selectNodeContents($('#out'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#msg').textContent='복사 버튼이 막혀 있어 결과지를 선택해 두었습니다. 길게 눌러 복사하세요.'})};
-  $('#again').onclick=()=>{S.cur=null;save();render()};
+  const s=S.cur,rp=report(s),kind=s.review?'review':s.custom?'custom':'';CURLV=null;$('#bar').innerHTML='';
+  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n,...(kind?{kind}:{})});S.log=S.log.slice(-200);addNotes(s);s.closed=true;save();syncNow().then(r=>{const e=$('#fsync');if(e&&r!=='off')e.textContent=r==='ok'?'기록을 동기화했습니다.':'동기화 실패: '+SY.err})}
+  const wrong=s.steps.map((st,i)=>({st,r:s.res[i]})).filter(x=>x.r&&(x.r.ok===false||x.r.conf==='unsure'));
+  const title=x=>{const st=x.st,m=['moji','gram','tg'].includes(st.k)?find('mock',st.id):null,o=m||(OBJ.includes(st.k)?find(st.k,st.id):null);
+    const t=m?m.stem:st.k==='listen'&&o?o.q.ja:st.k==='kanji'&&o?o.s:st.k==='v5'&&o?o.jp:st.k==='p630'&&o?o.pattern:st.k==='reading'&&o?o.q.ja:st.id||'';
+    return `${KN[st.k]||st.k}${x.r.ok===false?'':' (애매)'} · ${String(t).replace(/[【】]/g,'').slice(0,40)}`};
+  const sub=s.steps.some(st=>['ilyeok','hanyeok','write','write2'].includes(st.k));
+  const nm=kind==='review'?'복습':kind==='custom'?'골라 풀기':'오늘 학습';
+  $('#view').innerHTML=card('결과 · '+nm,`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
+   ${wrong.length?`<details open><summary>복습에 들어간 문제 ${wrong.length}</summary>${wrong.map(x=>`<p class="note">${esc(title(x))}</p>`).join('')}</details>`:'<p class="note">틀리거나 애매한 문제가 없어요.</p>'}
+   <p>${sub?'일역·한역·작문과 오답 이유를 판정받으려면 판정 요청문을 복사해 AI(유료·무료 아무거나)에게 붙여 넣으세요.':'질문이나 오답 이유를 물어보려면 판정 요청문을 복사해 AI에게 붙여 넣으세요.'}</p>
+   <div class="row"><button class="pri" id="copy">판정 요청문 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>
+   <details><summary>판정 요청문 내용 보기</summary><pre class="out" id="out">${esc(rp.text)}</pre></details>
+   <p class="note" id="fsync">${SY.repo?'동기화 중…':''}</p>${judgeUI(s.date)}`);bindJudge(s.date);
+  $('#copy').onclick=()=>{navigator.clipboard.writeText(rp.text).then(()=>$('#msg').textContent='복사했습니다. AI 채팅에 붙여 넣으세요.',()=>{const d=$('#out').closest('details');d.open=true;const r=document.createRange();r.selectNodeContents($('#out'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#msg').textContent='복사 버튼이 막혀 있어 내용을 선택해 두었습니다. 직접 복사하세요.'})};
+  $('#again').onclick=()=>{const back=kind==='review'?'review':kind==='custom'?'pick':'today';S.cur=active(S.pause)?S.pause:null;S.pause=null;VIEW=back;save();render()};
 }
-if(S.cur&&S.cur.date!==today()&&!S.cur.closed){/* 어제 하다 만 것은 이어서 */}
 if(S.cur&&S.cur.closed&&S.cur.date!==today())S.cur=null;
+if(S.pause&&S.pause.closed)S.pause=null;
 render();
-syncNow().then(r=>{if(r==='ok'&&!S.cur)render()});
+syncNow().then(r=>{if(r==='ok'&&VIEW!=='sess')render()});
 </script>
 <script>
 /* 루틴 팩(LARTN1)을 기기(IndexedDB)에서 꺼내 본 화면을 실행. 없으면 파일을 고르게 한다. 팩은 저장소에 없음 */
