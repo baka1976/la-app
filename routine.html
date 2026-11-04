@@ -119,6 +119,9 @@ button.on-star{border-color:var(--red);color:var(--red)}
 .ko2{font-size:14px;color:var(--mute);font-family:var(--ui)}.exs{font-size:11px;color:var(--mute);font-family:var(--ui)}
 .tag{display:inline-block;font-size:12px;font-family:var(--ui);border:1px solid var(--red);color:var(--red);border-radius:4px;padding:0 5px;vertical-align:2px}
 .aibox{margin:6px 0}.ai{white-space:pre-wrap;font-family:var(--ui);font-size:14px;line-height:1.7;color:var(--fg);background:color-mix(in srgb,var(--card) 70%,transparent);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;max-height:420px;overflow:auto}
+.warn{border-left:3px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent);padding:6px 10px;border-radius:4px;font-size:13px;line-height:1.6;color:var(--fg)}
+.nb .warn{font-size:calc(15px*var(--hz))}
+.jbox{display:flex;flex-direction:column;gap:8px;margin:8px 0}
 #selbtn{display:inline-flex;align-items:center;gap:6px;position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:40;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 </style></head><body>
 <div class="wrap">
@@ -263,15 +266,87 @@ function bindSync(after){const m=t=>{const e=$('#sym');if(e)e.textContent=t};
   const s2=$('#syn');if(s2)s2.onclick=run;
   const s3=$('#syo');if(s3)s3.onclick=()=>{SY={};saveSY();m('이 기기에서 자동 동기화를 껐습니다(저장소의 기록은 그대로).');setTimeout(after,600)}}
 
-// AI 판정 붙여넣기: 날짜별로 저장, 오답노트에서 그날 항목과 함께 보임
-function judgeUI(d){const j=S.judges[d];return `<details ${j?'':'open'}><summary>AI 판정 붙여넣기 (${esc(d)})${j?' · 저장됨':''}</summary>
-  <p class="note">결과지를 AI(유료·무료 어느 쪽이든)에게 보내고 받은 판정 답변을 그대로 붙여 넣으세요. 오답노트에 그날 기록과 함께 저장됩니다.</p>
-  <textarea id="jd" rows="6">${esc(j?j.text:'')}</textarea><div class="row"><button id="jds">판정 저장</button></div><p class="note" id="jdm"></p></details>`}
 // 쓰기 점수: AI 판정문 안의 「쓰기점수: 문법 a/5 · 문형 b/5 · 자연스러움 c/5」 줄을 모두 읽어 날짜별로 저장(JLPT 점수와 별도)
 function parseW(t){const re=/쓰기\s*점수\s*[:：]\s*문법\s*(\d(?:\.\d)?)\s*\/\s*5[^\d]*?(\d(?:\.\d)?)\s*\/\s*5[^\d]*?(\d(?:\.\d)?)\s*\/\s*5/g,o=[];let m;while((m=re.exec(t)))o.push([+m[1],+m[2],+m[3]].map(v=>Math.min(5,v)));return o}
-function bindJudge(d){const b=$('#jds');if(!b)return;b.onclick=()=>{const t=$('#jd').value.trim();if(!t)return;S.judges[d]={t:Date.now(),text:t};applyJudge(d);
-  const w=parseW(t);if(w.length)S.wsc[d]={t:Date.now(),items:w,test:!!(S.cur&&S.cur.test&&S.cur.date===d)};save();
-  $('#jdm').textContent='저장했습니다.'+(w.length?' 쓰기 점수 '+w.length+'개를 읽었습니다(실력 탭).':'')+(SY.repo?' 동기화 중…':'');syncNow().then(r=>{if(r!=='off')$('#jdm').textContent=r==='ok'?'저장하고 동기화했습니다.':'저장했지만 동기화 실패: '+SY.err})}}
+// ── 2026-11-05 AI 판정 방법: 채팅 AI(반자동·수동) / Gemini API(무료 키) / Claude API(유료 키) ──
+// 키는 이 기기에만 저장(기록 동기화·내보내기에 넣지 않음). 어느 방법이든 판정 글은 같은 해석기(judgeParse)로 들어간다
+const AK='la-ai-v1';let AI;try{AI=JSON.parse(localStorage.getItem(AK))||{}}catch(e){AI={}}
+AI.mode=AI.mode||'chat';
+const saveAI=()=>{try{localStorage.setItem(AK,JSON.stringify(AI))}catch(e){}};
+const CHATS={claude:['Claude','https://claude.ai/new'],chatgpt:['ChatGPT','https://chatgpt.com/'],gemini:['Gemini','https://gemini.google.com/app']};
+const GEM_M=['gemini-3.8-flash','gemini-3.6-flash','gemini-2.5-flash','gemini-3.5-flash-lite'];
+const CL_M='claude-opus-5-5';
+if(!CHATS[AI.chat])AI.chat='claude';
+const AI_WARN=`<div class="warn"><b>AI 판정 주의</b> 판정·해설·예문의 정확도는 어떤 AI를 쓰느냐에 따라 다릅니다. 같은 문장도 AI마다 다르게 판정할 수 있고, 틀린 설명이나 어색한 예문을 내놓기도 합니다(무료·가벼운 모델일수록 그렇습니다). 객관식 정답은 책 정답표가 기준이고, AI 판정은 참고 의견입니다. 중요하거나 이상한 판정은 <b>여러 AI에게 확인</b>하세요.</div>`;
+const aiName=()=>AI.mode==='gemini'?'Gemini API · '+(AI.gm||GEM_M[0]):AI.mode==='claude'?'Claude API · '+(AI.cm||CL_M):'채팅 AI ('+CHATS[AI.chat][0]+')';
+const AI_SYS='너는 일본어 교사다. 학습자는 한국어가 모국어인 JLPT N1 수준 학습자다. 한국어로 답한다. 요청문 끝 「요청」의 형식(머리표 [#…], 단어:, 문형:, 예문:, 교정:, 쓰기점수:)을 반드시 지킨다. 확실하지 않은 것은 확실하지 않다고 쓰고 지어내지 않는다. 객관식은 책 정답을 기준으로 설명하되, 책 정답이 이상하면 근거와 함께 지적한다.';
+async function askGemini(text){if(!AI.gk)throw new Error('Gemini 키가 없습니다(설정 → AI 판정 방법)');let last='';
+  for(const m of [...new Set([AI.gm||GEM_M[0],...GEM_M])]){
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':AI.gk},
+      body:JSON.stringify({systemInstruction:{parts:[{text:AI_SYS}]},contents:[{role:'user',parts:[{text}]}]})});
+    if(r.ok){const j=await r.json(),c=(j.candidates||[])[0],t=((c&&c.content&&c.content.parts)||[]).map(p=>p.text||'').join('').trim();if(!t)throw new Error('Gemini가 빈 답을 보냈습니다(차단되었을 수 있음)');return{text:t,by:'Gemini '+m}}
+    last=r.status+' '+(await r.text()).slice(0,160);if(r.status!==404)break}   // 모델이 없어졌을 때(404)만 다음 무료 모델로
+  throw new Error('Gemini 실패: '+last)}
+async function askClaude(text){if(!AI.ck)throw new Error('Claude API 키가 없습니다(설정 → AI 판정 방법)');const m=AI.cm||CL_M;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':AI.ck,'anthropic-version':'2026-10-21','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:m,max_tokens:16000,system:AI_SYS,messages:[{role:'user',content:text}]})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error('Claude API 실패: '+r.status+' '+((j.error&&j.error.message)||''));
+  if(j.stop_reason==='refusal')throw new Error('Claude가 이 요청에 답하지 않았습니다');
+  const t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();if(!t)throw new Error('Claude가 빈 답을 보냈습니다');
+  return{text:t+(j.stop_reason==='max_tokens'?'\n\n(답이 길어 중간에 끊겼습니다)':''),by:'Claude '+m}}
+// 판정 저장: 같은 날 판정이 이미 있으면 뒤에 이어 붙인다(여러 세션·여러 AI의 답이 모두 남음)
+function saveJudge(d,t,by,append){const o=S.judges[d];t=t.trim();
+  const text=append&&o&&o.text?(o.text.includes(t)?o.text:o.text+'\n\n---\n('+(by||'AI')+' 판정)\n'+t):t;
+  S.judges[d]={t:Date.now(),text,by:by||(o&&o.by)||''};applyJudge(d);
+  const w=parseW(text);if(w.length)S.wsc[d]={t:Date.now(),items:w,test:!!(S.cur&&S.cur.test&&S.cur.date===d)};save();return w.length}
+const looksJudge=t=>t&&!t.startsWith('[LA 오늘의 일본어 결과지]')&&/\[#|쓰기\s*점수|단어\s*[:：]|문형\s*[:：]|정답|오답/.test(t);
+// 판정 칸: 경고문 + 판정 받기(방법별) + 다른 AI에도 묻기 + 복사해 둔 판정 붙여넣기 + 직접 붙여넣기
+function judgeUI(d,req){const j=S.judges[d];
+  return `<div class="jbox">${AI_WARN}
+   ${req?`<div class="row"><button class="pri" id="jgo">${AI.mode==='chat'?'판정 받기 · 복사하고 '+CHATS[AI.chat][0]+' 열기':'판정 받기 · '+esc(aiName())}</button><button id="jchat">${AI.mode==='chat'?'다른 AI로':'다른 AI에도 묻기'}</button></div>`:''}
+   <div class="row"><button id="jclip">복사해 둔 AI 답 저장</button></div><p class="note" id="jdm"></p>
+   <details><summary class="note">판정 직접 붙여넣기 · 고치기 (${esc(d)})${j?' · 저장됨'+(j.by?' · '+esc(j.by):''):''}</summary>
+    <textarea id="jd" rows="6">${esc(j?j.text:'')}</textarea><div class="row"><button id="jds">판정 저장</button></div></details>
+   <p class="note">판정 방법: ${esc(aiName())} (설정에서 바꿈)</p></div>`}
+let clipW=null;
+function bindJudge(d,req){const m=h=>{const e=$('#jdm');if(e)e.innerHTML=h};
+  const done=(n,by)=>{m(esc('저장했습니다'+(by?' ('+by+')':'')+'.'+(n?' 쓰기 점수 '+n+'개를 읽었습니다.':'')+' 오답노트·단어장에 나눠 넣었습니다.'));syncNow().then(r=>{if(r==='err')m(esc('저장했지만 동기화 실패: '+SY.err))})};
+  // 다른 탭에서 AI 답을 복사하고 돌아오면 앱이 알아보고 저장할지 묻는다
+  const watch=()=>{if(clipW)window.removeEventListener('focus',clipW);clipW=async()=>{window.removeEventListener('focus',clipW);clipW=null;
+      try{const t=(await navigator.clipboard.readText()).trim();if(looksJudge(t)&&!((S.judges[d]||{}).text||'').includes(t)){m('AI 답이 복사되어 있습니다. <button class="pri" id="jclip2">판정 저장</button>');$('#jclip2').onclick=()=>done(saveJudge(d,t,'채팅 AI',true),'채팅 AI')}}catch(e){}};
+    setTimeout(()=>window.addEventListener('focus',clipW),800)};
+  const chat=(pre)=>navigator.clipboard.writeText(req).then(()=>{window.open(CHATS[AI.chat][1],'_blank','noopener');m(esc((pre||'')+'요청문을 복사했습니다. 열린 '+CHATS[AI.chat][0]+' 창에 붙여 넣어 보내고, 답을 복사해 이 화면으로 돌아오세요.'));watch()},
+    ()=>m(esc((pre||'')+'복사가 막혀 있습니다. 「판정 요청문 내용 보기」에서 직접 복사하세요.')));
+  const g=$('#jgo');if(g)g.onclick=async()=>{if(AI.mode==='chat')return chat();g.disabled=true;m(esc(aiName()+'에 묻는 중… (보통 10초~1분)'));
+    try{const r=await(AI.mode==='gemini'?askGemini(req):askClaude(req));done(saveJudge(d,r.text,r.by,true),r.by)}
+    catch(e){m(esc(e.message));if(req)setTimeout(()=>chat(e.message+' → 채팅 AI로 진행합니다. '),1200)}finally{g.disabled=false}};
+  const c=$('#jchat');if(c)c.onclick=()=>chat();
+  $('#jclip').onclick=async()=>{try{const t=(await navigator.clipboard.readText()).trim();if(!looksJudge(t))return m('클립보드에 AI 답이 없습니다. 답을 복사한 뒤 다시 누르세요.');done(saveJudge(d,t,'채팅 AI',true),'채팅 AI')}
+    catch(e){m('클립보드를 읽지 못했습니다(브라우저가 막음). 아래 「판정 직접 붙여넣기」를 쓰세요.')}};
+  $('#jds').onclick=()=>{const t=$('#jd').value.trim();if(!t)return;done(saveJudge(d,t,(S.judges[d]||{}).by||'직접 입력',false),'')}}
+// 설정: AI 판정 방법
+let AIOPEN=false;
+function aiSetUI(){const kk=(v)=>v?'(저장됨 · 바꿀 때만 입력)':'';
+  return `<details class="note" id="aiset" ${AIOPEN?'open':''}><summary>AI 판정 방법 · 지금 ${esc(aiName())}</summary>${AI_WARN}
+   <div class="chips">${[['chat','채팅 AI (무료 · 기본)'],['gemini','Gemini API (무료 키)'],['claude','Claude API (유료 키)']].map(([v,n])=>`<button data-am="${v}" class="${AI.mode===v?'on':''}">${n}</button>`).join('')}</div>
+   <p>채팅 AI로 열 곳 <span class="chips">${Object.entries(CHATS).map(([k,v])=>`<button data-ac="${k}" class="${AI.chat===k?'on':''}">${v[0]}</button>`).join('')}</span></p>
+   <p>채팅 AI는 API를 쓸 때도 「다른 AI에도 묻기」와 API가 실패했을 때 쓰입니다. 판정을 보고 더 묻고 싶을 때도 채팅 AI가 편합니다.</p>
+   <label for="agk">Gemini API 키 ${kk(AI.gk)}</label><input id="agk" type="password" autocomplete="off" spellcheck="false">
+   <label for="agm">Gemini 모델</label><input id="agm" value="${esc(AI.gm||GEM_M[0])}" spellcheck="false">
+   <p>무료 등급은 보낸 내용이 Google 제품 개선에 쓰일 수 있습니다. 사용 한도는 Google AI Studio에서 확인합니다. 모델이 없어지면 ${GEM_M.join(' → ')} 순서로 바꿔 시도합니다.</p>
+   <label for="ack">Claude API 키 ${kk(AI.ck)}</label><input id="ack" type="password" autocomplete="off" spellcheck="false">
+   <label for="acm">Claude 모델</label><input id="acm" value="${esc(AI.cm||CL_M)}" spellcheck="false">
+   <p>Claude API는 claude.ai 구독과 따로 결제(console.anthropic.com)하고 쓴 만큼 요금이 나갑니다. 판정 한 번에 대략 100원 안팎(독해 지문이 길면 더). 모델을 claude-sonnet-5-5로 바꾸면 절반쯤입니다. 콘솔에서 월 사용 한도를 걸어 두세요.</p>
+   <div class="row"><button id="aisv">저장</button><button id="aits">연결 시험</button>${AI.gk||AI.ck?'<button id="aidel">이 기기의 키 지우기</button>':''}</div><p id="aim"></p>
+   <p>키는 이 기기에만 저장되고 기록 동기화·내보내기에 들어가지 않습니다. 채팅이나 다른 사람에게 보내지 마세요.</p></details>`}
+function bindAiSet(after){const m=t=>{const e=$('#aim');if(e)e.textContent=t};const ds=$('#aiset');if(ds)ds.ontoggle=()=>{AIOPEN=ds.open};
+  document.querySelectorAll('[data-am]').forEach(b=>b.onclick=()=>{AI.mode=b.dataset.am;saveAI();AIOPEN=true;after()});
+  document.querySelectorAll('[data-ac]').forEach(b=>b.onclick=()=>{AI.chat=b.dataset.ac;saveAI();AIOPEN=true;after()});
+  const keep=()=>{const v=id=>($('#'+id).value||'').trim();if(v('agk'))AI.gk=v('agk').replace(/\s+/g,'');if(v('ack'))AI.ck=v('ack').replace(/\s+/g,'');AI.gm=v('agm')||GEM_M[0];AI.cm=v('acm')||CL_M;saveAI()};
+  $('#aisv').onclick=()=>{keep();AIOPEN=true;after()};
+  $('#aits').onclick=async()=>{keep();if(AI.mode==='chat')return m('채팅 AI는 시험할 것이 없습니다. Gemini나 Claude API를 고른 뒤 시험하세요.');m('시험 중…');
+    try{const r=await(AI.mode==='gemini'?askGemini:askClaude)('연결 시험입니다. 「よろしくお願いします」를 한국어 한 줄로 옮겨 주세요.');m('연결됨 ('+r.by+'): '+r.text.slice(0,80))}catch(e){m(e.message)}};
+  const dl=$('#aidel');if(dl)dl.onclick=()=>{delete AI.gk;delete AI.ck;if(AI.mode!=='chat')AI.mode='chat';saveAI();AIOPEN=true;after()}}
 
 // ── 2026-11-05 단어 찾기 · 단어장 ──
 // 사전(D.dict = [단어, 읽기, 뜻])은 문제 팩 안의 책 단어 모음. 문장에서 가장 긴 단어부터 찾아 읽기·뜻을 보여 준다.
@@ -468,7 +543,7 @@ function notesView(){
       ${e.a.some(a=>a.mine)?`<div class="ask"><span class="rp">내 답</span><p class="jp" style="font-size:16px">${esc(e.a[e.a.length-1].mine||'')}</p></div>`:''}
       ${ws.length?`<div class="wbox"><span class="rp">짚은 단어 · 문형</span>${ws.map(wLine).join('')}</div>`:''}
       ${sc?`<p><span class="stamp ${sAvg(sc)>=4?'ok':''}">쓰기 ${sc.join(' · ')}</span> <span class="note">문법 · 문형 · 자연스러움</span></p>`:''}
-      ${secs.map(([dd,s])=>`<details open class="aibox"><summary><span class="rp">AI 답</span> <span class="note">${esc(dd)}</span></summary><div class="ai">${aiHtml(s)}</div></details>`).join('')}
+      ${secs.map(([dd,s])=>`<details open class="aibox"><summary><span class="rp">AI 답</span> <span class="note">${esc(dd)}${S.judges[dd].by?' · '+esc(S.judges[dd].by):''} · 참고 의견</span></summary><div class="ai">${aiHtml(s)}</div><p class="note">AI마다 판정이 다를 수 있습니다. 이상하면 다른 AI에게도 확인하세요.</p></details>`).join('')}
       ${whole.map(dd=>`<details><summary class="note">그날 AI 판정 전체 (${esc(dd)} · 문항별로 나뉘지 않은 예전 형식)</summary><pre class="out">${esc(S.judges[dd].text)}</pre></details>`).join('')}
       <details${asks.length||ws.length||secs.length?'':' open'}><summary class="note">문제 · 정답 · 해설</summary>${q.h}
        ${e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}</div>`).join('')}</details>
@@ -631,14 +706,14 @@ function setView(){
    <div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
    <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
    ${S.ux.length?`<details><summary>저장된 메모 보기</summary>${S.ux.slice().reverse().map(u=>`<p class="note"><b>${esc(new Date(u.t).toLocaleDateString('sv'))}</b> ${esc(u.text)}</p>`).join('')}</details>`:''}
-   ${syncUI()}${recUI()}
+   ${aiSetUI()}${syncUI()}${recUI()}
    <details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`);
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});
   document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
   document.querySelectorAll('button[data-hd]').forEach(b=>b.onclick=()=>{S.pref.hand=b.dataset.hd;save();applyPref();render()});
   document.querySelectorAll('button[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
   $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
-  bindRec(render);bindSync(render)}
+  bindRec(render);bindSync(render);bindAiSet(render)}
 function vListen(st,lab){
   const x=find('listen',st.id),r=S.cur.res[S.cur.i];
   const ans=r?r.pick:null;
@@ -990,10 +1065,11 @@ function finish(){
   $('#view').innerHTML=card('결과 · '+nm,`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
    ${s.sc?scoreBoard(s.sc,s.lv,'레벨 테스트 '+(s.lv||'N1')+' 결과')+'<p class="note">「실력」 탭의 그래프와 테스트 기록에 들어갔습니다. 문항 수가 적은 영역(특히 독해)은 오차가 큽니다.</p>':''}
    ${wrong.length?`<details open><summary>복습에 들어간 문제 ${wrong.length}</summary>${wrong.map(x=>`<p class="note">${esc(title(x))}</p>`).join('')}</details>`:'<p class="note">틀리거나 애매한 문제가 없어요.</p>'}
-   <p>${sub?'일역·한역·작문과 오답 이유를 판정받으려면 판정 요청문을 복사해 AI(유료·무료 아무거나)에게 붙여 넣으세요.':'질문이나 오답 이유를 물어보려면 판정 요청문을 복사해 AI에게 붙여 넣으세요.'}</p>
-   <div class="row"><button class="pri" id="copy">판정 요청문 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>
-   <details><summary>판정 요청문 내용 보기</summary><pre class="out" id="out">${esc(rp.text)}</pre></details>
-   <p class="note" id="fsync">${SY.repo?'동기화 중…':''}</p>${judgeUI(s.date)}`);bindJudge(s.date);
+   <p>${sub?'일역·한역·작문과 오답 이유·질문을 AI에게 판정받으세요.':'오답 이유와 질문을 AI에게 물어보세요.'} 답은 오답노트·단어장에 문항별로 들어갑니다.</p>
+   ${judgeUI(s.date,rp.text)}
+   <div class="row"><button id="again">처음으로</button><button id="copy">요청문만 복사</button></div><p class="note" id="msg"></p>
+   <details><summary class="note">판정 요청문 내용 보기</summary><pre class="out" id="out">${esc(rp.text)}</pre></details>
+   <p class="note" id="fsync">${SY.repo?'동기화 중…':''}</p>`);bindJudge(s.date,rp.text);
   $('#copy').onclick=()=>{navigator.clipboard.writeText(rp.text).then(()=>$('#msg').textContent='복사했습니다. AI 채팅에 붙여 넣으세요.',()=>{const d=$('#out').closest('details');d.open=true;const r=document.createRange();r.selectNodeContents($('#out'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#msg').textContent='복사 버튼이 막혀 있어 내용을 선택해 두었습니다. 직접 복사하세요.'})};
   $('#again').onclick=()=>{const back=kind==='review'?'review':kind==='test'?'level':kind==='custom'?'pick':'today';S.cur=active(S.pause)?S.pause:null;S.pause=null;VIEW=back;save();render()};
 }
