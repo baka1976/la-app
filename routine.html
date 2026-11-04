@@ -144,7 +144,7 @@ S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=
 // 보기 설정(이 기기만): 글자 크기, 화면 테마
 const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';r.dataset.hand=S.pref.hand||'poor';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-const PLAN=[['wb',0,'단어장'],['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
+const PLAN=[['wb',0,'단어장'],['rw',0,'말 바꾸기'],['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
   const byId=new Map(pool.map(x=>[x.id,x])),out=[],w=(S.wrong[kind]||[]).filter(id=>byId.has(id));
   for(const id of w){if(out.length>=Math.ceil(n/2))break;const x=byId.get(id);if(!skip(x,out))out.push(x)}
@@ -206,7 +206,7 @@ function mark(kind,id,ok){const w=new Set(S.wrong[kind]||[]);ok?w.delete(id):w.a
 // 오답노트: 틀린 객관식, 주관식 답, 질문·의견을 문항별로 쌓는다(기기 사이에 합칠 수 있게 t=시각을 붙임)
 // 2026-11-05: 풀이 뒤 「모르는 단어」로 저장한 단어가 있으면 맞힌 문제도 오답노트(「아직」)에 들어간다(짐작으로 맞힌 문제)
 function addNotes(s){s.steps.forEach((st,i)=>{const r=s.res[i];if(!r||st.k==='wb')return;
-  const fb=((s.fb||{})[i]||'').trim(),sub=['ilyeok','hanyeok','write','write2'].includes(st.k),ws=((s.wsav||{})[i]||[]).filter(w=>S.words[w]&&!S.words[w].del);
+  const fb=((s.fb||{})[i]||'').trim(),sub=['ilyeok','hanyeok','write','write2','rw'].includes(st.k),ws=((s.wsav||{})[i]||[]).filter(w=>S.words[w]&&!S.words[w].del);
   if(!sub&&r.ok!==false&&r.conf!=='unsure'&&!fb&&!ws.length)return;
   const key=st.k+'|'+(st.id??(s.date+'#'+i)),e=S.notes[key]||(S.notes[key]={k:st.k,id:st.id??null,a:[]});
   const at={d:s.date,t:Date.now()*100+i};
@@ -280,20 +280,41 @@ if(!CHATS[AI.chat])AI.chat='claude';
 const AI_WARN=`<div class="warn"><b>AI 판정 주의</b> 판정·해설·예문의 정확도는 어떤 AI를 쓰느냐에 따라 다릅니다. 같은 문장도 AI마다 다르게 판정할 수 있고, 틀린 설명이나 어색한 예문을 내놓기도 합니다(무료·가벼운 모델일수록 그렇습니다). 객관식 정답은 책 정답표가 기준이고, AI 판정은 참고 의견입니다. 중요하거나 이상한 판정은 <b>여러 AI에게 확인</b>하세요.</div>`;
 const aiName=()=>AI.mode==='gemini'?'Gemini API · '+(AI.gm||GEM_M[0]):AI.mode==='claude'?'Claude API · '+(AI.cm||CL_M):'채팅 AI ('+CHATS[AI.chat][0]+')';
 const AI_SYS='너는 일본어 교사다. 학습자는 한국어가 모국어인 JLPT N1 수준 학습자다. 한국어로 답한다. 요청문 끝 「요청」의 형식(머리표 [#…], 단어:, 문형:, 예문:, 교정:, 쓰기점수:)을 반드시 지킨다. 확실하지 않은 것은 확실하지 않다고 쓰고 지어내지 않는다. 객관식은 책 정답을 기준으로 설명하되, 책 정답이 이상하면 근거와 함께 지적한다.';
-async function askGemini(text){if(!AI.gk)throw new Error('Gemini 키가 없습니다(설정 → AI 판정 방법)');let last='';
+// 응답이 너무 늦으면(2분) 끊는다 — 하염없이 기다리지 않게
+const AI_WAIT=120000;
+async function aiFetch(url,opt){const c=new AbortController(),tm=setTimeout(()=>c.abort(),AI_WAIT);
+  try{return await fetch(url,{...opt,signal:c.signal})}catch(e){throw new Error(e.name==='AbortError'?'응답이 2분 넘게 없어 멈췄습니다.':'연결하지 못했습니다(인터넷 연결 확인).')}finally{clearTimeout(tm)}}
+// Gemini 무료 한도: 하루 한도는 미국 태평양 시간 자정에 초기화. 하루 한도에 걸리면 그날은 바로 채팅 AI로 보낸다
+const pacDay=()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Los_Angeles'});
+function geminiReset(){const f=k=>+new Date().toLocaleString('en-US',{timeZone:'America/Los_Angeles',hour12:false,[k]:'2-digit'}).replace(/\D/g,'');
+  const h=f('hour')%24,mi=f('minute'),at=new Date(Date.now()+((24-h)*60-mi)*60000);
+  return at.toLocaleString('ko-KR',{month:'long',day:'numeric',hour:'numeric'})}
+const geminiOut=()=>AI.mode==='gemini'&&AI.gq===pacDay();
+function geminiErr(st,body){let msg='';try{const j=JSON.parse(body);msg=(j.error&&j.error.message)||''}catch(e){msg=body}
+  if(st===429){const day=/per\s*day|PerDay|daily/i.test(body),sec=(body.match(/"retryDelay"\s*:\s*"(\d+)/)||[])[1];
+    if(day){AI.gq=pacDay();saveAI();return 'Gemini 무료 사용 한도(하루)에 도달했습니다. 한국 시간 '+geminiReset()+'쯤 초기화됩니다. 그때까지는 채팅 AI로 판정받으세요.'}
+    return 'Gemini 무료 사용 한도(분당)에 걸렸습니다. '+(sec?sec+'초':'1분쯤')+' 뒤에 다시 누르세요.'}
+  if(st===400&&/API key|API_KEY/i.test(body)||st===401||st===403)return 'Gemini 키가 맞지 않거나 막혔습니다(설정에서 키 확인).';
+  if(st>=500)return 'Gemini 서버가 바쁘거나 문제가 있습니다('+st+'). 잠시 뒤 다시 시도하세요.';
+  return 'Gemini 실패: '+st+' '+msg.slice(0,120)}
+async function askGemini(text){if(!AI.gk)throw new Error('Gemini 키가 없습니다(설정 → AI 판정 방법)');
+  if(AI.gq===pacDay())throw new Error('Gemini 무료 사용 한도(하루)에 이미 도달했습니다. 한국 시간 '+geminiReset()+'쯤 초기화됩니다.');
+  let last='';
   for(const m of [...new Set([AI.gm||GEM_M[0],...GEM_M])]){
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':AI.gk},
+    const r=await aiFetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':AI.gk},
       body:JSON.stringify({systemInstruction:{parts:[{text:AI_SYS}]},contents:[{role:'user',parts:[{text}]}]})});
-    if(r.ok){const j=await r.json(),c=(j.candidates||[])[0],t=((c&&c.content&&c.content.parts)||[]).map(p=>p.text||'').join('').trim();if(!t)throw new Error('Gemini가 빈 답을 보냈습니다(차단되었을 수 있음)');return{text:t,by:'Gemini '+m}}
-    last=r.status+' '+(await r.text()).slice(0,160);if(r.status!==404)break}   // 모델이 없어졌을 때(404)만 다음 무료 모델로
-  throw new Error('Gemini 실패: '+last)}
+    if(r.ok){const j=await r.json(),c=(j.candidates||[])[0],tx=((c&&c.content&&c.content.parts)||[]).map(p=>p.text||'').join('').trim();if(!tx)throw new Error('Gemini가 빈 답을 보냈습니다(차단되었을 수 있음).');
+      if(AI.gq){delete AI.gq;saveAI()}return{text:tx,by:'Gemini '+m}}
+    const body=await r.text();last=geminiErr(r.status,body);if(r.status!==404)break}   // 모델이 없어졌을 때(404)만 다음 무료 모델로
+  throw new Error(last)}
 async function askClaude(text){if(!AI.ck)throw new Error('Claude API 키가 없습니다(설정 → AI 판정 방법)');const m=AI.cm||CL_M;
-  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':AI.ck,'anthropic-version':'2026-10-21','anthropic-dangerous-direct-browser-access':'true'},
+  const r=await aiFetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':AI.ck,'anthropic-version':'2026-10-21','anthropic-dangerous-direct-browser-access':'true'},
     body:JSON.stringify({model:m,max_tokens:16000,system:AI_SYS,messages:[{role:'user',content:text}]})});
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error('Claude API 실패: '+r.status+' '+((j.error&&j.error.message)||''));
-  if(j.stop_reason==='refusal')throw new Error('Claude가 이 요청에 답하지 않았습니다');
-  const t=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();if(!t)throw new Error('Claude가 빈 답을 보냈습니다');
-  return{text:t+(j.stop_reason==='max_tokens'?'\n\n(답이 길어 중간에 끊겼습니다)':''),by:'Claude '+m}}
+  const j=await r.json().catch(()=>({})),em=(j.error&&j.error.message)||'';
+  if(!r.ok)throw new Error(r.status===401?'Claude API 키가 맞지 않습니다(설정에서 키 확인).':r.status===429?'Claude API 사용 한도에 걸렸습니다. 잠시 뒤 다시 누르세요.':/credit|balance/i.test(em)?'Claude API 잔액이 부족합니다(console.anthropic.com에서 충전).':r.status>=500?'Claude API 서버가 바쁩니다('+r.status+'). 잠시 뒤 다시 시도하세요.':'Claude API 실패: '+r.status+' '+em.slice(0,120));
+  if(j.stop_reason==='refusal')throw new Error('Claude가 이 요청에 답하지 않았습니다.');
+  const tx=(j.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();if(!tx)throw new Error('Claude가 빈 답을 보냈습니다.');
+  return{text:tx+(j.stop_reason==='max_tokens'?'\n\n(답이 길어 중간에 끊겼습니다)':''),by:'Claude '+m}}
 // 판정 저장: 같은 날 판정이 이미 있으면 뒤에 이어 붙인다(여러 세션·여러 AI의 답이 모두 남음)
 function saveJudge(d,t,by,append){const o=S.judges[d];t=t.trim();
   const text=append&&o&&o.text?(o.text.includes(t)?o.text:o.text+'\n\n---\n('+(by||'AI')+' 판정)\n'+t):t;
@@ -303,7 +324,8 @@ const looksJudge=t=>t&&!t.startsWith('[LA 오늘의 일본어 결과지]')&&/\[#
 // 판정 칸: 경고문 + 판정 받기(방법별) + 다른 AI에도 묻기 + 복사해 둔 판정 붙여넣기 + 직접 붙여넣기
 function judgeUI(d,req){const j=S.judges[d];
   return `<div class="jbox">${AI_WARN}
-   ${req?`<div class="row"><button class="pri" id="jgo">${AI.mode==='chat'?'판정 받기 · 복사하고 '+CHATS[AI.chat][0]+' 열기':'판정 받기 · '+esc(aiName())}</button><button id="jchat">${AI.mode==='chat'?'다른 AI로':'다른 AI에도 묻기'}</button></div>`:''}
+   ${req&&geminiOut()?`<p class="note">Gemini 무료 한도(하루)에 도달해 오늘은 채팅 AI로 판정받습니다. 한국 시간 ${esc(geminiReset())}쯤 초기화. <button id="jretry">한도가 풀렸으면 다시 시도</button></p>`:''}
+   ${req?`<div class="row"><button class="pri" id="jgo">${AI.mode==='chat'||geminiOut()?'판정 받기 · 복사하고 '+CHATS[AI.chat][0]+' 열기':'판정 받기 · '+esc(aiName())}</button><button id="jchat">${AI.mode==='chat'?'다른 AI로':'다른 AI에도 묻기'}</button></div>`:''}
    <div class="row"><button id="jclip">복사해 둔 AI 답 저장</button></div><p class="note" id="jdm"></p>
    <details><summary class="note">판정 직접 붙여넣기 · 고치기 (${esc(d)})${j?' · 저장됨'+(j.by?' · '+esc(j.by):''):''}</summary>
     <textarea id="jd" rows="6">${esc(j?j.text:'')}</textarea><div class="row"><button id="jds">판정 저장</button></div></details>
@@ -317,9 +339,12 @@ function bindJudge(d,req){const m=h=>{const e=$('#jdm');if(e)e.innerHTML=h};
     setTimeout(()=>window.addEventListener('focus',clipW),800)};
   const chat=(pre)=>navigator.clipboard.writeText(req).then(()=>{window.open(CHATS[AI.chat][1],'_blank','noopener');m(esc((pre||'')+'요청문을 복사했습니다. 열린 '+CHATS[AI.chat][0]+' 창에 붙여 넣어 보내고, 답을 복사해 이 화면으로 돌아오세요.'));watch()},
     ()=>m(esc((pre||'')+'복사가 막혀 있습니다. 「판정 요청문 내용 보기」에서 직접 복사하세요.')));
-  const g=$('#jgo');if(g)g.onclick=async()=>{if(AI.mode==='chat')return chat();g.disabled=true;m(esc(aiName()+'에 묻는 중… (보통 10초~1분)'));
-    try{const r=await(AI.mode==='gemini'?askGemini(req):askClaude(req));done(saveJudge(d,r.text,r.by,true),r.by)}
-    catch(e){m(esc(e.message));if(req)setTimeout(()=>chat(e.message+' → 채팅 AI로 진행합니다. '),1200)}finally{g.disabled=false}};
+  // API로 묻는 동안 몇 초째인지 보여 주고, 실패·한도·2분 초과면 이유를 알리고 채팅 AI로 넘긴다
+  const g=$('#jgo');if(g)g.onclick=async()=>{if(AI.mode==='chat'||geminiOut())return chat(geminiOut()?'Gemini 오늘 한도 도달 → ':'');g.disabled=true;const t0=Date.now();
+    const tick=()=>m(esc(aiName()+'에 묻는 중… '+Math.round((Date.now()-t0)/1000)+'초 (보통 10초~1분, 2분이 넘으면 멈추고 채팅 AI로 넘어갑니다)'));tick();const iv=setInterval(tick,1000);
+    try{const r=await(AI.mode==='gemini'?askGemini(req):askClaude(req));clearInterval(iv);done(saveJudge(d,r.text,r.by,true),r.by)}
+    catch(e){clearInterval(iv);m(esc(e.message+' 3초 뒤 채팅 AI로 넘어갑니다.'));setTimeout(()=>chat(e.message+' → '),3000)}finally{clearInterval(iv);g.disabled=false}};
+  const rt=$('#jretry');if(rt)rt.onclick=()=>{delete AI.gq;saveAI();const box=rt.closest('.jbox');box.outerHTML=judgeUI(d,req);bindJudge(d,req)};
   const c=$('#jchat');if(c)c.onclick=()=>chat();
   $('#jclip').onclick=async()=>{try{const t=(await navigator.clipboard.readText()).trim();if(!looksJudge(t))return m('클립보드에 AI 답이 없습니다. 답을 복사한 뒤 다시 누르세요.');done(saveJudge(d,t,'채팅 AI',true),'채팅 AI')}
     catch(e){m('클립보드를 읽지 못했습니다(브라우저가 막음). 아래 「판정 직접 붙여넣기」를 쓰세요.')}};
@@ -383,9 +408,10 @@ function stepText(k,id,st){const J=a=>a.filter(Boolean).join('\n');
   if(k==='pat'&&x)return J([x.pattern,...x.ex.map(e=>e[0])]);
   if(k==='talk'&&x)return J(x.lines.map(l=>l.ja));
   if(k==='reading'&&x){const P=x.pid?(D.rpass||{})[x.pid]:x;return J([...(P.text||x.text||[]).map(l=>l.ja),x.q.ja,...x.ch.map(c=>c[0])])}
+  if(k==='rw'){const it=rwItem(id);return it?[it.ja,it.w].filter(Boolean).join('\n'):''}
   if(st&&st.ja)return st.ja;return ''}
 // 풀이 중에는 답한 뒤에만 단어를 찾을 수 있다(미리 보면 시험이 안 되므로)
-function lookable(st,r){if(!st)return false;if(OBJ.includes(st.k))return !!(r&&'ok' in r);if(st.k==='ilyeok'||st.k==='hanyeok')return !!(r&&r.shown);return['talk','pat','pat2'].includes(st.k)}
+function lookable(st,r){if(!st)return false;if(OBJ.includes(st.k))return !!(r&&'ok' in r);if(st.k==='ilyeok'||st.k==='hanyeok'||st.k==='rw')return !!(r&&r.shown);return['talk','pat','pat2'].includes(st.k)}
 const NAVER=w=>'https://ja.dict.naver.com/#/search?query='+encodeURIComponent(w);
 const naverA=(w,l)=>`<a class="btn" href="${NAVER(w)}" target="_blank" rel="noopener">${l||(w.length===1&&KJ.test(w)?'한자 음독·훈독 (네이버)':'네이버 사전')}${ic('ext')}</a>`;
 const hlw=(s,w)=>{s=String(s||'');const i=w?s.indexOf(w):-1;return i<0?esc(s):esc(s.slice(0,i))+'<span class="hl">'+esc(w)+'</span>'+esc(s.slice(i+w.length))};
@@ -440,7 +466,7 @@ document.addEventListener('selectionchange',()=>{clearTimeout(window.__selT);win
   if(!old)document.body.appendChild(b)},300)});
 
 // 오답노트: 첫 화면에서 모아 보기
-const KN={wb:'단어장',v5:'어휘',p630:'문형(630)',listen:'청해',kanji:'한자',vocab:'어휘',moji:'어휘(모의고사)',gram:'문법',tg:'글의 문법',reading:'독해',ilyeok:'일역',hanyeok:'한역',write:'작문',write2:'작문',pat2:'문형',pat:'문형',talk:'회화'};
+const KN={wb:'단어장',rw:'말 바꾸기',v5:'어휘',p630:'문형(630)',listen:'청해',kanji:'한자',vocab:'어휘',moji:'어휘(모의고사)',gram:'문법',tg:'글의 문법',reading:'독해',ilyeok:'일역',hanyeok:'한역',write:'작문',write2:'작문',pat2:'문형',pat:'문형',talk:'회화'};
 const OBJ=['listen','kanji','vocab','v5','p630','moji','gram','tg','reading'];
 function seenKey(e){if(['moji','gram','tg'].includes(e.k)){const x=find('mock',e.id);if(!x)return null;return(e.k==='moji'?'moji':x.type==='grammar_form'?'gf':x.type==='sentence_order'?'so':'tg')+'|'+e.id}return e.k+'|'+e.id}
 // ── 2026-11-05 AI 답을 문항별로: 판정 요청문의 머리표 [#문항키]로 답을 잘라 그 오답노트 항목에 붙인다 ──
@@ -464,7 +490,7 @@ function judgeParse(text){text=String(text||'');if(JC.has(text))return JC.get(te
 const jSec=(d,key)=>{const j=S.judges[d];return j?judgeParse(j.text).sec[key]:null};
 const sAvg=w=>(w[0]+w[1]+w[2])/3;
 // 판정에서 읽은 단어·문형을 단어장에 넣는다(지운 단어는 되살리지 않음). 판정 저장·다른 기기 판정 합칠 때
-function applyJudge(d){const j=S.judges[d];if(!j)return;const now=Date.now();
+function applyJudge(d){const j=S.judges[d];if(!j)return;const now=Date.now();applyRw(d);
   for(const it of judgeParse(j.text).items){const o=S.words[it.w];if(o&&o.del)continue;const k=it.key?[it.key]:[];
     if(!o){const[nk,...nid]=(it.key||'').split('|');S.words[it.w]={w:it.w,r:it.r,ko:it.ko,kind:it.kind,ex:it.ex.slice(0,5),keys:k,t:now,u:now,ok:0,n:0,st:'',del:false,src:{k:nk||'ai',id:nid.join('|')||null,d,ai:1},s:''};continue}
     let ch=false;if(!o.r&&it.r){o.r=it.r;ch=true}if(!o.ko&&it.ko){o.ko=it.ko;ch=true}if(it.kind==='p'&&o.kind!=='p'){o.kind='p';ch=true}
@@ -493,6 +519,7 @@ const wordsFor=(key,e)=>{const s=new Set(e.a.flatMap(a=>a.words||[]));Object.val
 // 주관식은 쓰기 점수로 상태를 정한다(평균 4 이상 통과)
 function noteSc(key,e){let r=null;[...new Set(e.a.map(a=>a.d))].forEach(d=>{const s=jSec(d,key);if(s){const w=parseW(s);if(w.length)r=w[0]}});return r}
 function noteStat(e,key){if(e.st&&e.st.v==='done')return 'done';
+  if(e.k==='rw')return(key&&noteRw(key,e))||'open';
   if(!OBJ.includes(e.k)){const w=key&&noteSc(key,e);return w?(sAvg(w)>=4?'pass':'fix'):'open'}
   const sk=seenKey(e),v=sk&&S.seen[sk],last=e.a[e.a.length-1];
   if(v&&v.ok&&v.t>(Math.floor((last?last.t:0)/100)))return 'fixed';
@@ -500,7 +527,66 @@ function noteStat(e,key){if(e.st&&e.st.v==='done')return 'done';
 const STN={open:'미해결',fixed:'다시 맞힘',done:'해결',memo:'질문',pass:'통과',fix:'고칠 곳'};
 // 복습 화면은 두 묶음만: 아직(미해결·질문·고칠 곳) / 알았다(다시 맞힘·해결·통과)
 const NG={todo:['open','memo','fix'],known:['fixed','done','pass']};
-function noteQ(e){const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?find(e.k,e.id):null,a0=e.a[e.a.length-1]||{};
+// ── 2026-11-05 말 바꾸기(우회 표현) 연습 — 중간 단계 ② ──
+// 떠오르지 않는 말을 다른 말로라도 전하는 연습. 목표는 「같은 뜻」이 아니라 「통하는가」. 정답이 여럿이라 판정은 AI(책 답이 있는 유형만 바로 비교)
+// 네 가지: p 같은 뜻 다른 말(모의고사 유의표현, 책 답 있음) / a 이 말 없이 옮기기(한국어 → 일역, 그 단어 금지) / e 풀어서 말하기 / t 문형 바꿔 쓰기
+const RWN={p:'같은 뜻 다른 말',a:'이 말 없이 옮기기',e:'풀어서 말하기',t:'문형 바꿔 쓰기'};
+const noSpk=s=>String(s||'').replace(/^[^：:「]{1,6}[：:]/,'').trim();
+// 예문이 진짜 문장이고 그 단어가 들어 있을 때만(어휘 카드의 「≒ 専門家」 같은 유의어 메모는 제외)
+const ctxOk=v=>{const s=noSpk(v.ctx&&v.ctx[0]),w=v.jp.replace(/^[～〜]/,''),stem=w.endsWith('する')?w.slice(0,-2):w.replace(/[だないるうくすつぬぶむ]$/,'');return s.length>=8&&!/^[≒=＝→]/.test(s)&&/[。！？」]$|[ぁ-ゖ]{2}/.test(s)&&(s.includes(w)||(stem.length>=2&&s.includes(stem)))&&!!(v.ctx[1]||'').trim()};
+function rwItem(id){const i=id.indexOf(':'),t=id.slice(0,i),r=id.slice(i+1);
+  if(t==='p'){const x=find('mock',r);if(!x)return null;return{sub:'p',w:(x.stem.match(/【(.+?)】/)||[])[1]||'',ja:x.stem,book:x.choices[x.answer-1],others:x.choices.filter((c,j)=>j!==x.answer-1)}}
+  if(t==='a'){if(r.startsWith('w:')){const w=S.words[r.slice(2)],e=w&&(w.ex||[]).find(e=>e[1]);return e?{sub:'a',w:w.w,r:w.r,mean:w.ko,ja:e[0],ko:e[1]}:null}
+    const v=find('v5',r);return v&&v.ctx&&ctxOk(v)?{sub:'a',w:v.jp,r:v.yomi,mean:v.ko,ja:noSpk(v.ctx[0]),ko:noSpk(v.ctx[1])}:null}
+  if(t==='e'){const v=find('v5',r);return v?{sub:'e',w:v.jp,r:v.yomi,mean:v.ko,ja:v.ctx&&ctxOk(v)?noSpk(v.ctx[0]):''}:null}
+  if(t==='t'){const j=r.lastIndexOf(':'),p=find('p630',r.slice(0,j)),e=p&&p.ex[+r.slice(j+1)];return e?{sub:'t',w:p.pattern,core:pCore(p.pattern),mean:p.meaning,ja:e[0],ko:e[1]||''}:null}
+  return null}
+let RWP=null;
+function rwPool(){if(RWP)return RWP;
+  const P=lvPool(D.mock.filter(x=>x.type==='paraphrase'&&/【.+】/.test(x.stem))).map(x=>'p:'+x.id);
+  const V=lvPool((D.v5||[]).filter(v=>v.ctx&&ctxOk(v)));
+  const W=Object.values(S.words).filter(w=>!w.del&&w.kind!=='p'&&(w.ex||[]).some(e=>e[1])).map(w=>'a:w:'+w.w);
+  const A=V.map(v=>'a:'+v.id),E=V.filter(v=>v.lv==='N1'||!S.levels.includes('N1')).map(v=>'e:'+v.id);
+  const T=lvPool(D.p630||[]).flatMap(p=>{const c=pCore(p.pattern);return c.length>=2?p.ex.map((e,i)=>e[1]&&e[0].includes(c)?'t:'+p.id+':'+i:null):[]}).filter(Boolean);
+  const q=[shuffle(P),shuffle(W.concat(A)),shuffle(E),shuffle(T)],o=[];while(q.some(a=>a.length))q.forEach(a=>a.length&&o.push(a.shift()));
+  return RWP=o.map(id=>({k:'rw',id,sk:'rw|'+id}))}
+const rwNorm=s=>String(s||'').replace(/[\s、。・「」（）()]/g,'');
+// 문제 부분(풀이 화면·오답노트 공용)
+function rwAsk(it){const R=it.sub;
+  if(R==='p')return`<p class="note">밑줄 친 말을 다른 말로 바꿔 쓰세요. 뜻이 통하면 됩니다.</p><div class="jp">${uline(it.ja)}</div>`;
+  if(R==='a')return`<p class="note">한국어를 일본어로 옮기세요. 단, <b class="jp">${esc(it.w)}</b>는 쓰지 말고 다른 말로 돌려서.</p><div>${esc(it.ko)}</div>`;
+  if(R==='e')return`<p class="note">이 말을 쓰지 말고, 일본어로 풀어서 설명해 보세요(한 줄). 그 말을 모르는 사람에게 설명하듯.</p><div class="jp big">${esc(it.w)}</div>`;
+  return`<p class="note">문형 <b class="jp">${esc(it.w)}</b>를 쓰지 말고, 같은 뜻으로 바꿔 쓰세요.</p><div class="jp">${hlw(it.ja,it.core)}</div>${it.ko?`<div class="ko">${esc(it.ko)}</div>`:''}`}
+// 참고 답 부분
+function rwRef(it,mine){const R=it.sub;
+  if(R==='p'){const same=mine&&rwNorm(mine)===rwNorm(it.book);
+    return`<div><span class="rp">책이 인정한 바꿔 말하기</span> <span class="jp">${esc(it.book)}</span>${same?' <span class="stamp ok">책 답과 같음</span>':''}</div><p class="note">같은 자리의 다른 보기(책에서 오답): ${esc(it.others.join(' · '))}</p>`}
+  if(R==='a')return`<div><span class="rp">원문</span> <span class="jp">${hlw(it.ja,it.w)}</span></div><p class="note">${esc(it.w)}${it.r&&it.r!==it.w?'（'+esc(it.r)+'）':''} = ${esc(it.mean||'')}</p>`;
+  if(R==='e')return`<div><span class="rp">뜻</span> ${esc(it.w)}${it.r&&it.r!==it.w?'（'+esc(it.r)+'）':''} = ${esc(it.mean||'')}</div>${it.ja?`<p class="note jp">${hlw(it.ja,it.w)}</p>`:''}`;
+  return`<div><span class="rp">문형 뜻</span> ${esc(it.w)} = ${esc(it.mean||'')}</div>`}
+function vRw(st,lab){const it=rwItem(st.id),s=S.cur,r=s.res[s.i]||{};
+  if(!it){s.res[s.i]={k:'rw',id:st.id,skip:1};s.i++;save();return render()}
+  let h=rwAsk(it)+`<textarea id="ans" placeholder="日本語で · 일본어 입력이 안 되면 한글 발음 표기도 됩니다">${esc(r.mine||'')}</textarea>`;
+  if(!r.shown)h+=`<div class="row"><button class="pri" id="show">참고 답 보기</button><button id="dunno">생각이 안 남</button></div>`;
+  else h+=rwRef(it,r.mine)+`<p class="note">답이 여러 개인 연습입니다. 「통하는가」는 결과 화면에서 AI에게 판정받으세요(같은 뜻 / 통함 / 뜻 달라짐).</p>${nextBtn()}`;
+  $('#view').innerHTML=card('말 바꾸기 · '+RWN[it.sub],h);
+  const t=$('#ans'),put=x=>{s.res[s.i]={...(s.res[s.i]||{}),k:'rw',id:st.id,sub:it.sub,mine:t.value,...x};save()};t.oninput=()=>put({});
+  const b=$('#show');if(b)b.onclick=()=>{put({shown:true});S.seen['rw|'+st.id]={t:Date.now(),ok:true};save();render()};
+  const dn=$('#dunno');if(dn)dn.onclick=()=>{put({shown:true,dunno:true,mine:t.value||'(생각이 안 남)'});S.seen['rw|'+st.id]={t:Date.now(),ok:false};save();render()};bindNext()}
+// AI 판정의 「우회판정」 읽기: 같은 뜻·통함 → 통과, 뜻 달라짐 → 고칠 곳
+const RWV=/우회\s*판정\s*[:：]\s*(같은\s*뜻|통함|뜻\s*(?:이\s*)?달라짐)/;
+function noteRw(key,e){let v=null;[...new Set(e.a.map(a=>a.d))].forEach(d=>{const s=jSec(d,key),m=s&&s.match(RWV);if(m)v=/달라/.test(m[1])?'fix':'pass'});return v}
+// 통과한 바꿔 말하기는 단어장의 원래 단어(문형) 밑에 「바꿔 말하기」로 붙인다(없으면 단어장에 새로 넣음)
+function applyRw(d){const j=S.judges[d];if(!j)return;const now=Date.now();
+  for(const[key,sec]of Object.entries(judgeParse(j.text).sec)){if(!key.startsWith('rw|'))continue;const m=sec.match(RWV);if(!m||/달라/.test(m[1]))continue;
+    const e=S.notes[key],mine=e&&((e.a[e.a.length-1]||{}).mine||'').trim(),it=rwItem(key.slice(3));if(!it||!it.w||!mine||mine==='(생각이 안 남)')continue;
+    const o=S.words[it.w];if(o&&o.del)continue;
+    const x=o||(S.words[it.w]={w:it.w,r:it.sub==='t'?'':(it.r||''),ko:it.mean||'',kind:it.sub==='t'?'p':'',ex:[],keys:[],t:now,u:now,ok:0,n:0,st:'',del:false,src:{k:'rw',id:key.slice(3),d},s:''});
+    if(!(x.alts||[]).includes(mine)){x.alts=[...(x.alts||[]),mine].slice(-5);x.u=now}
+    if(!(x.keys||[]).includes(key)){x.keys=[...(x.keys||[]),key];x.u=now}}}
+const altsHtml=w=>(w.alts||[]).length?`<div class="note"><span class="rp" style="font-size:inherit">바꿔 말하기</span> ${w.alts.map(a=>`<span class="jp">${esc(a)}</span>`).join(' · ')}</div>`:'';
+function noteQ(e){if(e.k==='rw'){const it=rwItem(e.id),a0=e.a[e.a.length-1]||{};return it?{t:RWN[it.sub]+' · '+(it.w||''),h:rwAsk(it)+rwRef(it,a0.mine)}:{t:'말 바꾸기',h:''}}
+const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?find(e.k,e.id):null,a0=e.a[e.a.length-1]||{};
   if(['moji','gram','tg'].includes(e.k)&&x)return{t:x.stem,h:`<div class="jp">${uline(x.stem)}</div><div class="opts">${x.choices.map((c,i)=>`<p class="${i+1===x.answer?'res ok':'note'}">${i+1}. ${esc(c)}</p>`).join('')}</div>${x.why?`<p>${esc(x.why)}</p>`:''}${Object.entries(x.wrong||{}).map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}${x.note?`<p class="note">${esc(x.note)}</p>`:''}`};
   if(e.k==='listen'&&x)return{t:x.q.ja,h:`<p class="note">${esc(x.src||'')}</p><div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
   if(e.k==='kanji'&&x)return{t:x.s,h:`<div class="jp">${esc(x.s)}</div><p class="res ok">정답: ${esc(x[x.ans])}</p>${x.ko?`<p class="ko">${esc(x.ko)}</p>`:''}`};
@@ -568,7 +654,7 @@ function wordsView(){
   for(const[d,ws]of Object.entries(byD)){h+=`<h3>${esc(d)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<div class="wrow">
      <div>${w.kind==='p'?'<span class="tag">문형</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
      <div class="m">${w.ko?esc(w.ko):'<span class="note">뜻 없음 · 네이버에서 확인 뒤 「고치기」로 적어 두세요</span>'}</div>
-     ${exHtml(w,wCore(w))}
+     ${exHtml(w,wCore(w))}${altsHtml(w)}
      <div class="note">${esc(wSrc(w.src))}${w.n?` · 복습 ${w.n}회`:''}${w.ok?` · 연속 ${w.ok}`:''}</div>
      <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}<button data-wx="${esc(w.w)}">빼기</button></div>
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`).join('')}
@@ -583,7 +669,7 @@ function wordsView(){
 function vWb(st,lab){const s=S.cur,w=S.words[st.id]||{w:st.id},r=s.res[s.i],show=r||(s.flip||{})[s.i];
   let h=`<p class="note">${w.kind==='p'?'문형의 뜻과 쓰임을 떠올려 예문을 하나 소리 내어 만들어 본 뒤 확인하세요.':'읽기와 뜻을 떠올려 소리 내어 말한 뒤 확인하세요.'}</p><div class="jp big">${esc(w.w)}</div>`;
   if(!show)h+=`<div class="row"><button class="pri" id="flip">${w.kind==='p'?'뜻 · 예문 보기':'읽기 · 뜻 보기'}</button></div>`;
-  else{h+=`${w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}<p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>${exHtml(w,wCore(w))}<div class="row">${naverA(wCore(w)||w.w)}</div>`;
+  else{h+=`${w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}<p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>${exHtml(w,wCore(w))}${altsHtml(w)}<div class="row">${naverA(wCore(w)||w.w)}</div>`;
     h+=r?`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'알았다':'다시 볼 것'}</div>${nextBtn()}`:`<div class="row"><button class="pri" data-k="1">알았다</button><button data-k="0">몰랐다</button></div>`}
   $('#view').innerHTML=card('단어장 복습 · '+lab.replace(/^단어장\s*/,''),h);
   const f=$('#flip');if(f)f.onclick=()=>{s.flip=s.flip||{};s.flip[s.i]=1;save();render()};
@@ -640,7 +726,7 @@ function render(){
   {const t=s.steps[s.i];const it=t&&t.id!=null?(['moji','gram','tg','pat2','write2'].includes(t.k)?find('mock',t.id):['listen','kanji','v5','p630','reading'].includes(t.k)?find(t.k,t.id):null):null;CURLV=it&&it.lv||null}
   const st=s.steps[s.i],n=s.steps.filter((x,i)=>i<s.i&&x.k===st.k).length+1,tot=s.steps.filter(x=>x.k===st.k).length;
   const lab=PLAN.find(p=>p[0]===st.k)[2]+(tot>1?` ${n}/${tot}`:'');
-  ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2,v5:vV5,p630:vP630,wb:vWb})[st.k](st,lab);bindFb();bindLook();
+  ({listen:vListen,kanji:vKanji,vocab:vVocab,moji:vMock,gram:vMock,tg:vMock,pat:vPat,pat2:vPat2,ilyeok:vTrans,hanyeok:vTrans,reading:vReading,talk:vTalk,write:vWrite,write2:vWrite2,v5:vV5,p630:vP630,wb:vWb,rw:vRw})[st.k](st,lab);bindFb();bindLook();
   // 확신도: 답하기 전 객관식에만. 누르지 않으면 「확실」. 애매하게 맞힌 문항도 복습에 들어간다
   if(CONF_K.includes(st.k)&&!s.res[s.i]){const k=$('.card .kind'),c=(s.conf||{})[s.i]||'sure';
     k.insertAdjacentHTML('afterend',`<div class="chips"><span class="note">답할 때 느낌</span>${[['sure','확실'],['unsure','애매 · 찍음']].map(([v,n])=>`<button data-cf="${v}" class="${c===v?'on':''}">${n}</button>`).join('')}</div>`);
@@ -682,7 +768,8 @@ const PICK=[
   ['reading','독해 (지문 단위)',()=>{const RU=[];lvPool(D.reading).forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.g.push({k:'reading',id:x.id});else RU.push({pid:x.pid,sk:'reading|'+x.id,g:[{k:'reading',id:x.id}]})});return RU}],
   ['tg','글의 문법 (지문 단위)',()=>{const m=new Map();lvPool(D.mock.filter(x=>x.type==='text_grammar')).forEach(x=>{if(!m.has(x.passage))m.set(x.passage,{sk:'tg|'+x.id,g:[]});m.get(x.passage).g.push({k:'tg',id:x.id})});return [...m.values()]}],
   ['trans','일역 · 한역',()=>D.trans.map((a,i)=>({k:i%2?'hanyeok':'ilyeok',ja:a[0],ko:a[1],src:a[2],sk:'tr|'+i}))],
-  ['talk','회화',()=>D.talk.map(x=>({k:'talk',id:x.id,sk:'talk|'+x.id}))]];
+  ['talk','회화',()=>D.talk.map(x=>({k:'talk',id:x.id,sk:'talk|'+x.id}))],
+  ['rw','말 바꾸기 (우회 표현)',()=>rwPool()]];
 let PK={a:'moji',n:10};
 function pickSteps(a,n){const pool=PICK.find(p=>p[0]===a)[2](),age=x=>{const v=S.seen[x.sk];return v?v.t:0};
   const ord=shuffle(pool).sort((x,y)=>age(x)-age(y)),out=[];for(const x of ord){if(out.length>=n)break;(x.g||[x]).forEach(s=>{const{sk,...st}=s;out.push(st)})}return out}
@@ -904,12 +991,15 @@ function qBlock(st,r){const J=a=>a.filter(Boolean).join('\n'),pk=r&&r.pick!=null
   if(st.k==='talk'&&x)return J(x.lines.map(l=>l.ja));
   if(st.k==='ilyeok'||st.k==='hanyeok')return J([`문제: ${r.q}`,`내 답: ${r.mine||'(안 씀)'}`,`교재: ${r.a}`]);
   if(st.k==='write'||st.k==='write2')return J([`요구 문형: ${r.pat}`,`내 문장: ${r.mine||'(안 씀)'}`]);
+  if(st.k==='rw'){const it=rwItem(st.id);if(!it)return '';const W=it.sub==='t'?'쓰지 말 문형':'쓰지 말 말';
+    return J([`연습: 말 바꾸기 · ${RWN[it.sub]}`,it.sub==='a'?`한국어: ${it.ko}`:'',it.sub==='p'||it.sub==='t'?`문장: ${it.ja.replace(/[【】]/g,'')}`:'',`${W}: ${it.w}${it.mean?' = '+it.mean:''}`,
+      it.sub==='p'?`책이 인정한 바꿔 말하기: ${it.book}`:'',it.sub==='a'?`원문: ${it.ja}`:'',`내 바꿔 말하기: ${r.mine||'(안 씀)'}`])}
   return st.ja||''}
 function report(s){
   const L=[`[LA 오늘의 일본어 결과지] ${s.date}`];
   const mc=s.res.filter(r=>r&&'ok' in r),ok=mc.filter(r=>r.ok).length;
   L.push(`객관식 ${ok}/${mc.length} 정답`);
-  const SUBJ=['ilyeok','hanyeok','write','write2'];
+  const SUBJ=['ilyeok','hanyeok','write','write2','rw'];
   s.steps.forEach((st,i)=>{const r=s.res[i];if(!r||st.k==='wb')return;
     const fb=((s.fb||{})[i]||'').trim(),ws=((s.wsav||{})[i]||[]).filter(liveW),sub=SUBJ.includes(st.k),bad=r.ok===false,uns=r.conf==='unsure';
     if(!sub&&!bad&&!uns&&!fb&&!ws.length)return;
@@ -922,6 +1012,7 @@ function report(s){
   L.push('3. 어휘 오답, 한자 읽기·표기 문제, 내가 모른다고 한 단어는 단어마다 아래 형식으로 써 주세요(읽기는 히라가나, 필요하면 한자별 음독·훈독도 짧게). 예문은 3개, 자연스러운 일본어로:\n단어: 漢字（よみ）= 한국어 뜻\n예문: 일본어 예문 / 한국어 번역\n예문: 일본어 예문 / 한국어 번역\n예문: 일본어 예문 / 한국어 번역');
   L.push('4. 문법·글의 문법 오답, 문형 문제, 내가 모른다고 한 문형은 아래 형식으로 써 주세요. 예문은 3개:\n문형: 〜형태 = 한국어 뜻 (접속: 앞에 오는 말의 모양)\n예문: 일본어 예문 / 한국어 번역\n예문: 일본어 예문 / 한국어 번역\n예문: 일본어 예문 / 한국어 번역');
   if(s.steps.some(st=>SUBJ.includes(st.k)))L.push('5. 일역·한역·작문은 교재 문장과 다른 표현도 맞으면 맞다고, 틀리면 근거와 함께 판정하고 「교정: …」 한 줄로 고친 문장을 주세요. 각 판정 끝에 반드시 이 형식의 한 줄을 넣어 주세요(앱이 점수를 읽습니다): 「쓰기점수: 문법 ○/5 · 문형 ○/5 · 자연스러움 ○/5」 — 문법=문법·표기가 맞는가, 문형=요구한 문형(번역은 원문 의미)을 바르게 살렸는가, 자연스러움=일본어(한국어)로 자연스러운가. 5=완벽, 3=뜻은 통하나 고칠 곳 있음, 1=크게 틀림. 작문이 한글 발음 표기면 표기는 감점하지 말고 일본어로 복원해 판정해 주세요.');
+  if(s.steps.some(st=>st.k==='rw'))L.push('6. 말 바꾸기 항목은 「완벽히 같은 뜻」이 아니라 「뜻이 통하는가」로 판정하고, 반드시 이 형식의 한 줄을 넣어 주세요(앱이 읽습니다): 「우회판정: 같은 뜻 | 통함 | 뜻 달라짐」 중 하나. 이어서 「차이: …」 한 줄(격식·문어/구어·뉘앙스 차이), 더 자연스러운 바꿔 말하기 1~2개를 주세요. 한글 발음 표기면 일본어로 복원해 판정해 주세요.');
   return {text:L.join('\n'),ok,n:mc.length};
 }
 // ── 내 실력: JLPT 채점처럼 언어지식·독해·청해 각 60점으로 환산한 추정 점수 ──
