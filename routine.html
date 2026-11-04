@@ -377,8 +377,8 @@ function setView(){
    ${syncUI()}${recUI()}
    <details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`);
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});
-  document.querySelectorAll('[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
-  document.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
+  document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
+  document.querySelectorAll('button[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
   $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
   bindRec(render);bindSync(render)}
 function vListen(st,lab){
