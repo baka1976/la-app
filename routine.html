@@ -62,6 +62,18 @@ button.start{width:100%;font-size:18px;padding:16px;min-height:60px}
 .chips button{min-height:32px;padding:3px 12px;font-size:13px;border-radius:99px}
 .chips button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .stat{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;color:var(--mute)}
+.board{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:12px;padding:14px;background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 7%,var(--card)),var(--card))}
+.board .head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.board .big{font-size:64px;font-weight:800;line-height:.95;letter-spacing:-2px;color:var(--accent);font-variant-numeric:tabular-nums}
+.board .big small{font-size:28px;font-weight:700;letter-spacing:0}
+.board .grade{font-size:20px;font-weight:800;padding:4px 10px;border-radius:999px;color:#fff;align-self:center}
+.board .sub{font-size:13px;color:var(--mute)}
+.scale{position:relative;height:30px;border-radius:8px;overflow:visible;display:flex}
+.scale>span{flex:none;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden}
+.scale>span:first-child{border-radius:8px 0 0 8px}.scale>span:last-of-type{border-radius:0 8px 8px 0}
+.scale .pin{position:absolute;top:-8px;width:0;height:46px;border-left:3px solid var(--fg)}
+.scale .pin::after{content:attr(data-v);position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:800;color:var(--fg);white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--mute)}
 input{font:inherit;box-sizing:border-box;width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--fg)}
 :root[data-fs="s"] body{font-size:14px}:root[data-fs="s"] .jp{font-size:17px}
 :root[data-fs="l"] body{font-size:17px}:root[data-fs="l"] .jp{font-size:22px}:root[data-fs="l"] .jp.big{font-size:32px}
@@ -604,14 +616,49 @@ function chart(pts,tests){const W=600,H=220,P=34,x=i=>P+(pts.length<2?(W-2*P)/2:
   pts.forEach((p,i)=>{const d=new Date(p.w);g+=`<text x="${x(i)}" y="${H-10}" font-size="11" fill="var(--mute)" text-anchor="middle">${d.getMonth()+1}/${d.getDate()}</text>`});
   g+='</svg>';return g+`<div class="stat">${SEC.map(([s,n])=>`<span><span style="color:${col[s]}">●</span> ${n}</span>`).join('')}<span>가로: 주(월요일 시작) · 세로: 60점 환산</span></div>`}
 const pct=v=>v==null?'—':Math.round(v*100)+'%';
+// 점수판: 큰 백분율 + 레벨 기준 띠 + 입체 막대(영역별 60점). sc={lang,read,listen}(+_n), null 허용
+// 레벨 기준은 앱의 추정 구간(공식 JLPT 판정 아님): 합격선(N1 100/180≈56%)을 기준으로 위아래를 나눔
+const PASSN={N1:100,N2:90,N3:95,N4:90,N5:80};
+const LOWER={N1:'N2',N2:'N3',N3:'N4',N4:'N5',N5:'입문'};
+function bands(lv){const p=Math.round(PASSN[lv||'N1']/180*100);
+  return[{to:Math.max(25,p-22),name:LOWER[lv]+' 이하',c:'#8a8f8c'},{to:p-10,name:LOWER[lv]+' 수준',c:'#c98a3a'},{to:p,name:lv+' 근접',c:'#d9b13b'},
+         {to:Math.min(80,p+20),name:lv+' 합격권',c:'#3f9a5c'},{to:100,name:lv+' 고득점',c:'#2b6cb0'}]}
+function gradeOf(pc,lv){return bands(lv).find(b=>pc<b.to)||bands(lv)[4]}
+function bars3d(sc){const W=360,H=260,B=58,D=16,base=H-34,top=52,sx=i=>40+i*95,h=v=>(v/60)*(base-top);
+  const col={lang:'var(--accent)',read:'var(--ok)',listen:'var(--bad)'},y19=base-h(19);
+  let g=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto" role="img" aria-label="영역별 점수 막대">`;
+  g+=`<defs><linearGradient id="shine" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>`;
+  for(const v of[0,30,60])g+=`<line x1="30" x2="${W-6}" y1="${base-h(v)}" y2="${base-h(v)}" stroke="var(--line)"/><text x="2" y="${base-h(v)+4}" font-size="10" fill="var(--mute)">${v}</text>`;
+  SEC.forEach(([k,n],i)=>{const v=sc[k],x=sx(i);
+    // 바닥 그림자(빈 칸 틀)
+    g+=`<path d="M${x} ${base} l${D} ${-D} h${B} v${-(base-top)} l${-D} ${D} h${-B} z" fill="var(--line)" opacity=".35"/>`;
+    if(v!=null&&v>0){const hh=h(v),y=base-hh;
+      g+=`<rect x="${x}" y="${y}" width="${B}" height="${hh}" fill="${col[k]}"/><rect x="${x}" y="${y}" width="${B}" height="${hh}" fill="url(#shine)"/>`+
+         `<path d="M${x+B} ${y} l${D} ${-D} v${hh} l${-D} ${D} z" fill="${col[k]}"/><path d="M${x+B} ${y} l${D} ${-D} v${hh} l${-D} ${D} z" fill="#000" opacity=".28"/>`+
+         `<path d="M${x} ${y} l${D} ${-D} h${B} l${-D} ${D} z" fill="${col[k]}"/><path d="M${x} ${y} l${D} ${-D} h${B} l${-D} ${D} z" fill="#fff" opacity=".35"/>`+
+         `<text x="${x+B/2+D/2}" y="${y-D-6}" text-anchor="middle" font-size="17" font-weight="800" fill="var(--fg)">${v}</text>`}
+    g+=`<text x="${x+B/2}" y="${base+16}" text-anchor="middle" font-size="12" fill="var(--fg)">${n}</text>`+
+       `<text x="${x+B/2}" y="${base+29}" text-anchor="middle" font-size="10" fill="var(--mute)">${v==null?'기록 부족':Math.round(v/60*100)+'%'+(sc[k+'_n']!=null?' · '+sc[k+'_n']+'문항':'')}</text>`});
+  g+=`<line x1="30" x2="${W-50}" y1="${y19}" y2="${y19}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="${W-2}" y="${y19+4}" text-anchor="end" font-size="10" fill="var(--bad)">과락 19</text>`;
+  return g+'</svg>'}
+function scoreBoard(sc,lv,title){lv=lv||'N1';const ks=SEC.map(([k])=>k),ok=ks.every(k=>sc[k]!=null),tot=ok?ks.reduce((a,k)=>a+sc[k],0):null;
+  const pc=tot==null?null:Math.round(tot/180*1000)/10,gr=pc==null?null:gradeOf(pc,lv),fail=ks.filter(k=>sc[k]!=null&&sc[k]<19),pass=PASSN[lv],B=bands(lv);
+  let from=0;const scale=`<div class="scale">${B.map(b=>{const w=b.to-from,el=`<span style="width:${w}%;background:${b.c}" title="${b.name} ${from}~${b.to}%">${w>=14?b.name:''}</span>`;from=b.to;return el}).join('')}${pc!=null?`<i class="pin" style="left:${Math.min(99.5,pc)}%" data-v="${pc}%"></i>`:''}</div>`;
+  from=0;const legend=`<div class="legend">${B.map(b=>{const t=`<span><b style="color:${b.c}">■</b> ${b.name} ${from}~${b.to===100?100:b.to-1}%</span>`;from=b.to;return t}).join('')}</div>`;
+  return `<div class="board">${title?`<div class="sub"><b>${esc(title)}</b></div>`:''}
+   <div class="head">${pc==null?'<div class="big" style="font-size:28px">기록이 더 필요해요</div>':`<div class="big">${pc}<small>%</small></div><span class="grade" style="background:${gr.c}">${gr.name}</span>`}</div>
+   <div class="sub">${tot==null?'세 영역이 모두 있어야 백분율이 나옵니다':`합계 <b>${tot}</b> / 180 · ${lv} 합격선 ${pass}점(${Math.round(pass/180*100)}%) ${tot>=pass?'넘음':'까지 '+(pass-tot)+'점'}`}${fail.length?` · <b style="color:var(--bad)">과락 ${fail.map(k=>SEC.find(x=>x[0]===k)[1]).join('·')}</b>`:''}</div>
+   ${scale}${legend}${bars3d(sc)}
+   <p class="note">레벨 기준 띠는 앱의 추정 구간입니다(합격선 기준으로 나눔, 공식 판정 아님). 실제 JLPT는 합계가 합격선을 넘고 세 영역이 모두 19점 이상이어야 합격입니다.</p></div>`}
+
 function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(lv),ty=typeStats(lv),cb=calib(lv),T=S.tests.filter(t=>t.lv===lv).slice(-5).reverse();
   const pass=lv==='N1'?100:lv==='N2'?90:lv==='N3'?95:lv==='N4'?90:80;
   const bar=(sc)=>sc==null?'<span class="note">문항이 더 필요해요</span>':`<b>${sc}</b> / 60 <span class="note">${sc<19?'(과락선 19 미만)':''}</span>`;
   const enough=SEC.filter(([s])=>e[s].n>=10).length;
   $('#view').innerHTML=card('내 실력',`<div class="chips"><span class="note">레벨</span>${LVS.map(l=>`<button data-lvv="${l}" class="${l===lv?'on':''}">${l}</button>`).join('')}</div>
    <div><b>${lv} 추정 점수</b> <span class="note">(JLPT처럼 영역별 60점 환산 · 처음 푼 문제 최근 60개 · 애매하게 맞힌 건 절반)</span></div>
-   ${SEC.map(([s,n])=>`<div class="row" style="align-items:center;justify-content:space-between"><span>${n} <span class="note">${e[s].n}문항</span></span><span>${bar(e[s].sc)}</span></div>`).join('')}
-   <div class="res ${e.total!=null&&e.total>=pass?'ok':''}">${e.total==null?'세 영역 모두 기록이 쌓이면 합계가 나와요':`합계 ${e.total} / 180 · 합격선 ${pass} ${e.total>=pass?'넘음':'까지 '+(pass-e.total)+'점'}`}</div>
+   ${T.length?scoreBoard(T[0].sc,lv,'최근 레벨 테스트 · '+T[0].date):''}
+   ${scoreBoard({lang:e.lang.sc,read:e.read.sc,listen:e.listen.sc,lang_n:e.lang.n,read_n:e.read.n,listen_n:e.listen.n},lv,'평소 풀이로 본 추정 점수 (최근 60문항씩)')}
    ${enough<3?'<p class="note">영역마다 10문항 이상 풀면 숫자가 안정됩니다. 「레벨 테스트」로 한 번에 기준점을 잡을 수 있어요.</p>':''}
    <button class="pri start" id="ltest">레벨 테스트 (${lv} · 객관식 약 30 + 쓰기 2)</button>
    <div><b>주별 추세</b></div>${w.length?chart(w.slice(-12),T):'<p class="note">이번 주부터 기록이 쌓입니다.</p>'}
@@ -667,7 +714,7 @@ function finish(){
   const sub=s.steps.some(st=>['ilyeok','hanyeok','write','write2'].includes(st.k));
   const nm=kind==='review'?'복습':kind==='test'?'레벨 테스트 '+(s.lv||''):kind==='custom'?'골라 풀기':'오늘 학습';
   $('#view').innerHTML=card('결과 · '+nm,`<div class="res">객관식 ${rp.ok}/${rp.n} 정답</div>
-   ${s.sc?`<div class="stat"><span>언어지식 <b>${s.sc.lang}</b>/60 (${s.sc.lang_n}문항)</span><span>독해 <b>${s.sc.read}</b>/60 (${s.sc.read_n})</span><span>청해 <b>${s.sc.listen}</b>/60 (${s.sc.listen_n})</span><span>합계 <b>${s.sc.lang+s.sc.read+s.sc.listen}</b>/180</span></div><p class="note">「실력」 탭의 그래프와 테스트 기록에 들어갔습니다. 문항 수가 적은 영역은 오차가 큽니다.</p>`:''}
+   ${s.sc?scoreBoard(s.sc,s.lv,'레벨 테스트 '+(s.lv||'N1')+' 결과')+'<p class="note">「실력」 탭의 그래프와 테스트 기록에 들어갔습니다. 문항 수가 적은 영역(특히 독해)은 오차가 큽니다.</p>':''}
    ${wrong.length?`<details open><summary>복습에 들어간 문제 ${wrong.length}</summary>${wrong.map(x=>`<p class="note">${esc(title(x))}</p>`).join('')}</details>`:'<p class="note">틀리거나 애매한 문제가 없어요.</p>'}
    <p>${sub?'일역·한역·작문과 오답 이유를 판정받으려면 판정 요청문을 복사해 AI(유료·무료 아무거나)에게 붙여 넣으세요.':'질문이나 오답 이유를 물어보려면 판정 요청문을 복사해 AI에게 붙여 넣으세요.'}</p>
    <div class="row"><button class="pri" id="copy">판정 요청문 복사</button><button id="again">처음으로</button></div><p class="note" id="msg"></p>
