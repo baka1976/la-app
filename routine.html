@@ -2,7 +2,7 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>LA 오늘의 루틴</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+JP:wght@500;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&family=Klee+One:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+JP:wght@500;700&family=Poor+Story&family=Gowun+Dodum&family=Hi+Melody&family=Gaegu:wght@400;700&family=Klee+One:wght@400;600&display=swap">
 <style>
 /* 레이아웃: 한 장씩 넘기는 학습 카드 한 줄 + 위쪽 진행 막대. 책 출처를 카드마다 아래에 둔다. */
 :root{
@@ -79,32 +79,37 @@ input{font:inherit;box-sizing:border-box;width:100%;border:1px solid var(--line)
 :root[data-fs="l"] body{font-size:17px}:root[data-fs="l"] .jp{font-size:22px}:root[data-fs="l"] .jp.big{font-size:32px}
 /* 2026-11-05 단어 찾기(앱 안 사전) · 단어장 · 공책 모양(오답노트·단어장): 줄 공책 + 빨간 여백선 + 형광펜 + 빨간 펜 */
 :root{--paper:#fffdf5;--rule:#c9dcef;--margin:#ee9d9d;--pen:#22396f;--red:#cf2a22;--hl:rgba(255,226,60,.6);
-  --hand:"Gaegu","Nanum Pen Script",var(--ui);--hand2:"Nanum Pen Script","Gaegu",var(--ui);--jph:"Klee One",var(--jp)}
+  --hand:"Poor Story",var(--ui);--hz:1;--hw:400;--jph:"Klee One",var(--jp)}
+:root[data-hand="gowun"]{--hand:"Gowun Dodum",var(--ui);--hz:.95}
+:root[data-hand="melody"]{--hand:"Hi Melody",var(--ui);--hz:1.15}
+:root[data-hand="gaegu"]{--hand:"Gaegu",var(--ui);--hz:1.05;--hw:700}
+.ic{width:1.05em;height:1.05em;vertical-align:-.17em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.fill{fill:currentColor}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#1f2421;--rule:rgba(130,170,210,.2);--margin:rgba(230,100,100,.45);--pen:#a9c2ff;--red:#ff7d72;--hl:rgba(255,215,50,.3)}}
 :root[data-theme="dark"]{--paper:#1f2421;--rule:rgba(130,170,210,.2);--margin:rgba(230,100,100,.45);--pen:#a9c2ff;--red:#ff7d72;--hl:rgba(255,215,50,.3)}
 .card.nb{background-color:var(--paper);background-image:linear-gradient(90deg,transparent 30px,var(--margin) 30px,var(--margin) 32px,transparent 32px),repeating-linear-gradient(180deg,transparent 0 31px,var(--rule) 31px 32px);
-  background-position:0 6px;padding-left:44px;font-family:var(--hand);font-size:19px;font-weight:700;line-height:32px;color:var(--pen);border-color:var(--rule)}
-.nb .kind{font-family:var(--hand2);font-size:26px;letter-spacing:0;color:var(--red);font-weight:400}
+  background-position:0 6px;padding-left:44px;font-family:var(--hand);font-size:calc(19px*var(--hz));font-weight:var(--hw);line-height:32px;color:var(--pen);border-color:var(--rule)}
+.nb .kind{font-family:var(--hand);font-size:calc(24px*var(--hz));letter-spacing:0;color:var(--red);font-weight:var(--hw)}
 .nb .jp{font-family:var(--jph);color:var(--fg)}
-.nb .note{font-size:17px;font-weight:700;color:var(--pen);opacity:.85}
-.nb h3{font-family:var(--hand2);font-weight:400;font-size:24px;color:var(--red);margin:8px 0 0}
+.nb .note{font-size:calc(17px*var(--hz));font-weight:var(--hw);color:var(--pen);opacity:.85}
+.nb h3{font-family:var(--hand);font-weight:var(--hw);font-size:calc(22px*var(--hz));color:var(--red);margin:8px 0 0}
 .nb details>summary{color:var(--pen)}
 .nb button,.nb input,.nb textarea{font-family:var(--ui);line-height:1.4}
-.nb .res.ok{color:var(--ok)}.nb .res.bad,.nb .rp{color:var(--red);font-family:var(--hand2);font-size:22px;font-weight:400}
+.nb .res.ok{color:var(--ok)}.nb .res.bad,.nb .rp{color:var(--red);font-family:var(--hand);font-size:calc(19px*var(--hz));font-weight:var(--hw)}
 .hl,.nb u{background:linear-gradient(100deg,transparent 2%,var(--hl) 4%,var(--hl) 96%,transparent 98%) 0 70%/100% 55% no-repeat;border:0;padding:0 2px;color:inherit}
-.stamp{display:inline-block;font-family:var(--hand2);font-size:20px;line-height:1.1;color:var(--red);border:2px solid var(--red);border-radius:6px;padding:0 6px;transform:rotate(-4deg)}
+.stamp{display:inline-block;font-family:var(--hand);font-size:calc(16px*var(--hz));line-height:1.1;color:var(--red);border:2px solid var(--red);border-radius:6px;padding:0 6px;transform:rotate(-4deg)}
 .stamp.ok{color:var(--ok);border-color:var(--ok)}
 .wrow{border-bottom:1px dashed var(--rule);padding:4px 0 8px;display:flex;flex-direction:column;gap:2px}
 .wrow .w{font-family:var(--jph);font-size:22px;color:var(--fg)}
 .wrow .r{font-family:var(--jph);font-size:15px;color:var(--red);margin-left:8px}
-.wrow .m{font-family:var(--hand);font-size:19px;font-weight:700}
+.wrow .m{font-family:var(--hand);font-size:calc(19px*var(--hz));font-weight:var(--hw)}
 .wrow .row button,.wrow .row a{min-height:34px;padding:3px 10px;font-size:13px}
-a.btn{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 12px;color:var(--accent);text-decoration:none;font-size:14px;background:var(--card)}
+a.btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;padding:6px 12px;color:var(--accent);text-decoration:none;font-size:14px;background:var(--card)}
 button.on-star{border-color:var(--red);color:var(--red)}
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:flex;align-items:flex-end;justify-content:center}
 .sheet{width:100%;max-width:640px;max-height:82vh;overflow:auto;border-radius:14px 14px 0 0;box-sizing:border-box}
 .sheet.card{animation:none}
-#selbtn{position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:40;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#selbtn{display:inline-flex;align-items:center;gap:6px;position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:40;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -124,7 +129,7 @@ const KEY='la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
 S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];S.hist=S.hist||[];S.ux=S.ux||[];S.tests=S.tests||[];S.wsc=S.wsc||{};S.pref=S.pref||{};S.words=S.words||{};
 // 보기 설정(이 기기만): 글자 크기, 화면 테마
-const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
+const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';r.dataset.hand=S.pref.hand||'poor';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['wb',0,'단어장'],['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',5,'어휘'],['v5',3,'어휘'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일역'],['hanyeok',1,'한역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 function take(kind,pool,n,skip=()=>false){
@@ -233,7 +238,7 @@ function syncNow(){if(!SY.repo||!SY.token)return Promise.resolve('off');if(syncP
     throw new Error('다른 기기와 동시에 올려 충돌이 계속됨')})()
    .catch(e=>{SY.err=e.message;saveSY();return 'err'}).finally(()=>setTimeout(()=>{syncP=null},0));
   return syncP}
-const syncLine=()=>!SY.repo?'자동 동기화 꺼짐 (⚙ 설정 → 자동 동기화 설정)':SY.err?'동기화 실패: '+SY.err:SY.last?'동기화됨 · '+new Date(SY.last).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'동기화 대기 중';
+const syncLine=()=>!SY.repo?'자동 동기화 꺼짐 (설정 → 자동 동기화 설정)':SY.err?'동기화 실패: '+SY.err:SY.last?'동기화됨 · '+new Date(SY.last).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'동기화 대기 중';
 function syncUI(){return `<details class="note"><summary>자동 동기화 설정 · ${esc(syncLine())}</summary>
   <p>비공개 GitHub 저장소에 기록·오답노트를 자동으로 저장합니다. 앱을 열 때 받아 오고, 학습을 끝내거나 판정을 붙여 넣을 때 올립니다. 저장소와 토큰은 이 기기에만 저장됩니다.</p>
   <label class="note" for="syr">저장소</label><input id="syr" value="${esc(SY.repo||'baka1976/la-records')}" autocomplete="off" spellcheck="false">
@@ -262,6 +267,11 @@ function bindJudge(d){const b=$('#jds');if(!b)return;b.onclick=()=>{const t=$('#
 // 동사·형용사는 끝 글자를 뗀 줄기로도 찾는다(訪れる → 訪れた). 사전에 없는 한자어는 네이버 사전 링크만 준다.
 const KJ=/[㐀-鿿々]/;
 let DX=null;
+// 선 아이콘(이모지 대신): 책·별·바깥 링크·재생. 글자 색을 따라간다
+const IC={book:'<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5c-.8 0-1.5-.7-1.5-1.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5z"/>',
+  star:'<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>',ext:'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  play:'<path d="M7 4.5v15l12-7.5z"/>'};
+const ic=(n,f)=>`<svg class="ic${f?' fill':''}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 function dx(){if(DX)return DX;const m=new Map(),st=new Map();let mx=2;
   (D.dict||[]).forEach(e=>{const w=e[0].replace(/^[～〜]+|[～〜]+$/g,'');if(w.length<2)return;if(!m.has(w))m.set(w,e);mx=Math.max(mx,w.length);
     const s=w.endsWith('する')?w.slice(0,-2):w.replace(/[だなるうくぐすつぬぶむい]$/,'');
@@ -291,7 +301,7 @@ function stepText(k,id,st){const J=a=>a.filter(Boolean).join('\n');
 // 풀이 중에는 답한 뒤에만 단어를 찾을 수 있다(미리 보면 시험이 안 되므로)
 function lookable(st,r){if(!st)return false;if(OBJ.includes(st.k))return !!(r&&'ok' in r);if(st.k==='ilyeok'||st.k==='hanyeok')return !!(r&&r.shown);return['talk','pat','pat2'].includes(st.k)}
 const NAVER=w=>'https://ja.dict.naver.com/#/search?query='+encodeURIComponent(w);
-const naverA=(w,l)=>`<a class="btn" href="${NAVER(w)}" target="_blank" rel="noopener">${l||(w.length===1&&KJ.test(w)?'한자 음독·훈독 (네이버) ↗':'네이버 사전 ↗')}</a>`;
+const naverA=(w,l)=>`<a class="btn" href="${NAVER(w)}" target="_blank" rel="noopener">${l||(w.length===1&&KJ.test(w)?'한자 음독·훈독 (네이버)':'네이버 사전')}${ic('ext')}</a>`;
 const hlw=(s,w)=>{s=String(s||'');const i=w?s.indexOf(w):-1;return i<0?esc(s):esc(s.slice(0,i))+'<span class="hl">'+esc(w)+'</span>'+esc(s.slice(i+w.length))};
 const sentOf=(t,sf)=>{const L=String(t||'').replace(/[【】]/g,'').split(/(?<=[。！？\n])/).map(x=>x.trim()).filter(Boolean);const s=L.find(x=>x.includes(sf))||'';return s.length>90?s.slice(0,90)+'…':s};
 const liveW=w=>S.words[w]&&!S.words[w].del;
@@ -305,7 +315,7 @@ function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
   return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
-    <div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?'★ 단어장에 있음':'☆ 모르는 단어로 저장'}</button>${naverA(w,'네이버 ↗')}${w.length>=2&&KJ.test(w)?`<span class="note" style="align-self:center">한자 음·훈: ${[...new Set(w.match(/[㐀-鿿]/g))].slice(0,5).map(c=>`<a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px;margin:0 3px">${esc(c)}</a>`).join('')}</span>`:''}</div></div>`}
+    <div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}${w.length>=2&&KJ.test(w)?`<span class="note" style="align-self:center">한자 음·훈: ${[...new Set(w.match(/[㐀-鿿]/g))].slice(0,5).map(c=>`<a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px;margin:0 3px">${esc(c)}</a>`).join('')}</span>`:''}</div></div>`}
 // 아래에서 올라오는 단어 창: 이 문제의 단어 목록 + 검색칸(드래그로 고른 글자가 들어옴)
 function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
   const hits=wordsIn(text),bg=document.createElement('div');bg.className='sheet-bg';bg.id='sheet';
@@ -314,7 +324,7 @@ function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
     bg.innerHTML=`<section class="card nb sheet" role="dialog" aria-label="단어 찾기"><div class="row" style="justify-content:space-between;align-items:center"><div class="kind">단어 찾기</div><button id="lx">닫기</button></div>
       <input id="lq" placeholder="찾을 말 (일본어·한자 한 글자도 됨)" value="${esc(qq)}" autocomplete="off" spellcheck="false">
       ${qq.trim()?`<div>${sr.map(h=>wordRow(h,ctx)).join('')||'<p class="note">앱 사전에 없습니다.</p>'}<div class="row" style="margin-top:6px">${naverA(qq.trim())}</div></div>`:''}
-      ${hits.length?`<h3>이 문제의 단어 ${hits.length}</h3><p class="note">책 단어 사전에서 찾은 읽기·뜻입니다. 모르는 단어는 ☆을 눌러 단어장에 넣으세요${ctx.inSess?' (이 문제도 오답노트에 남습니다)':''}.</p>${hits.map(h=>wordRow(h,{...ctx,s:sentOf(text,h.sf)})).join('')}`:(text?'<p class="note">이 문제에서 찾은 단어가 없습니다. 위 칸에 직접 넣어 찾으세요.</p>':'')}
+      ${hits.length?`<h3>이 문제의 단어 ${hits.length}</h3><p class="note">책 단어 사전에서 찾은 읽기·뜻입니다. 모르는 단어는 「모르는 단어로 저장」을 눌러 단어장에 넣으세요${ctx.inSess?' (이 문제도 오답노트에 남습니다)':''}.</p>${hits.map(h=>wordRow(h,{...ctx,s:sentOf(text,h.sf)})).join('')}`:(text?'<p class="note">이 문제에서 찾은 단어가 없습니다. 위 칸에 직접 넣어 찾으세요.</p>':'')}
     </section>`;
     $('#lx').onclick=closeSheet;const inp=$('#lq');inp.oninput=()=>{clearTimeout(inp._t);inp._t=setTimeout(()=>{const p=inp.selectionStart;draw();const n=$('#lq');n.focus();n.setSelectionRange(p,p)},250)};
     bg.querySelectorAll('[data-tw]').forEach(b=>b.onclick=()=>{const w=b.dataset.tw,h=[...sr,...hits].find(x=>x.e[0]===w);toggleWord(h?h.e:[w,'',''],{...ctx,s:h&&h.sf?sentOf(text,h.sf):ctx.s});const y=bg.firstChild.scrollTop;draw();bg.firstChild.scrollTop=y;updLook()})};
@@ -329,16 +339,17 @@ function searchDict(q){const{m}=dx(),out=[],seen=new Set(),add=e=>{if(e&&!seen.h
 // 문제 카드 아래 「단어 찾기」 버튼(답한 뒤에만)
 function lookBtn(){const s=S.cur;if(!s||VIEW!=='sess')return '';const st=s.steps[s.i];if(!lookable(st,s.res[s.i]))return '';
   const n=wordsIn(stepText(st.k,st.id,st)).length,sv=((s.wsav||{})[s.i]||[]).filter(liveW).length;
-  return `<div class="row"><button id="wlook">📖 이 문제의 단어 ${n} · 읽기·뜻 보기${sv?` · ★${sv}`:''}</button></div>`}
+  return `<div class="row"><button id="wlook">${wlookTxt(n,sv)}</button></div>`}
+const wlookTxt=(n,sv)=>`${ic('book')} 이 문제의 단어 ${n} · 읽기·뜻 보기${sv?` · 저장 ${sv}`:''}`;
 function updLook(){const b=$('#wlook');if(!b||!S.cur)return;const s=S.cur,st=s.steps[s.i],sv=((s.wsav||{})[s.i]||[]).filter(liveW).length;
-  b.textContent=`📖 이 문제의 단어 ${wordsIn(stepText(st.k,st.id,st)).length} · 읽기·뜻 보기${sv?' · ★'+sv:''}`}
+  b.innerHTML=wlookTxt(wordsIn(stepText(st.k,st.id,st)).length,sv)}
 function bindLook(){const b=$('#wlook');if(!b)return;b.onclick=()=>{const s=S.cur,st=s.steps[s.i];lookSheet(stepText(st.k,st.id,st),'',{inSess:true,src:{k:st.k,id:st.id??null,d:s.date}})}}
 // 글자를 드래그해 고르면 아래에 「찾기」 버튼(풀이 중에는 답한 뒤에만)
 document.addEventListener('selectionchange',()=>{clearTimeout(window.__selT);window.__selT=setTimeout(()=>{
   const sel=getSelection(),t=String(sel||'').trim(),old=$('#selbtn');
   const inView=sel.rangeCount&&$('#view').contains(sel.anchorNode),okNow=VIEW!=='sess'||(S.cur&&lookable(S.cur.steps[S.cur.i],S.cur.res[S.cur.i]));
   if(!t||t.length>20||!/[ぁ-ゖァ-ヺ㐀-鿿]/.test(t)||!inView||!okNow||$('#sheet')){if(old)old.remove();return}
-  const b=old||document.createElement('button');b.id='selbtn';b.className='pri';b.textContent=`📖 「${t.length>8?t.slice(0,8)+'…':t}」 찾기`;
+  const b=old||document.createElement('button');b.id='selbtn';b.className='pri';b.innerHTML=`${ic('book')} 「${esc(t.length>8?t.slice(0,8)+'…':t)}」 찾기`;
   b.onmousedown=e=>e.preventDefault();b.onclick=()=>{b.remove();const s=S.cur,st=VIEW==='sess'&&s?s.steps[s.i]:null;lookSheet(st?stepText(st.k,st.id,st):'',t,st?{inSess:true,src:{k:st.k,id:st.id??null,d:s.date}}:{})};
   if(!old)document.body.appendChild(b)},300)});
 
@@ -385,9 +396,9 @@ function notesView(){
       const lv=(['moji','gram','tg'].includes(n.e.k)?find('mock',n.e.id):OBJ.includes(n.e.k)?find(n.e.k,n.e.id):null);
       return `<details><summary><span class="stamp ${n.st==='fixed'||n.st==='done'?'ok':''}">${STN[n.st]}</span>${lv&&lv.lv?' · '+lv.lv:''} · <span class="jp" style="font-size:16px">${esc(q.t.replace(/[【】]/g,'').slice(0,40))}</span> <span class="note">${n.e.a.length}회 · ${esc(ds[ds.length-1])}</span></summary>${q.h}
        ${wd.length?`<div><span class="rp">모른 단어</span> ${wd.map(w=>{const x=S.words[w];return `<span class="jp hl" style="font-size:17px">${esc(w)}</span><span class="rp" style="font-size:18px"> ${esc(x.r||'')}</span> <span class="note">${esc(x.ko||'')}</span>`}).join(' · ')}</div>`:''}
-       ${n.e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">✗ 오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}${a.why?'<br>내 이유: '+esc(a.why):''}${a.mine?'<br>내 답: '+esc(a.mine):''}${a.fb?'<br>질문·의견: '+esc(a.fb):''}</div>`).join('')}
+       ${n.e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}${a.why?'<br>내 이유: '+esc(a.why):''}${a.mine?'<br>내 답: '+esc(a.mine):''}${a.fb?'<br>질문·의견: '+esc(a.fb):''}</div>`).join('')}
        ${ds.filter(d=>S.judges[d]).map(d=>`<details><summary>AI 판정 (${esc(d)})</summary><pre class="out">${esc(S.judges[d].text)}</pre></details>`).join('')}
-       <div class="row">${stepText(n.e.k,n.e.id,{ja:(n.e.a[n.e.a.length-1]||{}).q})?`<button data-nw="${esc(n.key)}">📖 단어 찾기</button>`:''}<button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div></details>`}).join('')}
+       <div class="row">${stepText(n.e.k,n.e.id,{ja:(n.e.a[n.e.a.length-1]||{}).q})?`<button data-nw="${esc(n.key)}">${ic('book')} 단어 찾기</button>`:''}<button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div></details>`}).join('')}
   h+=judgeUI(jd);
   $('#view').innerHTML=nbCard('복습 · 오답노트',h);bindRv();
   document.querySelectorAll('[data-nf]').forEach(b=>b.onclick=()=>{NF=b.dataset.nf;notesView()});
@@ -395,22 +406,22 @@ function notesView(){
   document.querySelectorAll('[data-nw]').forEach(b=>b.onclick=()=>{const e=S.notes[b.dataset.nw],a0=e.a[e.a.length-1]||{};lookSheet(stepText(e.k,e.id,{ja:a0.q}),'',{src:{k:e.k,id:e.id,d:today()}})});
   $('#nrev').onclick=()=>{const steps=rev.slice(0,10).map(n=>({k:n.e.k,id:n.e.id}));startSession({date:today(),steps,next:{},res:[],i:0,review:true})};
   bindJudge(jd)}
-// 단어장: 풀이 중 ☆로 저장한 단어 + 어휘·한자에서 틀린 단어(자동). 단어장 복습에서 3번 연속 알면 「외움」
+// 단어장: 풀이 중 저장한 단어 + 어휘·한자에서 틀린 단어(자동). 단어장 복습에서 3번 연속 알면 「외움」
 const wSrc=s=>!s?'':`${KN[s.k]||s.k||''}${s.auto?' 오답':''}${s.d?' · '+s.d:''}`;
 function wordsView(){
   const L=Object.values(S.words).filter(w=>!w.del).sort((a,b)=>b.t-a.t),inW=(w,f)=>f==='all'||(f==='done')===(w.st==='done');
   const list=L.filter(w=>inW(w,WF)),todo=L.filter(w=>w.st!=='done').sort((a,b)=>(a.ok-b.ok)||(a.u-b.u));
   const byD={};list.forEach(w=>{const d=new Date(w.t).toLocaleDateString('sv');(byD[d]=byD[d]||[]).push(w)});
   let h=`${rvSwitch()}<button class="pri start" id="wrev" ${todo.length?'':'disabled'}>${todo.length?`단어장 복습 (${Math.min(todo.length,10)}단어)`:'외울 단어가 없어요'}</button>
-   <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">📖 단어 찾기</button></div>
-   <p class="note">문제를 푼 뒤 「📖 이 문제의 단어」에서 ☆을 누른 단어와, 어휘·한자에서 틀린 단어가 모입니다. 단어장 복습에서 세 번 연속 「알았다」면 「외움」으로 갑니다.</p>`;
+   <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">${ic('book')} 단어 찾기</button></div>
+   <p class="note">문제를 푼 뒤 「이 문제의 단어」에서 「모르는 단어로 저장」한 단어와, 어휘·한자에서 틀린 단어가 모입니다. 단어장 복습에서 세 번 연속 「알았다」면 「외움」으로 갑니다.</p>`;
   if(!list.length)h+='<p class="note">해당하는 단어가 없습니다.</p>';
   for(const[d,ws]of Object.entries(byD)){h+=`<h3>${esc(d)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<div class="wrow">
      <div><span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
      <div class="m">${w.ko?esc(w.ko):'<span class="note">뜻 없음 · 네이버에서 확인 뒤 「고치기」로 적어 두세요</span>'}</div>
      ${w.s?`<div class="jp" style="font-size:15px;line-height:1.8">${hlw(w.s,w.w)}</div>`:''}
      <div class="note">${esc(wSrc(w.src))}${w.n?` · 복습 ${w.n}회`:''}${w.ok?` · 연속 ${w.ok}`:''}</div>
-     <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(w.w,'네이버 ↗')}<button data-wx="${esc(w.w)}">빼기</button></div>
+     <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(w.w,'네이버')}<button data-wx="${esc(w.w)}">빼기</button></div>
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`).join('')}
   $('#view').innerHTML=nbCard('복습 · 단어장',h);bindRv();
   const up=(w,f)=>{f(S.words[w]);S.words[w].u=Date.now();save();wordsView();syncNow()};
@@ -464,12 +475,13 @@ function tabs(){const t=$('#tabs');
   if(VIEW==='sess'){const s=S.cur,nm=s&&s.review?'복습':s&&s.test?'레벨 테스트':s&&s.custom?'골라 풀기':'오늘 학습';
     t.innerHTML=`<button id="quit" style="flex:0 0 auto">← 그만하기</button><span class="note" style="align-self:center">${nm} · ${s?Math.min(s.i+1,s.steps.length):0} / ${s?s.steps.length:0} · 나중에 이어서 할 수 있어요</span>`;
     $('#quit').onclick=()=>{VIEW=s&&s.review?'review':s&&s.test?'level':s&&s.custom?'pick':'today';render()};return}
-  t.innerHTML=[['today','오늘'],['review','복습'],['pick','골라 풀기'],['level','실력'],['set','⚙']].map(([k,n])=>`<button data-tab="${k}" class="${VIEW===k?'on':''}${k==='set'?' gear':''}" ${k==='set'?'aria-label="설정" title="설정"':''}>${n}</button>`).join('');
+  t.innerHTML=[['today','오늘'],['review','복습'],['pick','골라 풀기'],['level','실력'],['set','설정']].map(([k,n])=>`<button data-tab="${k}" class="${VIEW===k?'on':''}${k==='set'?' gear':''}" ${k==='set'?'aria-label="설정" title="설정"':''}>${n}</button>`).join('');
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{VIEW=b.dataset.tab;render()})}
 const active=s=>s&&!s.closed&&s.i<s.steps.length;
 // 새 풀이 시작: 오늘 학습을 하던 중에 복습·골라 풀기를 시작하면 오늘 학습은 잠시 보관했다가 끝나면 되돌린다
 function startSession(sess){if(active(S.cur)&&!S.cur.review&&!S.cur.custom&&(sess.review||sess.custom))S.pause=S.cur;S.cur=sess;VIEW='sess';save();render()}
 function render(){
+  {const sb=document.getElementById('selbtn');if(sb)sb.remove()}
   tabs();
   if(VIEW!=='sess'){$('#bar').innerHTML='';CURLV=null;return ({today:home,review:notesView,pick:pickView,level:levelView,set:setView})[VIEW]()}
   const s=S.cur;drawBar();
@@ -499,7 +511,7 @@ function home(){
   const doneToday=S.log.some(l=>l.date===today()&&!l.kind);
   let main;
   if(daily)main=`<button class="pri start" id="resume">오늘 학습 이어서 하기 (${daily.i+1} / ${daily.steps.length})</button>`;
-  else if(doneToday)main=`<div class="res ok">오늘 학습을 마쳤어요 ✓</div><div class="row"><button id="start">새 루틴 한 번 더</button></div>`;
+  else if(doneToday)main=`<div class="res ok">오늘 학습을 마쳤어요</div><div class="row"><button id="start">새 루틴 한 번 더</button></div>`;
   else main=`<button class="pri start" id="start">오늘 학습 시작</button>`;
   $('#view').innerHTML=card('오늘',`${main}
    ${other?`<div class="row"><button id="other">하던 ${other.review?'복습':other.test?'레벨 테스트':'골라 풀기'} 이어서 (${other.i+1} / ${other.steps.length})</button></div>`:''}
@@ -530,7 +542,7 @@ function pickView(){const unit=['reading','tg'].includes(PK.a)?'지문':'문항'
   $('#view').innerHTML=card('골라 풀기',`<p class="note">영역을 고르고 개수를 정하세요. 아직 안 푼 문제부터, 그다음 오래전에 푼 문제 순서로 나옵니다. 틀린 문제는 복습에 들어갑니다(오늘 루틴의 순서에는 영향 없음).</p>
    <div class="opts">${PICK.map(([k,n])=>`<button class="opt ${PK.a===k?'okb':''}" data-pa="${k}">${n} <span class="note">· ${cnt(k)}${['reading','tg'].includes(k)?'지문':''}</span></button>`).join('')}</div>
    <div class="chips"><span class="note">개수</span>${ns.map(n=>`<button data-pn="${n}" class="${PK.n===n?'on':''}">${n}${unit}</button>`).join('')}</div>
-   <button class="pri start" id="pgo">풀기 시작</button><p class="note">출제 레벨 ${esc(S.levels.join('·'))} (⚙ 설정에서 바꿈)</p>`);
+   <button class="pri start" id="pgo">풀기 시작</button><p class="note">출제 레벨 ${esc(S.levels.join('·'))} (설정에서 바꿈)</p>`);
   document.querySelectorAll('[data-pa]').forEach(b=>b.onclick=()=>{PK.a=b.dataset.pa;pickView()});
   document.querySelectorAll('[data-pn]').forEach(b=>b.onclick=()=>{PK.n=+b.dataset.pn;pickView()});
   $('#pgo').onclick=()=>{const steps=pickSteps(PK.a,PK.n);if(!steps.length)return;startSession({date:today(),steps,next:{},res:[],i:0,custom:true,area:PK.a})}}
@@ -541,6 +553,7 @@ function setView(){
    <p class="note">${lvSummary()}</p>
    <div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>화면</b></div><div class="chips">${[['','기기 설정대로'],['light','밝게'],['dark','어둡게']].map(([v,n])=>`<button data-th="${v}" class="${(S.pref.theme||'')===v?'on':''}">${n}</button>`).join('')}</div>
+   <div><b>공책 글씨</b> <span class="note">(복습 탭의 오답노트·단어장)</span></div><div class="chips">${[['poor','또박또박 손글씨'],['gowun','단정한 글씨'],['melody','동글 손글씨'],['gaegu','자유 손글씨']].map(([v,n])=>`<button data-hd="${v}" class="${(S.pref.hand||'poor')===v?'on':''}" style="font-family:${{poor:'Poor Story',gowun:'Gowun Dodum',melody:'Hi Melody',gaegu:'Gaegu'}[v]}">${n}</button>`).join('')}</div>
    <div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
    <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
    ${S.ux.length?`<details><summary>저장된 메모 보기</summary>${S.ux.slice().reverse().map(u=>`<p class="note"><b>${esc(new Date(u.t).toLocaleDateString('sv'))}</b> ${esc(u.text)}</p>`).join('')}</details>`:''}
@@ -548,6 +561,7 @@ function setView(){
    <details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`);
   document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()});
   document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
+  document.querySelectorAll('button[data-hd]').forEach(b=>b.onclick=()=>{S.pref.hand=b.dataset.hd;save();applyPref();render()});
   document.querySelectorAll('button[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
   $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
   bindRec(render);bindSync(render)}
@@ -555,7 +569,7 @@ function vListen(st,lab){
   const x=find('listen',st.id),r=S.cur.res[S.cur.i];
   const ans=r?r.pick:null;
   let h=`<p class="note">음성을 듣고 가장 알맞은 대답을 고르세요. 보기는 음성으로만 나옵니다.</p>
-   <div class="row"><button id="play">▶ 듣기</button></div>
+   <div class="row"><button id="play">${ic('play',1)} 듣기</button></div>
    <div class="row">${[1,2,3].map(k=>`<button data-k="${k}" class="${ans?(k===x.ans?'okb':k===ans?'badb':''):''}" ${ans?'disabled':''}>${k}</button>`).join('')}</div>`;
   if(ans){const ok=ans===x.ans;
     h+=`<div class="res ${ok?'ok':'bad'}">${ok?'정답':'오답'} · 정답 ${x.ans}번</div>
