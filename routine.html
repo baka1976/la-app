@@ -543,6 +543,19 @@ const hlw=(s,w)=>{s=String(s||'');const i=w?s.indexOf(w):-1;return i<0?esc(s):es
 const sentOf=(t,sf)=>{const L=String(t||'').replace(/[【】]/g,'').split(/(?<=[。！？\n])/).map(x=>x.trim()).filter(Boolean);const s=L.find(x=>x.includes(sf))||'';return s.length>90?s.slice(0,90)+'…':s};
 const liveW=w=>S.words[w]&&!S.words[w].del;
 // 단어장에 넣기/빼기. 풀이 중이면 그 문항에 「모른 단어」로 붙여 오답노트에도 남긴다
+// 2026-11-10 단어장 5단계: 모르는 이유(why: kanji 한자 / yomi 읽기 / mean 뜻 / use 쓰임), 종류(kind: '' 단어 / p 문형 / x 표현), 직접 등록, 이유별 카드
+const WHY=[['yomi','읽기'],['mean','뜻'],['use','쓰임'],['kanji','한자']],WHYN=Object.fromEntries(WHY),KINDN={'':'단어',p:'문형',x:'표현'};
+// 이유를 고르지 않은 말은 그 말의 책 문제를 틀린 유형으로 짐작한다(한자 읽기 → 읽기, 표기 → 한자, 용법 → 쓰임, 그 밖 → 뜻)
+function whyOf(w){if(w.why&&w.why.length)return w.why;if(w.kind)return[];const g=GRP['w:'+w.w],o=new Set();
+  if(g)for(const m of g.m){if(m[2]!=='q')continue;const st=stepOf(m[0],m[1]),v=st&&S.seen[seenKey(st)];if(!v||v.ok)continue;const x=m[0]==='mock'?find('mock',m[1]):null;
+    o.add(m[0]==='kr'||(x&&x.type==='kanji_reading')?'yomi':x&&x.type==='orthography'?'kanji':x&&x.type==='usage'?'use':'mean')}
+  return[...o]}
+const whyChips=w=>`<div class="chips"><span class="note">모르는 것</span>${WHY.map(([k,n])=>`<button data-wy="${esc(w.w)}|${k}" class="${(w.why||[]).includes(k)?'on':''}">${n}</button>`).join('')}</div>`;
+function bindWhy(root,after){root.querySelectorAll('[data-wy]').forEach(b=>b.onclick=()=>{const i=b.dataset.wy.lastIndexOf('|'),w=S.words[b.dataset.wy.slice(0,i)],k=b.dataset.wy.slice(i+1);if(!w)return;
+  const a=new Set(w.why||[]);a.has(k)?a.delete(k):a.add(k);w.why=[...a];w.u=Date.now();save();after&&after()})}
+// 그 말이 든 책 문제(묶음)
+const wordGrp=w=>{const k=(w.kind==='p'?'p:':'w:')+(w.kind==='p'?pCore(w.w):w.w);return GRP[k]?k:null};
+const wordQs=w=>{const k=wordGrp(w);return k?GRP[k].m.filter(m=>'qd'.includes(m[2])).map(m=>stepOf(m[0],m[1])).filter(st=>st&&st.k!=='tg'):[]};
 function toggleWord(e,ctx){const w=e[0],now=Date.now();
   if(liveW(w)){S.words[w].del=true;S.words[w].u=now;if(S.cur&&S.cur.wsav)Object.values(S.cur.wsav).forEach(a=>{const i=a.indexOf(w);if(i>=0)a.splice(i,1)})}
   else{const o=S.words[w]||{};S.words[w]={w,r:o.r||e[1]||'',ko:o.ko||e[2]||'',t:o.t&&!o.del?o.t:now,u:now,ok:0,n:o.n||0,st:'',del:false,src:ctx.src||o.src||null,s:ctx.s||o.s||'',ex:o.ex||[],kind:o.kind||'',keys:[...new Set([...(o.keys||[]),...(ctx.src&&ctx.src.id!=null?[ctx.src.k+'|'+ctx.src.id]:[])])]};
@@ -552,7 +565,7 @@ function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
   return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
-    <div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}${w.length>=2&&KJ.test(w)?`<span class="note" style="align-self:center">한자 음·훈: ${[...new Set(w.match(/[㐀-鿿]/g))].slice(0,5).map(c=>`<a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px;margin:0 3px">${esc(c)}</a>`).join('')}</span>`:''}</div></div>`}
+    <div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}${w.length>=2&&KJ.test(w)?`<span class="note" style="align-self:center">한자 음·훈: ${[...new Set(w.match(/[㐀-鿿]/g))].slice(0,5).map(c=>`<a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px;margin:0 3px">${esc(c)}</a>`).join('')}</span>`:''}</div>${on?whyChips(sw):''}</div>`}
 // 아래에서 올라오는 단어 창: 이 문제의 단어 목록 + 검색칸(드래그로 고른 글자가 들어옴)
 function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
   const hits=wordsIn(text),bg=document.createElement('div');bg.className='sheet-bg';bg.id='sheet';
@@ -560,10 +573,26 @@ function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
     const sr=qq.trim()?searchDict(qq.trim()):[];
     bg.innerHTML=`<section class="card nb sheet" role="dialog" aria-label="단어 찾기"><div class="row" style="justify-content:space-between;align-items:center"><div class="kind">단어 찾기</div><button id="lx">닫기</button></div>
       <input id="lq" placeholder="찾을 말 (일본어·한자 한 글자도 됨)" value="${esc(qq)}" autocomplete="off" spellcheck="false">
-      ${qq.trim()?`<div>${sr.map(h=>wordRow(h,ctx)).join('')||'<p class="note">앱 사전에 없습니다.</p>'}<div class="row" style="margin-top:6px">${naverA(qq.trim())}</div></div>`:''}
+      ${qq.trim()?`<div>${sr.map(h=>wordRow(h,ctx)).join('')||'<p class="note">앱 사전에 없습니다. 아래 「직접 등록」으로 넣을 수 있습니다.</p>'}<div class="row" style="margin-top:6px">${naverA(qq.trim())}</div>
+        <details id="madd" ${sr.some(h=>h.e[0]===qq.trim())?'':'open'}><summary><b>직접 등록</b> <span class="note">사전에 없는 말·문형·표현을 내가 적어 단어장에</span></summary>
+         <p class="note">네이버 사전에서 읽기와 뜻을 확인한 뒤 적으세요(자동으로 가져오지는 못합니다).</p>
+         <input id="mw" value="${esc((S.words[qq.trim()]||{}).w||qq.trim())}" placeholder="말 (예: 土中, 〜とあいまって)" autocomplete="off" spellcheck="false">
+         <div class="row"><input id="mr" value="${esc((S.words[qq.trim()]||{}).r||'')}" placeholder="읽기(히라가나 · 로마자로 쳐도 바뀜)" style="flex:1;min-width:140px" autocomplete="off"><input id="mk" value="${esc((S.words[qq.trim()]||{}).ko||'')}" placeholder="뜻" style="flex:2;min-width:160px" autocomplete="off"></div>
+         <div class="chips"><span class="note">종류</span>${Object.entries(KINDN).map(([k,n])=>`<button data-mk="${k}" class="${((S.words[qq.trim()]||{}).kind||(/^[〜~～]/.test(qq.trim())?'p':''))===k?'on':''}">${n}</button>`).join('')}</div>
+         <div class="chips"><span class="note">모르는 것</span>${WHY.map(([k,n])=>`<button data-my="${k}" class="${((S.words[qq.trim()]||{}).why||[]).includes(k)?'on':''}">${n}</button>`).join('')}</div>
+         <div class="row"><button class="pri" id="msave">단어장에 저장</button><span class="note" id="mmsg"></span></div></details></div>`:''}
       ${hits.length?`<h3>이 문제의 단어 ${hits.length}</h3><p class="note">책 단어 사전에서 찾은 읽기·뜻입니다. 모르는 단어는 「모르는 단어로 저장」을 눌러 단어장에 넣으세요${ctx.inSess?' (이 문제도 오답노트에 남습니다)':''}.</p>${hits.map(h=>wordRow(h,{...ctx,s:sentOf(text,h.sf)})).join('')}`:(text?'<p class="note">이 문제에서 찾은 단어가 없습니다. 위 칸에 직접 넣어 찾으세요.</p>':'')}
     </section>`;
     $('#lx').onclick=closeSheet;const inp=$('#lq');inp.oninput=()=>{clearTimeout(inp._t);inp._t=setTimeout(()=>{const p=inp.selectionStart;draw();const n=$('#lq');n.focus();n.setSelectionRange(p,p)},250)};
+    bindWhy(bg,()=>{const y=bg.firstChild.scrollTop;draw();bg.firstChild.scrollTop=y});
+    bg.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{bg.querySelectorAll('[data-mk]').forEach(x=>x.classList.toggle('on',x===b))});
+    bg.querySelectorAll('[data-my]').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+    {const mr=$('#mr');if(mr)mr.addEventListener('input',()=>{const v=R2K(mr.value);if(v!==mr.value)mr.value=v})}
+    {const ms=$('#msave');if(ms)ms.onclick=()=>{const w=$('#mw').value.trim();if(!w){$('#mmsg').textContent='말을 적어 주세요.';return}
+      const now=Date.now(),o=S.words[w]||{},kind=(bg.querySelector('[data-mk].on')||{dataset:{mk:''}}).dataset.mk,why=[...bg.querySelectorAll('[data-my].on')].map(b=>b.dataset.my);
+      S.words[w]={w,r:$('#mr').value.trim().replace(/n$/,'ん'),ko:$('#mk').value.trim(),kind,why,ex:o.ex||[],keys:[...new Set([...(o.keys||[]),...(ctx.src&&ctx.src.id!=null?[ctx.src.k+'|'+ctx.src.id]:[])])],t:o.t&&!o.del?o.t:now,u:now,ok:0,n:o.n||0,st:'',del:false,src:o.src&&!o.del?o.src:{...(ctx.src||{k:'wb',d:today()}),manual:1},s:o.s||ctx.s||sentOf(text,w)||''};
+      if(ctx.inSess&&S.cur){const s=S.cur;s.wsav=s.wsav||{};const a=s.wsav[s.i]=s.wsav[s.i]||[];if(!a.includes(w))a.push(w)}
+      save();syncNow();const y=bg.firstChild.scrollTop;draw();bg.firstChild.scrollTop=y;const m=$('#mmsg');if(m)m.textContent='「'+w+'」 저장했습니다.';updLook()}}
     bg.querySelectorAll('[data-tw]').forEach(b=>b.onclick=()=>{const w=b.dataset.tw,h=[...sr,...hits].find(x=>x.e[0]===w);toggleWord(h?h.e:[w,'',''],{...ctx,s:h&&h.sf?sentOf(text,h.sf):ctx.s});const y=bg.firstChild.scrollTop;draw();bg.firstChild.scrollTop=y;updLook()})};
   bg.onclick=ev=>{if(ev.target===bg)closeSheet()};document.body.appendChild(bg);draw();
   if(q)setTimeout(()=>{const n=$('#lq');if(n)n.focus()},50)}
@@ -617,6 +646,7 @@ const sAvg=w=>(w[0]+w[1]+w[2])/3;
 // 판정에서 읽은 단어·문형을 단어장에 넣는다(지운 단어는 되살리지 않음). 판정 저장·다른 기기 판정 합칠 때
 function applyWrite(d){for(const[key,e]of Object.entries(S.notes)){if(!['hanyeok','pc','kw'].includes(e.k)||e.id==null||!e.a.some(a=>a.d===d))continue;
     const sec=jSec(d,key),j=wJudge(sec),w=sec?parseW(sec):[];if(!j||(!j.v&&!w.length))continue;
+    j.ch.forEach(c2=>{const to=c2.to;if(!to||to.length>30||/[가-힣]/.test(to)||S.words[to])return;S.words[to]={w:to,r:'',ko:c2.why||'',kind:'x',from:c2.from,why:['use'],ex:j.fix?[[j.fix,'']]:[],keys:[key],t:Date.now(),u:Date.now(),ok:0,n:0,st:'',del:false,src:{k:e.k,id:e.id,d,ai:1},s:''}});
     const bad=j.v?WV.indexOf(j.v)>=2:sAvg(w[0])<4,c=S.srs[key],tag=d+':'+(j.v||'s');if(c&&c.jd===tag)continue;if(c&&c.jd&&c.jd.slice(0,10)>d)continue;
     if(bad)S.srs[key]={k:e.k,id:e.id,wr:1,box:0,due:addDays(d,3),t:Date.now(),last:d,why:'write',jd:tag};
     else if(c&&!c.done){const box=c.box+1;S.srs[key]=box>=SRS_INT.length?{...c,done:true,jd:tag,t:Date.now()}:{...c,box,due:addDays(d,SRS_INT[box]),jd:tag,t:Date.now()}}}}
@@ -790,37 +820,54 @@ function notesView(){
   $('#nrev').onclick=()=>{const steps=rev.slice(0,10).map(n=>({k:n.e.k,id:n.e.id}));startSession({date:today(),steps,next:{},res:[],i:0,review:true})};
   bindJudge(jd)}
 // 단어장: 풀이 중 저장한 단어 + 틀린 어휘·한자·문형(자동) + AI 판정의 단어·문형. 단어장 복습에서 3번 연속 알면 「외움」
-const wSrc=s=>!s?'':`${s.ai?'AI 판정 · ':''}${KN[s.k]||''}${s.auto?' 오답':''}${s.d?' · '+s.d:''}`;
+const wSrc=s=>!s?'':`${s.manual?'직접 등록 · ':''}${s.ai?'AI 판정 · ':''}${KN[s.k]||''}${s.auto?' 오답':''}${s.d?' · '+s.d:''}`;
+let WK='all';
 function wordsView(){
-  const L=Object.values(S.words).filter(w=>!w.del).sort((a,b)=>b.t-a.t),inW=(w,f)=>f==='all'||(f==='done')===(w.st==='done');
+  const L0=Object.values(S.words).filter(w=>!w.del).sort((a,b)=>b.t-a.t),L=L0.filter(w=>WK==='all'||(w.kind||'')===WK),inW=(w,f)=>f==='all'||(f==='done')===(w.st==='done');
   const list=L.filter(w=>inW(w,WF)),todo=L.filter(w=>w.st!=='done').sort((a,b)=>(a.ok-b.ok)||(a.u-b.u));
   const byD={};list.forEach(w=>{const d=new Date(w.t).toLocaleDateString('sv');(byD[d]=byD[d]||[]).push(w)});
   let h=`${rvSwitch()}<button class="pri start" id="wrev" ${todo.length?'':'disabled'}>${todo.length?`단어장 복습 (${Math.min(todo.length,10)}개)`:'외울 단어가 없어요'}</button>
-   <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">${ic('book')} 단어 찾기</button></div>
-   <p class="note">문제를 푼 뒤 저장한 단어, 틀린 어휘·한자·문형, AI 판정에서 설명한 단어·문형이 모입니다. 예문은 AI 예문 → 책 예문 → 문제 문장 순서로 세 개까지. 단어장 복습에서 세 번 연속 「알았다」면 「외움」으로 갑니다.</p>`;
+   <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">${ic('book')} 단어 찾기 · 직접 등록</button></div>
+   <div class="chips"><span class="note">종류</span>${[['all','전체'],['','단어'],['p','문형'],['x','표현']].map(([k,n])=>`<button data-wkd="${k}" class="${WK===k?'on':''}">${n} ${L0.filter(x=>k==='all'||(x.kind||'')===k).length}</button>`).join('')}</div>
+   <div class="chips"><span class="note">이유별 카드</span>${WHY.map(([k,n])=>{const c=todo.filter(w=>whyOf(w).includes(k)&&(k==='mean'||k==='use'||w.r)).length;return `<button data-wc="${k}" ${c?'':'disabled'}>${n} ${c}</button>`}).join('')}</div>
+   <p class="note">문제를 푼 뒤 저장한 단어, 직접 등록한 말, 틀린 어휘·한자·문형, AI 판정에서 설명한 단어·문형과 고쳐 준 표현이 모입니다. 「모르는 것」을 고르면 그에 맞는 카드(읽기·뜻·쓰임·한자)로 복습합니다. 예문은 AI 예문 → 책 예문 → 문제 문장 순서로 세 개까지. 단어장 복습에서 세 번 연속 「알았다」면 「외움」으로 갑니다.</p>`;
   if(!list.length)h+='<p class="note">해당하는 단어가 없습니다.</p>';
   for(const[d,ws]of Object.entries(byD)){h+=`<h3>${esc(d)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<div class="wrow">
-     <div>${w.kind==='p'?'<span class="tag">문형</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
+     <div>${w.kind==='p'?'<span class="tag">문형</span> ':w.kind==='x'?'<span class="tag">표현</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
      <div class="m">${w.ko?esc(w.ko):'<span class="note">뜻 없음 · 네이버에서 확인 뒤 「고치기」로 적어 두세요</span>'}</div>
-     ${exHtml(w,wCore(w))}${altsHtml(w)}
+     ${w.from?`<div class="note">내가 쓴 표현: <span class="jp">${esc(w.from)}</span></div>`:''}${exHtml(w,wCore(w))}${altsHtml(w)}
+     ${whyChips(w)}${!(w.why||[]).length&&whyOf(w).length?`<div class="note">틀린 문제로 짐작한 이유: ${whyOf(w).map(k=>WHYN[k]).join(' · ')}</div>`:''}
      <div class="note">${esc(wSrc(w.src))}${w.n?` · 복습 ${w.n}회`:''}${w.ok?` · 연속 ${w.ok}`:''}</div>
-     <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}<button data-wx="${esc(w.w)}">빼기</button></div>
+     <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}${wordQs(w).length?`<button data-wg="${esc(w.w)}">이 말의 책 문제 ${wordQs(w).length}</button>`:''}<button data-wx="${esc(w.w)}">빼기</button></div>
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`).join('')}
   $('#view').innerHTML=nbCard('복습 · 단어장',h);bindRv();
   const up=(w,f)=>{f(S.words[w]);S.words[w].u=Date.now();save();wordsView();syncNow()};
   document.querySelectorAll('[data-wf]').forEach(b=>b.onclick=()=>{WF=b.dataset.wf;wordsView()});
+  document.querySelectorAll('[data-wkd]').forEach(b=>b.onclick=()=>{WK=b.dataset.wkd;wordsView()});
+  bindWhy($('#view'),()=>{const y=scrollY;wordsView();scrollTo(0,y);syncNow()});
+  document.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{const k=b.dataset.wc,ws=todo.filter(w=>whyOf(w).includes(k)&&(k==='mean'||k==='use'||w.r)).slice(0,10);if(ws.length)startSession({date:today(),steps:ws.map(w=>({k:'wb',id:w.w,face:k})),next:{},res:[],i:0,review:true})});
+  document.querySelectorAll('[data-wg]').forEach(b=>b.onclick=()=>{const st=wordQs(S.words[b.dataset.wg]).slice(0,6);if(st.length)startSession({date:today(),steps:st,next:{},res:[],i:0,custom:true,area:'grp'})});
   document.querySelectorAll('[data-wd]').forEach(b=>b.onclick=()=>up(b.dataset.wd,x=>{x.st=x.st==='done'?'':'done';x.ok=0}));
   document.querySelectorAll('[data-wx]').forEach(b=>b.onclick=()=>up(b.dataset.wx,x=>{x.del=true}));
   document.querySelectorAll('[data-wes]').forEach(b=>b.onclick=()=>{const w=b.dataset.wes,r=document.querySelector(`[data-wer="${CSS.escape(w)}"]`).value.trim(),k=document.querySelector(`[data-wek="${CSS.escape(w)}"]`).value.trim();up(w,x=>{x.r=r;x.ko=k})});
   $('#wfind').onclick=()=>lookSheet('','',{src:{k:'wb',d:today()}});
   $('#wrev').onclick=()=>startSession({date:today(),steps:todo.slice(0,10).map(w=>({k:'wb',id:w.w})),next:{},res:[],i:0,review:true})}
 function vWb(st,lab){const s=S.cur,w=S.words[st.id]||{w:st.id},r=s.res[s.i],show=r||(s.flip||{})[s.i];
-  let h=`<p class="note">${w.kind==='p'?'문형의 뜻과 쓰임을 떠올려 예문을 하나 소리 내어 만들어 본 뒤 확인하세요.':'읽기와 뜻을 떠올려 소리 내어 말한 뒤 확인하세요.'}</p><div class="jp big">${esc(w.w)}</div>`;
-  if(!show)h+=`<div class="row"><button class="pri" id="flip">${w.kind==='p'?'뜻 · 예문 보기':'읽기 · 뜻 보기'}</button></div>`;
-  else{h+=`${w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}<p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>${exHtml(w,wCore(w))}${altsHtml(w)}<div class="row">${naverA(wCore(w)||w.w)}</div>`;
-    h+=r?`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'알았다':'다시 볼 것'}</div>${nextBtn()}`:`<div class="row"><button class="pri" data-k="1">알았다</button><button data-k="0">몰랐다</button></div>`}
+  // 앞면: 읽기 카드(말을 보고 읽기를 써 봄) / 뜻 카드(말+읽기를 보고 뜻) / 쓰임 카드(뜻과 빈칸 예문을 보고 말) / 한자 카드(읽기+뜻을 보고 한자 표기) / 그 밖은 예전처럼
+  const fs=(st.face?[st.face]:whyOf(w)).filter(k=>(k==='mean'||k==='use')||w.r),face=w.kind==='p'?'':fs.length?fs[(w.n||0)%fs.length]:'';
+  const ex0=(w.ex||[]).find(e=>e&&e[0]&&e[0].includes(w.w))||(w.s&&w.s.includes(w.w)?[w.s,'']:null),typed=(s.typed||{})[s.i]||'';
+  const HOW={yomi:'읽기를 써 본 뒤 확인하세요(히라가나 또는 로마자).',mean:'뜻을 떠올려 말한 뒤 확인하세요.',use:'뜻과 문장을 보고, 빈칸에 들어갈 말을 떠올려 말한 뒤 확인하세요.',kanji:'읽기와 뜻을 보고 한자 표기를 떠올린 뒤(써 보면 더 좋습니다) 확인하세요.'};
+  let h=`<p class="note">${face?`<span class="lvb">${WHYN[face]} 카드</span> `+HOW[face]:w.kind==='p'?'문형의 뜻과 쓰임을 떠올려 예문을 하나 소리 내어 만들어 본 뒤 확인하세요.':w.kind==='x'?'이 표현을 넣어 한 문장을 소리 내어 만들어 본 뒤 확인하세요.':'읽기와 뜻을 떠올려 소리 내어 말한 뒤 확인하세요.'}</p>`;
+  if(face==='use')h+=`<p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>${ex0?`<div class="jp">${esc(ex0[0].replace(w.w,'＿＿＿'))}</div>${ex0[1]?`<div class="ko">${esc(ex0[1])}</div>`:''}`:''}`;
+  else if(face==='kanji')h+=`<div class="jp big" style="color:var(--red)">${esc(w.r)}</div><p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>`;
+  else h+=`<div class="jp big">${esc(w.w)}</div>${face==='mean'&&w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}`;
+  if(!show)h+=(face==='yomi'?`<textarea id="ans" placeholder="よみ" style="min-height:48px">${esc(typed)}</textarea>`:'')+`<div class="row"><button class="pri" id="flip">${face==='yomi'?'확인':face==='use'||face==='kanji'?'말 보기':w.kind==='p'?'뜻 · 예문 보기':face==='mean'?'뜻 보기':'읽기 · 뜻 보기'}</button></div>`;
+  else{const hit=face==='yomi'&&typed?fNorm(typed)===fNorm(w.r):null;
+    h+=`${face==='use'||face==='kanji'?`<div class="jp big">${esc(w.w)}</div>`:''}${w.r&&face!=='kanji'&&face!=='mean'?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}${hit!==null?`<div class="res ${hit?'ok':'bad'}">내가 쓴 읽기 「${esc(typed)}」 — ${hit?'맞음':'다름'}</div>`:''}<p style="text-align:center"><b>${esc(w.ko||'(뜻 없음)')}</b></p>${w.from?`<p class="note">내가 쓴 표현: <span class="jp">${esc(w.from)}</span></p>`:''}${exHtml(w,wCore(w))}${altsHtml(w)}<div class="row">${naverA(wCore(w)||w.w)}</div>`;
+    h+=r?`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'알았다':'다시 볼 것'}</div>${nextBtn()}`:`<div class="row"><button class="${hit===false?'':'pri'}" data-k="1">알았다</button><button class="${hit===false?'pri':''}" data-k="0">몰랐다</button></div>`}
   $('#view').innerHTML=card('단어장 복습 · '+lab.replace(/^단어장\s*/,''),h);
-  const f=$('#flip');if(f)f.onclick=()=>{s.flip=s.flip||{};s.flip[s.i]=1;save();render()};
+  const ta=$('#ans');if(ta)ta.oninput=()=>{s.typed=s.typed||{};s.typed[s.i]=ta.value;save()};
+  const f=$('#flip');if(f)f.onclick=()=>{if(ta){ta.blur();s.typed=s.typed||{};s.typed[s.i]=ta.value.replace(/([ぁ-ゖ])nn?$/,'$1ん')}s.flip=s.flip||{};s.flip[s.i]=1;save();render()};
   document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const ok=b.dataset.k==='1',x=S.words[st.id];
     if(x){x.n=(x.n||0)+1;x.ok=ok?(x.ok||0)+1:0;if(x.ok>=3)x.st='done';x.u=Date.now()}rec({k:'wb',id:st.id,ok});render()});bindNext()}
 
@@ -870,7 +917,7 @@ const R2K=(()=>{const T={a:'あ',i:'い',u:'う',e:'え',o:'お',shi:'し',chi:'
       if(nx&&c===nx&&/[kstcphmrgzdbjfwy]/.test(c)){o+=up?'ッ':'っ';i++;continue}
       if(c==='t'&&nx==='c'){o+=up?'ッ':'っ';i++;continue}
       o+=ch;i++}return o}})();
-function romaBind(){const t=$('#ans'),s=S.cur;if(!t||!s||VIEW!=='sess')return;const st=s.steps[s.i];if(!st||!['hanyeok','pc','kw','rw','write','write2','fill'].includes(st.k))return;
+function romaBind(){const t=$('#ans'),s=S.cur;if(!t||!s||VIEW!=='sess')return;const st=s.steps[s.i];if(!st||!['hanyeok','pc','kw','rw','write','write2','fill','wb'].includes(st.k))return;
   t.insertAdjacentHTML('afterend',`<div class="chips" id="romab"><span class="note">일본어 자판이 없으면</span><button data-ro="1" class="${S.pref.roma?'on':''}">로마자로 치기 (かな로 바뀜)</button><span class="note">${S.pref.roma?'예: gakkou → がっこう · 대문자 KOSUTO → コスト · ん은 nn · 한자는 가나로 써도 됩니다':''}</span></div>`);
   $('#romab [data-ro]').onclick=()=>{S.pref.roma=!S.pref.roma;save();render()};
   if(S.pref.roma)t.addEventListener('input',ev=>{if(ev.isComposing)return;const v=t.value,p=t.selectionStart,head=R2K(v.slice(0,p)),tail=v.slice(p);if(head!==v.slice(0,p)){t.value=head+tail;t.setSelectionRange(head.length,head.length)}},true);
@@ -1457,7 +1504,9 @@ function autoWords(s){s.steps.forEach((st,i)=>{const r=s.res[i];if(!r||r.ok!==fa
 // 끝 화면: 점수 + 틀린 것만 + 버튼 두 개(판정 요청문 복사 · 처음으로). 판정 붙여넣기는 그 아래
 function finish(){
   const s=S.cur,rp=report(s),kind=s.review?'review':s.test?'test':s.custom?'custom':'';CURLV=null;$('#bar').innerHTML='';
-  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n,...(kind?{kind}:{})});S.log=S.log.slice(-200);autoWords(s);addNotes(s);s.steps.forEach((st,i)=>{const c=st.wrOf&&S.srs[st.wrOf];if(c&&s.res[i]&&s.res[i].shown)c.due=addDays(today(),3)});Object.entries(s.uxq||{}).forEach(([i,v])=>{v=(v||'').trim();const st=s.steps[i];if(v&&st)S.ux.push({t:Date.now()+(+i),text:v,key:st.k+'|'+(st.id??st.tid??(s.date+'#'+i)),d:s.date})});if(s.test){s.sc=testScore(s);S.tests.push({t:Date.now(),date:s.date,lv:s.lv,sc:s.sc})}s.closed=true;save();syncNow().then(r=>{const e=$('#fsync');if(e&&r!=='off')e.textContent=r==='ok'?'기록을 동기화했습니다.':'동기화 실패: '+SY.err})}
+  if(!s.closed){Object.assign(S.ptr,s.next);S.log.push({date:s.date,ok:rp.ok,n:rp.n,...(kind?{kind}:{})});S.log=S.log.slice(-200);autoWords(s);s.steps.forEach((st,i)=>{const r0=s.res[i];if(!r0||r0.ok!==false||st.id==null)return;const x=['moji','gram'].includes(st.k)?find('mock',st.id):null;
+      const y=st.k==='kr'||st.k==='kanji'||(x&&x.type==='kanji_reading')?'yomi':x&&x.type==='orthography'?'kanji':x&&x.type==='usage'?'use':['v5','vocab','moji'].includes(st.k)?'mean':'';if(!y)return;
+      Object.values(S.words).forEach(w=>{if(!w.del&&w.src&&w.src.auto&&w.src.k===st.k&&w.src.id===st.id&&!(w.why||[]).includes(y)){w.why=[...(w.why||[]),y];w.u=Date.now()}})});addNotes(s);s.steps.forEach((st,i)=>{const c=st.wrOf&&S.srs[st.wrOf];if(c&&s.res[i]&&s.res[i].shown)c.due=addDays(today(),3)});Object.entries(s.uxq||{}).forEach(([i,v])=>{v=(v||'').trim();const st=s.steps[i];if(v&&st)S.ux.push({t:Date.now()+(+i),text:v,key:st.k+'|'+(st.id??st.tid??(s.date+'#'+i)),d:s.date})});if(s.test){s.sc=testScore(s);S.tests.push({t:Date.now(),date:s.date,lv:s.lv,sc:s.sc})}s.closed=true;save();syncNow().then(r=>{const e=$('#fsync');if(e&&r!=='off')e.textContent=r==='ok'?'기록을 동기화했습니다.':'동기화 실패: '+SY.err})}
   const wrong=s.steps.map((st,i)=>({st,r:s.res[i]})).filter(x=>x.r&&(x.r.ok===false||x.r.conf==='unsure'));
   const title=x=>{const st=x.st,m=['moji','gram','tg'].includes(st.k)?find('mock',st.id):null,o=m||(OBJ.includes(st.k)?find(st.k,st.id):null);
     const t=m?m.stem:st.k==='listen'&&o?o.q.ja:st.k==='kanji'&&o?o.s:st.k==='v5'&&o?o.jp:st.k==='p630'&&o?o.pattern:st.k==='reading'&&o?o.q.ja:st.id||'';
