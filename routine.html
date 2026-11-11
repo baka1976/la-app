@@ -1340,7 +1340,7 @@ function vP630(st,lab){
   else h+=`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'알고 있음':'다시 볼 문형'}</div>
     ${x.notes.length?`<details open><summary>설명</summary>${x.notes.map(n=>`<p class="note">${esc(n)}</p>`).join('')}</details>`:''}
     ${x.words.length?`<details><summary>단어</summary>${x.words.map(w=>`<p class="note">${esc(w)}</p>`).join('')}</details>`:''}
-    <p class="note">${x.src==='cm'?'Claude가 만든 예문·설명입니다. 이상한 곳이 있으면 아래 칸에 적어 주세요.':x.src==='claude'?'원본 대조 완료':'다른 AI가 옮긴 자료입니다. 이상한 곳이 있으면 아래 칸에 적어 주세요.'}</p>${nextBtn()}`;
+    <p class="note">${x.book?esc(x.book)+' · ':'일본어문형 630 · '}${x.src==='cm'?'Claude가 만든 예문·설명입니다. 이상한 곳이 있으면 아래 칸에 적어 주세요.':x.src==='claude'?'원본 대조 완료':'다른 AI가 옮긴 자료입니다. 이상한 곳이 있으면 아래 칸에 적어 주세요.'}</p>${nextBtn()}`;
   $('#view').innerHTML=card('문형 · '+lab,h);
   document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const ok=b.dataset.k==='1';rec({k:'p630',id:x.id,ok});mark('p630',x.id,ok);render()});bindNext();
 }
