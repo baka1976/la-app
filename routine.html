@@ -126,6 +126,11 @@ button.on-star{border-color:var(--red);color:var(--red)}
 #nums button.playing{outline:3px solid var(--accent);outline-offset:2px}
 #selbtn{display:inline-flex;align-items:center;gap:6px;position:fixed;left:50%;transform:translateX(-50%);bottom:max(16px,env(safe-area-inset-bottom,0px));z-index:40;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .idx{display:block;width:100%;text-align:left;margin:6px 0;padding:10px 12px;line-height:1.5}
+@keyframes flipN{from{opacity:.15;transform:perspective(900px) rotateY(-30deg) translateX(28px)}to{opacity:1;transform:none}}
+@keyframes flipP{from{opacity:.15;transform:perspective(900px) rotateY(30deg) translateX(-28px)}to{opacity:1;transform:none}}
+.page.flipN{animation:flipN .3s ease-out;transform-origin:right center}.page.flipP{animation:flipP .3s ease-out;transform-origin:left center}
+@media(prefers-reduced-motion:reduce){.page.flipN,.page.flipP{animation:none}}
+.pgjump{margin:2px 0 10px}.pgjump input[type=range]{flex:1;min-width:120px}.pgjump input[type=number]{width:70px}
 .pgnav{align-items:center;justify-content:space-between;gap:6px}
 </style></head><body>
 <div class="wrap">
@@ -786,7 +791,27 @@ const openNotes=()=>Object.entries(S.notes).filter(([k,e])=>NG.todo.includes(not
 const rvSwitch=()=>{const nw=Object.values(S.words).filter(w=>!w.del&&w.st!=='done').length;
   return `<div class="chips">${[['notes','오답노트',openNotes()],['words','단어장',nw]].map(([k,n,c])=>`<button data-rv="${k}" class="${RV===k?'on':''}">${n} · 아직 ${c}</button>`).join('')}</div>`};
 const bindRv=()=>document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>{RV=b.dataset.rv;NP=WP=null;notesView()});
-const pgNav=(i,n,extra)=>`<div class="row pgnav"><button id="pidx">← 차례</button><span class="note">${i+1} / ${n}${extra?' · '+extra:''}</span><span><button id="pprev" ${i?'':'disabled'}>이전</button> <button id="pnext" class="pri" ${i<n-1?'':'disabled'}>다음</button></span></div>`;
+const pgNav=(i,n,extra)=>`<div class="row pgnav"><button id="pidx">← 차례</button><span class="note">${i+1} / ${n}쪽${extra?' · '+extra:''}</span><span><button id="pprev" ${i?'':'disabled'}>이전</button> <button id="pnext" class="pri" ${i<n-1?'':'disabled'}>다음</button></span></div>${n>2?`<div class="row pgjump"><input type="range" id="pgr" min="1" max="${n}" value="${i+1}" aria-label="쪽 이동"><input type="number" id="pgn" min="1" max="${n}" value="${i+1}" aria-label="쪽 번호"><button id="pgg">쪽으로</button></div>`:''}`;
+// 2026-11-12 책처럼 넘기기: 차례(묶음 바로 가기)·찾기·책갈피·쪽 바로 가기·넘기는 움직임. 복습 탭(오답노트·단어장)만
+let RVQ='',PGD=0;const RVS={notes:'date',words:'date'};
+const BM=(()=>{try{return JSON.parse(localStorage.getItem('la-bm'))||{}}catch(e){return {}}})(),bmSet=(k,v)=>{if(BM[k]===v)return;BM[k]=v;try{localStorage.setItem('la-bm',JSON.stringify(BM))}catch(e){}};
+const kanaN=s=>(s||'').replace(/^[～〜\-ー\s]+/,'').replace(/[ァ-ヶ]/g,m=>String.fromCharCode(m.charCodeAt(0)-96));
+const kanaI=s=>{const c=kanaN(s).charAt(0);return c>='ぁ'&&c<='ん'?['お','ご','ぞ','ど','の','ぽ','も','よ','ろ','ん'].findIndex(e=>c<=e):10};
+const kanaRow=s=>{const i=kanaI(s);return i>9?'그 밖':'あかさたなはまやらわ'[i]+'행'};
+const rvGrp=arr=>{const gs=[];arr.forEach(x=>{const l=gs[gs.length-1];if(l&&l[0]===x.g)l[1]++;else gs.push([x.g,1])});return gs};
+const pageWrap=h=>`<div class="page ${PGD>0?'flipN':PGD<0?'flipP':''}">${h}</div>`;
+const rvTools=(ph,sorts,gs,bm)=>`<div class="row"><input id="rvq" value="${esc(RVQ)}" placeholder="${ph}" style="flex:1;min-width:140px"><button id="rvqb">찾기</button>${RVQ?'<button id="rvqx">찾기 지우기</button>':''}</div>
+   <div class="chips"><span class="note">차례 순서</span>${sorts.map(([k,n])=>`<button data-rvs="${k}" class="${RVS[RV]===k?'on':''}">${n}</button>`).join('')}</div>
+   ${gs.length>1?`<div class="chips"><span class="note">바로 가기</span>${gs.map(([g,c],i)=>`<button data-toc="${i}">${esc(g)} <span class="note">${c}</span></button>`).join('')}</div>`:''}
+   ${bm?`<button class="idx" id="rvbm"><span class="rp">책갈피</span> 보던 곳 이어 보기 · <span class="jp">${esc(bm)}</span></button>`:''}`;
+const bindTools=(re,goBm)=>{const q=$('#rvq');if(q){const f=()=>{RVQ=q.value.trim();re()};$('#rvqb').onclick=f;q.onkeydown=e=>{if(e.key==='Enter')f()}}
+  ($('#rvqx')||{}).onclick=()=>{RVQ='';re()};($('#rvbm')||{}).onclick=goBm;
+  document.querySelectorAll('[data-rvs]').forEach(b=>b.onclick=()=>{RVS[RV]=b.dataset.rvs;re()});
+  document.querySelectorAll('[data-toc]').forEach(b=>b.onclick=()=>{const t=$('#toc'+b.dataset.toc);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})})};
+const bindPg=(i,n,goI)=>{const on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('pidx',()=>goI(-1));on('pprev',()=>{PGD=-1;goI(i-1)});on('pnext',()=>{PGD=1;goI(i+1)});
+  const r=$('#pgr'),m=$('#pgn'),j=v=>{v=Math.max(1,Math.min(n,+v||1))-1;if(v!==i){PGD=v>i?1:-1;goI(v)}};
+  if(r){r.oninput=()=>{m.value=r.value};r.onchange=()=>j(r.value);on('pgg',()=>j(m.value));m.onkeydown=e=>{if(e.key==='Enter')j(m.value)}}};
+document.addEventListener('keydown',e=>{if(VIEW!=='review'||!(NP||WP)||$('#sheet')||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;const b=e.key==='ArrowRight'?$('#pnext'):e.key==='ArrowLeft'?$('#pprev'):null;if(b&&!b.disabled)b.click()});
 // AI 답 글: 머리줄(#)·굵게(**)만 살리고 나머지는 줄바꿈 그대로
 const aiHtml=t=>esc(String(t).split('\n').filter(l=>!/^\s*(?:[-*•>]\s*)?(?:\*\*)?(단어|문형|예문\s*\d*)(?:\*\*)?\s*[:：]/.test(l)).join('\n').replace(/\n{3,}/g,'\n\n').trim()).split('\n').map(l=>/^#{1,4}\s/.test(l)?`<b>${l.replace(/^#+\s*/,'')}</b>`:l.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')).join('\n');
 // 단어·문형 한 줄(오답노트 안): 형광펜 단어 + 빨간 펜 읽기 + 뜻 + 예문 3개
@@ -799,9 +824,8 @@ function notesView(){
   const dates=[...new Set(S.log.map(l=>l.date))].reverse(),jd=dates[0]||today();
   let h=`${rvSwitch()}<button class="pri start" id="nrev" ${rev.length?'':'disabled'}>${rev.length?`틀린 문제 다시 풀기 (${Math.min(rev.length,10)}문항)`:'다시 풀 문제가 없어요'}</button>
    <div class="chips">${[['todo','아직'],['known','알았다'],['all','전체']].map(([k,n])=>`<button data-nf="${k}" class="${NF===k?'on':''}">${n} ${all.filter(x=>inG(x,k)).length}</button>`).join('')}</div>
-   <p class="note">줄을 누르면 그 문제만 한 장으로 펼쳐집니다. 「다음」이나 옆으로 밀기로 넘깁니다.</p>`;
-  if(!list.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
-  const IT=[];
+   <p class="note">줄을 누르면 그 문제만 한 장으로 펼쳐집니다. 「다음」이나 옆으로 밀기(키보드 ← →)로 넘깁니다.</p>`;
+  let IT=[];
   for(const n of list){const e=n.e,q=noteQ(e),ds=[...new Set(e.a.map(a=>a.d))],d=ds[ds.length-1];
     const asks=e.a.filter(a=>a.fb||a.why).map(a=>[a.fb,a.why].filter(Boolean).join(' / ')),ws=wordsFor(n.key,e),sc=noteSc(n.key,e);
     const secs=ds.map(dd=>[dd,jSec(dd,n.key)]).filter(x=>x[1]),whole=ds.filter(dd=>S.judges[dd]&&!secs.some(x=>x[0]===dd));
@@ -809,7 +833,7 @@ function notesView(){
     const head=asks.length?asks[asks.length-1].replace(/^\[[^\]]+\]\s*/,''):q.t.replace(/[【】]/g,'');
     const wj=WRK.includes(e.k)?noteWj(n.key,e):null;
     const sibs=e.id!=null&&OBJ.includes(e.k)?grpSibs(e.k,e.id):[],sdone=sibs.filter(x=>S.seen[seenKey(x.st)]),sbad=sdone.filter(x=>!S.seen[seenKey(x.st)].ok);
-    IT.push({key:n.key,d,sum:`<span class="stamp ${['fixed','done','pass'].includes(n.st)?'ok':''}">${STN[n.st]}</span> <span class="note">${esc(KN[e.k]||e.k)}${lv&&lv.lv?' · '+lv.lv:''}</span><br><span class="${asks.length?'askt':'jp'}">${esc(head.slice(0,60))}${head.length>60?'…':''}</span>`,body:`${asks.length&&!(asks.length===1&&head.length<=60)?`<div class="ask"><span class="rp">내 질문</span>${asks.map(a=>`<p>${esc(a)}</p>`).join('')}</div>`:''}
+    IT.push({key:n.key,d,kn:KN[e.k]||e.k,txt:(head+' '+q.t+' '+ws.map(x=>x.w+' '+(x.r||'')+' '+(x.ko||'')).join(' ')).replace(/[【】]/g,'').toLowerCase(),sum:`<span class="stamp ${['fixed','done','pass'].includes(n.st)?'ok':''}">${STN[n.st]}</span> <span class="note">${esc(KN[e.k]||e.k)}${lv&&lv.lv?' · '+lv.lv:''}</span><br><span class="${asks.length?'askt':'jp'}">${esc(head.slice(0,60))}${head.length>60?'…':''}</span>`,body:`${asks.length&&!(asks.length===1&&head.length<=60)?`<div class="ask"><span class="rp">내 질문</span>${asks.map(a=>`<p>${esc(a)}</p>`).join('')}</div>`:''}
       ${e.a.some(a=>a.mine)?`<div class="ask"><span class="rp">내 답</span><p class="jp" style="font-size:16px">${esc(e.a[e.a.length-1].mine||'')}</p></div>`:''}
       ${wj&&(wj.v||wj.fix||wj.ch.length)?`<div class="ask">${wj.v?`<span class="stamp ${WV.indexOf(wj.v)<2?'ok':''}">${esc(wj.v)}</span> `:''}${wj.fix?`<span class="rp">교정</span><p class="jp" style="font-size:16px">${esc(wj.fix)}</p>`:''}${wj.ch.map(c=>`<p class="note"><b>${esc(c.kind)}</b> <span class="jp">${esc(c.from)}</span> → <span class="jp hl">${esc(c.to)}</span>${c.why?' · '+esc(c.why):''}</p>`).join('')}</div>`:''}
       ${ws.length?`<div class="wbox"><span class="rp">짚은 단어 · 문형</span>${ws.map(wLine).join('')}</div>`:''}
@@ -820,13 +844,18 @@ function notesView(){
        ${e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}</div>`).join('')}</details>
       ${sibs.length?`<p class="note"><b>묶음 「${esc(sibs[0].key.slice(2))}」</b> 같은 말이 나오는 다른 책 문제 ${sibs.length}개 · 푼 것 ${sdone.length}${sbad.length?' · 틀린 것 '+sbad.length:''}</p>`:''}
       <div class="row">${sibs.length?`<button data-ng="${esc(n.key)}">묶음으로 풀기</button>`:''}${stepText(e.k,e.id,{ja:(e.a[e.a.length-1]||{}).q})?`<button data-nw="${esc(n.key)}">${ic('book')} 단어 찾기</button>`:''}<button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div>`})}
+  if(RVQ)IT=IT.filter(x=>x.txt.includes(RVQ.toLowerCase()));
+  if(RVS.notes==='kind')IT.sort((a,b)=>a.kn.localeCompare(b.kn,'ko'));
+  IT.forEach(x=>x.g=RVS.notes==='kind'?x.kn:x.d);
   const pi=NP?IT.findIndex(x=>x.key===NP):-1;
-  if(pi>=0){const it=IT[pi];h=`${rvSwitch()}${pgNav(pi,IT.length,esc(it.d))}<div class="nitem" style="padding:6px 0">${it.sum}</div>${it.body}`}
-  else{NP=null;let lastD='';for(const it of IT){if(it.d!==lastD){h+=`<h3>${esc(it.d)}</h3>`;lastD=it.d}h+=`<button class="idx" data-np="${esc(it.key)}">${it.sum}</button>`}h+=judgeUI(jd)}
-  $('#view').innerHTML=nbCard('복습 · 오답노트',h);bindRv();
+  if(pi>=0){const it=IT[pi];bmSet('notes',it.key);h=`${rvSwitch()}${pgNav(pi,IT.length,esc(it.g))}${pageWrap(`<div class="nitem" style="padding:6px 0">${it.sum}</div>${it.body}`)}`}
+  else{NP=null;const gs=rvGrp(IT),bm=IT.find(x=>x.key===BM.notes);h+=rvTools('찾기 (문제 글·단어·뜻)',[['date','날짜별'],['kind','영역별']],gs,bm?bm.txt.slice(0,28):'');
+    if(!IT.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
+    let lastG=null,gi=0;for(const it of IT){if(it.g!==lastG){h+=`<h3 id="toc${gi++}">${esc(it.g)}</h3>`;lastG=it.g}h+=`<button class="idx" data-np="${esc(it.key)}">${it.sum}</button>`}h+=judgeUI(jd)}
+  $('#view').innerHTML=nbCard('복습 · 오답노트',h);PGD=0;bindRv();
   document.querySelectorAll('[data-nf]').forEach(b=>b.onclick=()=>{NF=b.dataset.nf;NP=null;notesView()});
   document.querySelectorAll('[data-np]').forEach(b=>b.onclick=()=>{NP=b.dataset.np;notesView();scrollTo(0,0)});
-  {const go=k=>{NP=k;notesView();scrollTo(0,0)},on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('pidx',()=>go(null));on('pprev',()=>go(IT[pi-1].key));on('pnext',()=>go(IT[pi+1].key))}
+  bindPg(pi,IT.length,i=>{NP=i<0?null:IT[i].key;notesView();scrollTo(0,0)});bindTools(()=>{NP=null;notesView()},()=>{NP=BM.notes;notesView();scrollTo(0,0)});
   document.querySelectorAll('[data-ng]').forEach(b=>b.onclick=()=>{const e=S.notes[b.dataset.ng],sb=grpSibs(e.k,e.id).sort((x,y)=>(S.seen[seenKey(x.st)]?1:0)-(S.seen[seenKey(y.st)]?1:0)).slice(0,6);
     startSession({date:today(),steps:[...sb.map(x=>x.st),{k:e.k,id:e.id}],next:{},res:[],i:0,custom:true,area:'grp'})});
   document.querySelectorAll('[data-nd]').forEach(b=>b.onclick=()=>{const e=S.notes[b.dataset.nd];e.st={v:e.st&&e.st.v==='done'?'':'done',t:Date.now()};save();notesView();syncNow()});
@@ -838,14 +867,15 @@ const wSrc=s=>!s?'':`${s.manual?'직접 등록 · ':''}${s.ai?'AI 판정 · ':''
 let WK='all';
 function wordsView(){
   const L0=Object.values(S.words).filter(w=>!w.del).sort((a,b)=>b.t-a.t),L=L0.filter(w=>WK==='all'||(w.kind||'')===WK),inW=(w,f)=>f==='all'||(f==='done')===(w.st==='done');
-  const list=L.filter(w=>inW(w,WF)),todo=L.filter(w=>w.st!=='done').sort((a,b)=>(wLv(a)-wLv(b))||(a.u-b.u));
-  const byD={};list.forEach(w=>{const d=new Date(w.t).toLocaleDateString('sv');(byD[d]=byD[d]||[]).push(w)});
+  let list=L.filter(w=>inW(w,WF));const todo=L.filter(w=>w.st!=='done').sort((a,b)=>(wLv(a)-wLv(b))||(a.u-b.u));
+  if(RVQ){const q=RVQ.toLowerCase();list=list.filter(w=>(w.w+' '+(w.r||'')+' '+(w.ko||'')).toLowerCase().includes(q))}
+  const kana=RVS.words==='kana',wk=w=>kanaN(w.r||w.w),gOf=w=>kana?kanaRow(w.r||w.w):new Date(w.t).toLocaleDateString('sv');
+  if(kana)list=list.slice().sort((a,b)=>(kanaI(wk(a))-kanaI(wk(b)))||(wk(a)<wk(b)?-1:wk(a)>wk(b)?1:0));
   let h=`${rvSwitch()}<button class="pri start" id="wrev" ${todo.length?'':'disabled'}>${todo.length?`단어장 복습 (${Math.min(todo.length,10)}개)`:'외울 단어가 없어요'}</button>
    <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">${ic('book')} 단어 찾기 · 직접 등록</button></div>
    <div class="chips"><span class="note">종류</span>${[['all','전체'],['','단어'],['p','문형'],['x','표현']].map(([k,n])=>`<button data-wkd="${k}" class="${WK===k?'on':''}">${n} ${L0.filter(x=>k==='all'||(x.kind||'')===k).length}</button>`).join('')}</div>
    <div class="chips"><span class="note">단계별</span>${[0,1,2].map(k=>{const c=todo.filter(w=>wLv(w)===k).length;return `<button data-wc="${k}" ${c?'':'disabled'}>${WLN[k]} ${c}</button>`}).join('')}</div>
    <p class="note">문제를 푼 뒤 저장한 단어, 직접 등록한 말, 틀린 어휘·한자·문형, AI 판정에서 설명한 단어·문형과 고쳐 준 표현이 모입니다. 복습은 세 단계입니다: 1 뜻 쓰기 → 2 읽기 쓰기 → 3 그 말로 작문. 1·2단계는 직접 쓰면 바로 채점하고, 3단계만 AI 판정을 받아 「외움」으로 갑니다.</p>`;
-  if(!list.length)h+='<p class="note">해당하는 단어가 없습니다.</p>';
   const cardOf=w=>`<div class="wrow">
      <div>${w.kind==='p'?'<span class="tag">문형</span> ':w.kind==='x'?'<span class="tag">표현</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
      <div class="m">${w.ko?esc(w.ko):'<span class="note">뜻 없음 · 네이버에서 확인 뒤 「고치기」로 적어 두세요</span>'}</div>
@@ -855,13 +885,15 @@ function wordsView(){
      <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}${wordQs(w).length?`<button data-wg="${esc(w.w)}">이 말의 책 문제 ${wordQs(w).length}</button>`:''}<button data-wx="${esc(w.w)}">빼기</button></div>
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`;
   const wi=WP?list.findIndex(w=>w.w===WP):-1;
-  if(wi>=0)h=`${rvSwitch()}${pgNav(wi,list.length,'')}${cardOf(list[wi])}`;
-  else{WP=null;for(const[d,ws]of Object.entries(byD)){h+=`<h3>${esc(d)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<button class="idx" data-wp="${esc(w.w)}">${w.kind?`<span class="tag">${KINDN[w.kind]}</span> `:''}<span class="jp" style="font-size:18px">${esc(w.w)}</span>${w.r?` <span class="rp">${esc(w.r)}</span>`:''} <span class="m2">${esc((w.ko||'뜻 없음').slice(0,26))}</span><br><span class="note">${WLN[w.st==='done'?3:wLv(w)]}</span></button>`).join('')}}
-  $('#view').innerHTML=nbCard('복습 · 단어장',h);bindRv();
+  if(wi>=0){bmSet('words',list[wi].w);h=`${rvSwitch()}${pgNav(wi,list.length,esc(gOf(list[wi])))}${pageWrap(cardOf(list[wi]))}`}
+  else{WP=null;const gl=list.map(w=>({g:gOf(w),w})),gs=rvGrp(gl);h+=rvTools('찾기 (단어·읽기·뜻)',[['date','날짜별'],['kana','가나순 색인']],gs,list.some(w=>w.w===BM.words)?BM.words:'');
+    if(!list.length)h+='<p class="note">해당하는 단어가 없습니다.</p>';
+    let at=0;gs.forEach(([g,c],gi)=>{const ws=list.slice(at,at+c);at+=c;h+=`<h3 id="toc${gi}">${esc(g)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<button class="idx" data-wp="${esc(w.w)}">${w.kind?`<span class="tag">${KINDN[w.kind]}</span> `:''}<span class="jp" style="font-size:18px">${esc(w.w)}</span>${w.r?` <span class="rp">${esc(w.r)}</span>`:''} <span class="m2">${esc((w.ko||'뜻 없음').slice(0,26))}</span><br><span class="note">${WLN[w.st==='done'?3:wLv(w)]}</span></button>`).join('')})}
+  $('#view').innerHTML=nbCard('복습 · 단어장',h);PGD=0;bindRv();
   const up=(w,f)=>{f(S.words[w]);S.words[w].u=Date.now();save();wordsView();syncNow()};
   document.querySelectorAll('[data-wf]').forEach(b=>b.onclick=()=>{WF=b.dataset.wf;WP=null;wordsView()});
   document.querySelectorAll('[data-wp]').forEach(b=>b.onclick=()=>{WP=b.dataset.wp;wordsView();scrollTo(0,0)});
-  {const go=k=>{WP=k;wordsView();scrollTo(0,0)},on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('pidx',()=>go(null));on('pprev',()=>go(list[wi-1].w));on('pnext',()=>go(list[wi+1].w))}
+  bindPg(wi,list.length,i=>{WP=i<0?null:list[i].w;wordsView();scrollTo(0,0)});bindTools(()=>{WP=null;wordsView()},()=>{WP=BM.words;wordsView();scrollTo(0,0)});
   document.querySelectorAll('[data-wkd]').forEach(b=>b.onclick=()=>{WK=b.dataset.wkd;WP=null;wordsView()});
   bindWhy($('#view'),()=>{const y=scrollY;wordsView();scrollTo(0,y);syncNow()});
   document.querySelectorAll('[data-wc]').forEach(b=>b.onclick=()=>{const ws=todo.filter(w=>wLv(w)===+b.dataset.wc).slice(0,10);if(ws.length)startSession({date:today(),steps:ws.map(wStep),next:{},res:[],i:0,review:true})});
