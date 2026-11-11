@@ -575,7 +575,12 @@ function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
   return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
-    <div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}${w.length>=2&&KJ.test(w)?`<span class="note" style="align-self:center">한자 음·훈: ${[...new Set(w.match(/[㐀-鿿]/g))].slice(0,5).map(c=>`<a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px;margin:0 3px">${esc(c)}</a>`).join('')}</span>`:''}</div>${on?whyChips(sw):''}</div>`}
+    ${kjLine(w)}<div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}</div>${on?whyChips(sw):''}</div>`}
+// 한자 음훈(D.kj = {字:[한국 훈음, 음독, 훈독]}, 콕콕 N1 한자). 단어 안의 한자마다 훈음을 보이고, 글자를 누르면 네이버 한자 풀이
+const KJI=c=>(D.kj||{})[c];
+function kjLine(w){const cs=[...new Set(w.match(/[㐀-鿿]/g)||[])].slice(0,6);if(!cs.length)return'';
+  return `<div class="note" style="margin:2px 0 4px;line-height:1.9">${cs.map(c=>{const k=KJI(c),ok=k&&(k[1]||k[2]);
+    return `<span style="white-space:nowrap;margin-right:10px"><a href="${NAVER(c)}" target="_blank" rel="noopener" class="jp" style="font-size:17px">${esc(c)}</a>${k?' '+esc(k[0]):''}${ok?` <span class="jp">(${[k[1]&&'음 '+esc(k[1]),k[2]&&'훈 '+esc(k[2])].filter(Boolean).join(' · ')})</span>`:''}</span>`}).join('')}</div>`}
 // 아래에서 올라오는 단어 창: 이 문제의 단어 목록 + 검색칸(드래그로 고른 글자가 들어옴)
 function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
   const hits=wordsIn(text),bg=document.createElement('div');bg.className='sheet-bg';bg.id='sheet';
@@ -583,7 +588,7 @@ function lookSheet(text,q,ctx){ctx=ctx||{};closeSheet();
     const sr=qq.trim()?searchDict(qq.trim()):[];
     bg.innerHTML=`<section class="card nb sheet" role="dialog" aria-label="단어 찾기"><div class="row" style="justify-content:space-between;align-items:center"><div class="kind">단어 찾기</div><button id="lx">닫기</button></div>
       <input id="lq" placeholder="찾을 말 (일본어·한자 한 글자도 됨)" value="${esc(qq)}" autocomplete="off" spellcheck="false">
-      ${qq.trim()?`<div>${sr.map(h=>wordRow(h,ctx)).join('')||'<p class="note">앱 사전에 없습니다. 아래 「직접 등록」으로 넣을 수 있습니다.</p>'}<div class="row" style="margin-top:6px">${naverA(qq.trim())}</div>
+      ${qq.trim()?`<div>${qq.trim().length===1&&KJI(qq.trim())?`<div class="wrow"><div class="kind">한자</div>${kjLine(qq.trim())}</div>`:''}${sr.map(h=>wordRow(h,ctx)).join('')||'<p class="note">앱 사전에 없습니다. 아래 「직접 등록」으로 넣을 수 있습니다.</p>'}<div class="row" style="margin-top:6px">${naverA(qq.trim())}</div>
         <details id="madd" ${sr.some(h=>h.e[0]===qq.trim())?'':'open'}><summary><b>직접 등록</b> <span class="note">사전에 없는 말·문형·표현을 내가 적어 단어장에</span></summary>
          <p class="note">네이버 사전에서 읽기와 뜻을 확인한 뒤 적으세요(자동으로 가져오지는 못합니다).</p>
          <input id="mw" value="${esc((S.words[qq.trim()]||{}).w||qq.trim())}" placeholder="말 (예: 土中, 〜とあいまって)" autocomplete="off" spellcheck="false">
