@@ -635,11 +635,11 @@ function judgeParse(text){text=String(text||'');if(JC.has(text))return JC.get(te
   const o={sec:{},items:[]},re=/\[#([^\]\s]+)\]/g,pos=[];let m;while((m=re.exec(text)))pos.push({k:m[1],i:m.index,e:re.lastIndex});
   const parts=[{k:null,body:text.slice(0,pos.length?pos[0].i:text.length)}];
   pos.forEach((p,j)=>{const body=text.slice(p.e,j+1<pos.length?pos[j+1].i:text.length).replace(/^[\s#*:：\-—]+/,'').trim();parts.push({k:p.k,body});o.sec[p.k]=(o.sec[p.k]?o.sec[p.k]+'\n\n':'')+body});
-  const clean=s=>s.replace(/\*\*|`|^[「『"]|[」』"]$/g,'').trim();
+  const clean=s=>s.replace(/\\([~*_\[\]()])/g,'$1').replace(/\*\*|`|^[「『"]|[」』"]$/g,'').trim();
   for(const pt of parts){let cur=null;
     for(const ln of pt.body.split('\n')){const l=ln.replace(/\*\*/g,'').replace(/^\s*(?:[-*•>]|\d+[.)])\s*/,'').trim();
       let a=l.match(/^(단어|문형)\s*[:：]\s*(.+)$/);
-      if(a){const kind=a[1]==='문형'?'p':'w',[hd,...mn]=a[2].split(/\s*[=＝]\s*/),h2=/^[〜~～]\s*[（(]/.test(hd)?null:hd.match(/^(.+?)\s*[（(]\s*([ぁ-ゖァ-ヺー・\s]+)\s*[)）]\s*(.*)$/);   // 「〜(よ)うものなら」의 괄호는 읽기가 아니다
+      if(a){const kind=a[1]==='문형'?'p':'w',[hd,...mn]=a[2].split(/\s*[=＝]\s*/),h2=(m=>m&&!m[3].trim()?m:null)(hd.match(/^(.+?)\s*[（(]\s*([ぁ-ゖァ-ヺー・\s]+)\s*[)）]\s*(.*)$/));   // 「〜(よ)うものなら」의 괄호는 읽기가 아니다
         const w=clean(h2?h2[1]:hd);if(!w||w.length>24){cur=null;continue}
         cur={kind,w,r:h2?h2[2].replace(/\s/g,''):'',ko:clean(mn.join(' = ')),ex:[],key:pt.k};o.items.push(cur);continue}
       a=l.match(/^예문\s*\d*\s*[:：]\s*(.+)$/);
@@ -891,7 +891,7 @@ function vWb(st,lab){const s=S.cur,w=S.words[st.id],r=s.res[s.i];if(!w||w.del){s
   const mode=lv===0?'mean':(kanji&&w.r&&fNorm(w.r)!==fNorm(w.w))?'yomi':'word',core=w.kind==='p'?pCore(w.w):w.w;
   const ex0=(w.ex||[]).find(e=>e&&e[0]&&e[0].includes(core))||(w.s&&w.s.includes(core)?[w.s,'']:null);
   const ans=mode==='mean'?w.ko:mode==='yomi'?w.r:w.w,HOW={mean:'이 말의 뜻을 한국어로 쓰세요.',yomi:'이 말의 읽기를 쓰세요(히라가나 또는 로마자).',word:'뜻을 보고 그 말을 일본어로 쓰세요(가나로 써도 됩니다).'}[mode];
-  const hit=v=>mode==='mean'?koMatch(v,w.ko):mode==='yomi'?fNorm(v)===fNorm(w.r):[w.w,core,w.r].some(a=>a&&fNorm(a)===fNorm(v));
+  const hit=v=>mode==='mean'?koMatch(v,w.ko):mode==='yomi'?fNorm(v)===fNorm(w.r):[w.w,core,w.r,w.w.replace(/^(Na|N|A|V-?(る|た)?|[〜~～]|\s)+/,'').replace(/[()（）]/g,''),w.w.replace(/^(Na|N|A|V-?(る|た)?|[〜~～]|\s)+/,'').replace(/[（(].*?[)）]/g,'')].some(a=>a&&fNorm(a)===fNorm(v));
   let h=`<p class="note"><span class="lvb">${WLN[lv]}</span> ${w.kind?KINDN[w.kind]+' · ':''}${HOW}</p>`;
   h+=mode==='word'?`<p style="text-align:center"><b>${esc(w.ko)}</b></p>${ex0?`<div class="jp">${esc(ex0[0].replace(core,'＿＿＿'))}</div>${ex0[1]?`<div class="ko">${esc(ex0[1])}</div>`:''}`:''}`
     :`<div class="jp big">${esc(w.w)}</div>${mode==='yomi'?`<p style="text-align:center"><b>${esc(w.ko)}</b></p>`:''}`;
@@ -1624,7 +1624,9 @@ if(TEST){document.querySelector('h1').textContent=TEST.name;document.title=TEST.
 if(S.cur&&S.cur.closed&&S.cur.date!==today())S.cur=null;
 if(S.pause&&S.pause.closed)S.pause=null;
 {let ch=false;const now=Date.now();
- if(S.words['〜']&&!S.words['〜'].del){S.words['〜'].del=true;S.words['〜'].u=now;ch=true;JC.clear();Object.keys(S.judges).forEach(applyJudge)}   // 예전에 「〜(よ)うものなら」가 「〜」로 잘려 들어간 것 바로잡기
+ {const bad=Object.values(S.words).filter(w=>!w.del&&w.src&&w.src.ai&&(/^(V-?|N|A|Na|[〜~～])$/.test(w.w)||(w.kind==='p'&&w.w.length<=2&&/[-〜~～]$/.test(w.w))));
+  if(bad.length){bad.forEach(w=>{w.del=true;w.u=now});ch=true;JC.clear();Object.keys(S.judges).forEach(applyJudge)}}
+ Object.values(S.words).forEach(w=>{if(w.ko&&/\\[~*_]/.test(w.ko)){w.ko=w.ko.replace(/\\([~*_\[\]()])/g,'$1');w.u=now;ch=true}});
  Object.values(S.words).forEach(w=>{const e=(w.ex||[]).filter(x=>!/[가-힣]/.test((x&&x[0])||''));if(e.length!==(w.ex||[]).length){w.ex=e;w.u=now;ch=true}});
  Object.entries(S.judges).forEach(([d,j])=>{const c=S.wsc[d];if(!c||!j||!j.text)return;const w=parseWK(j.text);if(w.length&&JSON.stringify(w)!==JSON.stringify(c.items)){S.wsc[d]={...c,items:w,t:now};ch=true}});
  if(ch)save()}
