@@ -159,7 +159,7 @@ const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['wb3',0,'단어 작문'],['cw',1,'조건 작문'],['fill',1,'넣기'],['kr',2,'어휘·한자'],['oc',1,'오문 정정'],['cj',1,'접속 구별'],['pc',1,'문형 카드'],['kw',1,'회화 작문'],['wb',0,'단어장'],['rw',1,'말 바꾸기'],['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',4,'어휘·한자'],['v5',2,'어휘·한자'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일→한 번역'],['hanyeok',1,'한→일 번역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 // 2026-11-06 문제 고르기: 루틴·레벨 테스트·골라 풀기 어디서든 이미 푼 문제(S.seen)는 건너뛴다.
-// 틀렸거나 애매했던 문제는 여기서 내지 않고 간격 반복(S.srs, 1·3·7·21일)으로만 다시 낸다. 안 푼 문제가 다 떨어지면 오래전에 푼 것부터
+// 틀렸거나 애매했던 문제는 여기서 내지 않고 간격 반복(S.srs, 1·3·7일, 세 번 연달아 맞히면 끝)으로만 다시 낸다. 안 푼 문제가 다 떨어지면 오래전에 푼 것부터
 let RVID=new Set();
 function take(kind,pool,n,skip=()=>false,sk=kind){
   const out=[],seen=x=>!!S.seen[sk+'|'+x.id];let p=S.ptr[kind]||0;
@@ -167,8 +167,8 @@ function take(kind,pool,n,skip=()=>false,sk=kind){
     if(!out.includes(x)&&!RVID.has(x.id)&&!skip(x,out)&&(pass||!seen(x)))out.push(x)}if(out.length>=n)break}
   return {items:out,next:p};
 }
-// 간격 반복: 틀림 → 내일, 애매하게 맞힘 → 내일(단계 그대로), 확실히 맞힘 → 다음 단계(1·3·7·21일), 네 번 넘기면 끝
-const SRS_INT=[1,3,7,21];
+// 간격 반복: 틀림 → 내일, 애매하게 맞힘 → 내일(단계 그대로), 확실히 맞힘 → 다음 단계(1·3·7일), 세 번 연달아 맞히면 끝(2026-11-12 사용자 요청: 4번 → 3번)
+const SRS_INT=[1,3,7];
 function srsUp(k,id,ok,unsure){const key=k+'|'+id,e=S.srs[key],now=Date.now(),d=today();
   if(!ok){S.srs[key]={k,id,box:0,due:addDays(d,1),t:now,last:d,why:'wrong'};return}
   if(unsure){S.srs[key]={k,id,box:e&&!e.done?e.box:0,due:addDays(d,1),t:now,last:d,why:'unsure'};return}
@@ -308,9 +308,13 @@ const kwItem=id=>(LISTEN_U).find(x=>x.id===id);
 function find(k,id){if(k==='kw')return kwItem(id);if(k==='kr')return(D.kr||[]).find(x=>x.id===id);if(k==='oc')return(D.oc||[]).find(x=>x.id===id);if(k==='cj')return(D.cj||[]).find(x=>x.id===id);if(k==='pc')return(D.p630||[]).find(x=>x.id===id);if(k==='listen')return LISTEN_U.find(x=>x.id===id);if(k==='kanji')return D.kanji.find(x=>x.id===id);if(k==='kkr')return(D.kkr||[]).find(x=>x.id===id);
   if(k==='vocab')return D.vocab.find(x=>x.jp===id);if(k==='pat')return D.pats.find(x=>x.no===id);
   if(k==='reading')return D.reading.find(x=>x.id===id);if(k==='mock')return D.mock.find(x=>x.id===id);if(k==='talk')return D.talk.find(x=>x.id===id);if(k==='v5'){const a=(D.v5alias||{})[id]||id;return(D.v5||[]).find(x=>x.id===a)}if(k==='p630')return(D.p630||[]).find(x=>x.id===id)}
-// 2026-11-10 객관식 보기 섞기: 풀 때만 섞어 보여 주고(회차에 순서를 기억), 답한 뒤에는 책 순서·책 번호로 되돌린다. 기록·판정·해설 번호는 모두 책 번호
+// 2026-11-10 객관식 보기 섞기: 풀 때 섞어 보여 주고 회차에 순서를 기억한다. 기록·판정·해설 번호는 모두 책 번호
+// 2026-11-12 사용자 요청: 답한 뒤 책 순서로 되돌리면 고른 보기가 옮겨진 것처럼 보여 헷갈림 → 답한 뒤에도 풀 때 순서·번호를 그대로 두고 「책 ○번」만 붙인다
 const ordOf=n=>{const s=S.cur;if(!s||S.pref.noshuf)return null;s.ord=s.ord||{};if(!s.ord[s.i]||s.ord[s.i].length!==n){s.ord[s.i]=shuffle([...Array(n).keys()]);save()}return s.ord[s.i]};
-const shufNote=()=>S.cur&&(S.cur.ord||{})[S.cur.i]?'<p class="note">풀 때는 보기 순서를 섞었습니다. 아래는 책 순서와 책 번호입니다.</p>':'';
+const ordKeep=n=>{const s=S.cur,o=s&&(s.ord||{})[s.i];return o&&o.length===n?o:null};
+const dnOf=od=>b=>od?od.indexOf(b-1)+1:b;   // 책 번호 → 화면 번호
+const bkTag=(od,b)=>od?` <span class="note">(책 ${b}번)</span>`:'';
+const shufNote=()=>S.cur&&(S.cur.ord||{})[S.cur.i]?'<p class="note">보기 순서는 풀 때 그대로입니다. 괄호 안은 책 번호입니다(해설·AI 판정은 책 번호로 말합니다).</p>':'';
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 let player=null;
 function playSeq(items){if(player)player.pause();if('speechSynthesis' in window)speechSynthesis.cancel();let i=0;
@@ -847,7 +851,7 @@ function notesView(){
       ${secs.map(([dd,s])=>`<details open class="aibox"><summary><span class="rp">AI 답</span> <span class="note">${esc(dd)}${S.judges[dd].by?' · '+esc(S.judges[dd].by):''} · 참고 의견</span></summary><div class="ai">${aiHtml(s)}</div><p class="note">AI마다 판정이 다를 수 있습니다. 이상하면 다른 AI에게도 확인하세요.</p></details>`).join('')}
       ${whole.map(dd=>`<details><summary class="note">그날 AI 판정 전체 (${esc(dd)} · 문항별로 나뉘지 않은 예전 형식)</summary><pre class="out">${esc(S.judges[dd].text)}</pre></details>`).join('')}
       <details${asks.length||ws.length||secs.length?'':' open'}><summary class="note">문제 · 정답 · 해설</summary>${q.h}
-       ${e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+esc(a.pick):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}</div>`).join('')}</details>
+       ${e.a.map(a=>`<div class="note"><b>${esc(a.d)}</b>${a.ok===false?' <span class="rp">오답</span>':a.ok?' 정답':''}${a.conf==='unsure'?' (애매)':''}${a.ms?' · '+Math.round(a.ms/1000)+'초':''}${a.pick?' · 내 선택 '+(!a.picked&&/^\d$/.test(a.pick)?'책 '+a.pick+'번':esc(a.pick)):''}${a.picked?' · 고른 뜻 '+esc(a.picked):''}</div>`).join('')}</details>
       ${sibs.length?`<p class="note"><b>묶음 「${esc(sibs[0].key.slice(2))}」</b> 같은 말이 나오는 다른 책 문제 ${sibs.length}개 · 푼 것 ${sdone.length}${sbad.length?' · 틀린 것 '+sbad.length:''}</p>`:''}
       <div class="row">${sibs.length?`<button data-ng="${esc(n.key)}">묶음으로 풀기</button>`:''}${stepText(e.k,e.id,{ja:(e.a[e.a.length-1]||{}).q})?`<button data-nw="${esc(n.key)}">${ic('book')} 단어 찾기</button>`:''}<button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div>`})}
   if(RVQ)IT=IT.filter(x=>x.txt.includes(RVQ.toLowerCase()));
@@ -1069,7 +1073,7 @@ function home(){
   $('#view').innerHTML=card('오늘',`${main}
    ${other?`<div class="row"><button id="other">하던 ${other.review?'복습':other.test?'레벨 테스트':'골라 풀기'} 이어서 (${other.i+1} / ${other.steps.length})</button></div>`:''}
    <div class="stat"><span>연속 ${streak()}일</span>${last?`<span>지난 학습 ${esc(last.date)} · 객관식 ${last.ok}/${last.n}</span>`:''}<span>복습할 문제 ${open}</span><span>출제 레벨 ${esc(S.levels.join('·'))}</span></div>
-   <p class="note">순서: 다시 볼 문제 → 청해 → 어휘·한자 → 오문 정정 → 문법 → 접속 구별 → 문형 카드 → 넣기(어제까지 맞힌 말을 보기 없이) → 번역(일→한·한→일) → 글의 문법·독해(하루씩 번갈아) → 회화 작문 → 말 바꾸기. 틀렸거나 애매했던 문제는 1·3·7·21일 간격으로 맨 앞 「다시」에 나오고(같은 말을 쓰는 다른 책 문제가 있으면 번갈아 그 문제로), 이미 푼 문제는 루틴에 다시 나오지 않습니다.</p>
+   <p class="note">순서: 다시 볼 문제 → 청해 → 어휘·한자 → 오문 정정 → 문법 → 접속 구별 → 문형 카드 → 넣기(어제까지 맞힌 말을 보기 없이) → 번역(일→한·한→일) → 글의 문법·독해(하루씩 번갈아) → 회화 작문 → 말 바꾸기. 틀렸거나 애매했던 문제는 1·3·7일 간격으로 맨 앞 「다시」에 나오고(세 번 연달아 맞히면 빠짐)(같은 말을 쓰는 다른 책 문제가 있으면 번갈아 그 문제로), 이미 푼 문제는 루틴에 다시 나오지 않습니다.</p>
    ${TEST?'':`<p class="note">${esc(syncLine())}</p>`}`);
   const st=$('#start');if(st)st.onclick=()=>{if(daily&&S.cur===daily)S.cur=null;S.pause=null;startSession(buildSession())};
   const rs=$('#resume');if(rs)rs.onclick=()=>{if(S.cur!==daily){S.cur=daily;S.pause=null}VIEW='sess';save();render()};
@@ -1187,11 +1191,11 @@ function vListen(st,lab){
     2:'질문을 먼저 듣고 보기를 읽은 뒤 대화를 들으세요. 이유·생각 같은 「포인트」를 묻습니다. 질문 뒤에 보기를 읽는 조용한 시간(약 20초)이 있고 그다음에 대화가 나옵니다.',3:'이야기를 듣고 전체 내용(주제·요지)을 고르세요. 질문과 보기는 음성으로만 나옵니다.',5:'긴 대화를 듣고 여러 정보를 비교해 답하세요. 보기를 먼저 읽어 두세요.'}[M];
   let h=`<p class="note"><b>${esc(x.type||'즉시 응답')}</b> · ${HOW}</p>
    <div class="row"><button id="play">${ic('play',1)} 듣기</button></div>`;
-  const od=txt&&!ans?ordOf(n):null;
+  const od=null;   // 2026-11-12: 청해는 음성이 책 번호로 보기를 읽으므로 섞지 않는다
   h+=txt&&!ans?`<div class="opts">${(od||x.ch.map((_,i)=>i)).map((i,p)=>`<button class="opt" data-k="${i+1}"><span class="jp">${(od?p:i)+1}. ${esc(x.ch[i][0])}</span></button>`).join('')}</div>`
     :`<div class="row" id="nums">${Array.from({length:n},(_,i)=>i+1).map(k=>`<button data-k="${k}" class="${ans?(k===x.ans?'okb':k===ans?'badb':''):''}" ${ans?'disabled':''}>${k}</button>`).join('')}</div>`;
   if(ans){const ok=ans===x.ans;
-    h+=shufNote()+`<div class="res ${ok?'ok':'bad'}">${ok?'정답':'오답'} · 정답 ${x.ans}번</div>
+    h+=`<div class="res ${ok?'ok':'bad'}">${ok?'정답':'오답'} · 정답 ${x.ans}번</div>
      ${x.lines?`${x.intro?`<p class="note">${esc(x.intro.ja)}<br>${esc(x.intro.ko)}</p>`:''}<details open><summary>대본</summary><div class="opts">${x.lines.map(l=>`<div class="turn"><div class="who">${esc(l.who||'')}</div><div><div class="jp">${esc(l.ja)}</div><div class="ko">${esc(l.ko||'')}</div></div></div>`).join('')}</div></details>
        <div><b class="jp">${esc(x.q.ja)}</b><div class="ko">${esc(x.q.ko)}</div></div>`
       :`<div class="turn"><div class="who">${esc(x.q.who||'')}</div><div><div class="jp">${esc(x.q.ja)}</div><div class="ko">${esc(x.q.ko)}</div></div></div>`}
@@ -1216,15 +1220,15 @@ function vMock(st,lab){
   if(x.passage){const tag=x.stem.replace(/[\[\]]/g,'').split(' / ').map(t=>'['+t+']');
     h+=`<div class="jp" style="font-size:16px">${x.passage.split('\n').map(p=>'<p>'+tag.reduce((a,t)=>a.split(esc(t)).join('<u>'+esc(t)+'</u>'),esc(p))+'</p>').join('')}</div><div><b>${esc(x.stem)}</b></div>`}
   else h+=`<div class="jp${x.type==='usage'?' big':''}">${uline(x.stem)}</div>`;
-  const od=r||x.type==='error_correction'?null:ordOf(x.choices.length);
-  h+=`<div class="opts">${(od||x.choices.map((_,i)=>i)).map((i,p)=>`<button class="opt ${r?(i+1===x.answer?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp" style="font-size:17px">${(od?p:i)+1}. ${esc(x.choices[i])}</span></button>`).join('')}</div>`;
-  if(r){h+=shufNote()+`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${x.answer}번${st.k==='oc'&&r.ms?` · ${Math.round(r.ms/1000)}초 (JPT 약 30초)`:''}</div>`;
+  const od=x.type==='error_correction'?null:r?ordKeep(x.choices.length):ordOf(x.choices.length),dn=dnOf(od);
+  h+=`<div class="opts">${(od||x.choices.map((_,i)=>i)).map((i,p)=>`<button class="opt ${r?(i+1===x.answer?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp" style="font-size:17px">${(od?p:i)+1}. ${esc(x.choices[i])}</span>${r?bkTag(od,i+1):''}</button>`).join('')}</div>`;
+  if(r){h+=shufNote()+`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${dn(x.answer)}번${bkTag(od,x.answer)}${st.k==='oc'&&r.ms?` · ${Math.round(r.ms/1000)}초 (JPT 약 30초)`:''}</div>`;
     if(x.why)h+=`<p>${esc(x.why)}</p>`;
-    const w=Object.entries(x.wrong||{});if(w.length)h+=`<div class="opts">${w.map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}</div>`;
+    const w=Object.entries(x.wrong||{}).sort((a,b)=>(/^\d$/.test(a[0])?dn(+a[0]):9)-(/^\d$/.test(b[0])?dn(+b[0]):9));if(w.length)h+=`<div class="opts">${w.map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?dn(+k)+'번':esc(k)}</b>${/^\d$/.test(k)?bkTag(od,k):''} ${esc(v)}</p>`).join('')}</div>`;
     if(x.note)h+=`<p class="note">${esc(x.note)}</p>`;
     if(x.gen)h+=`<p class="note">읽기·뜻은 책 단어장(${esc(x.src.replace(/^읽기·뜻: /,'').replace(/ \/ 오답:.*$/,''))}), 오답 보기는 규칙으로 자동 생성했습니다. 이상하면 아래 「이상해요」를 눌러 주세요.</p>`;
     if(x.vocab&&x.vocab.length)h+=`<details ${r.ok?'':'open'}><summary>단어</summary>${x.vocab.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v.word)}</span>${v.reading?' ('+esc(v.reading)+')':''} ${esc(v.ko)}</p>`).join('')}</details>`;
-    if(!r.ok)h+=`<label class="note" for="why">왜 ${r.pick}번을 골랐는지 한 줄 (결과지에 들어갑니다)</label><textarea id="why">${esc(r.why||'')}</textarea>`;
+    if(!r.ok)h+=`<label class="note" for="why">왜 ${dn(r.pick)}번을 골랐는지 한 줄 (결과지에 들어갑니다)</label><textarea id="why">${esc(r.why||'')}</textarea>`;
     h+=nextBtn()}
   $('#view').innerHTML=card(lab,h);
   const mk=st.k==='cj'?'cj':st.k==='oc'?'oc':st.k==='kr'?'kr':st.k==='moji'?'moji':x.type==='grammar_form'?'gf':x.type==='sentence_order'?'so':'tg';
@@ -1336,7 +1340,7 @@ function vFill(st,lab){const kk=st.k==='kkr',it=kk?kkrItem(st.id):fillItem(st),s
     if(!shown)h+=`<div class="row"><button class="pri" id="chk">확인</button><button id="dunno">모르겠음</button></div>`;
     else h+=`<div class="res bad">표기가 답과 다릅니다</div><div><span class="note">책의 답</span> <b class="jp">${esc(it.ans)}</b></div><p class="note">한자·가나 표기만 다르고 같은 말이면 「맞았다」를 누르세요.</p><div class="row"><button class="pri" data-sf2="1">같은 말 — 맞았다</button><button data-sf2="0">틀렸다</button></div>`}
   else h+=`<div><span class="note">내 답</span> <span class="jp">${esc(r.mine||'(안 씀)')}</span></div><div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 책의 답 <b class="jp">${esc(it.ans)}</b></div>${it.why?`<p>${esc(it.why)}</p>`:''}${it.src?`<p class="note">${esc(it.src)}</p>`:''}${nextBtn()}`;
-  $('#view').innerHTML=card(kk?'한자 읽기 · 직접 쓰기':'넣기 · 보기 없이'+(st.gk?' · 묶음 「'+esc(st.gk.slice(2))+'」':''),h);
+  $('#view').innerHTML=card(kk?'한자 읽기 · 직접 쓰기':'넣기 · 보기 없이'+(st.gk&&r&&'ok' in r?' · 묶음 「'+esc(st.gk.slice(2))+'」':''),h);
   const t=$('#ans'),fin=ok=>{const mine=(s.res[s.i]&&s.res[s.i].mine)||(t?t.value:'');rec({k:RK,id:fid,ok,mine});render()};
   if(t&&!t.disabled)t.oninput=()=>{s.res[s.i]={k:'fill',mine:t.value};save()};
   const c=$('#chk');if(c)c.onclick=()=>{const v=t.value;if(!v.trim())return;if(fNorm(v)===fNorm(it.ans)||(it.alt||[]).some(a=>fNorm(a)===fNorm(v))){s.res[s.i]={k:'fill',mine:v};fin(true)}else{s.res[s.i]={k:'fill',mine:v,shown:true};save();render()}};
@@ -1404,15 +1408,15 @@ function vPc(st,lab){
 }
 function vReading(st,lab){
   const x=find('reading',st.id),r=S.cur.res[S.cur.i],P=x.pid?(D.rpass||{})[x.pid]:x,intro=P.intro||x.intro,text=P.text||x.text||[];
-  const od=r?null:ordOf(x.ch.length);
+  const od=r?ordKeep(x.ch.length):ordOf(x.ch.length),dn=dnOf(od),ix=od||x.ch.map((_,i)=>i);
   let h=`<p class="note">${esc(intro.ja)}</p><div class="opts">${text.map(l=>`<div class="jp">${esc(l.ja)}</div>`).join('')}</div>
    <div><b class="jp">${esc(x.q.ja)}</b></div>
-   <div class="opts">${(od||x.ch.map((_,i)=>i)).map((i,p)=>`<button class="opt ${r?(i+1===x.ans?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp">${(od?p:i)+1}. ${esc(x.ch[i][0])}</span></button>`).join('')}</div>`;
-  if(r){h+=shufNote()+`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${x.ans}번</div>
+   <div class="opts">${ix.map((i,p)=>`<button class="opt ${r?(i+1===x.ans?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp">${(od?p:i)+1}. ${esc(x.ch[i][0])}</span>${r?bkTag(od,i+1):''}</button>`).join('')}</div>`;
+  if(r){h+=shufNote()+`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${dn(x.ans)}번${bkTag(od,x.ans)}</div>
     ${x.note?`<p class="note">${esc(x.note)}</p>`:''}
     ${(P.vocab||[]).length?`<details><summary>단어</summary>${P.vocab.map(v=>`<p class="note"><span class="jp" style="font-size:16px">${esc(v[0])}</span>${v[1]?' ('+esc(v[1])+')':''} ${esc(v[2])}</p>`).join('')}</details>`:''}
-    <details><summary>한국어 번역 보기</summary>${text.map(l=>`<p class="ko">${esc(l.ko)}</p>`).join('')}<p class="ko">${esc(x.q.ko)}</p>${x.ch.map((c,i)=>`<p class="ko">${i+1}. ${esc(c[1])}</p>`).join('')}</details>
-    ${r.ok?'':`<label class="note" for="why">왜 ${r.pick}번을 골랐는지 한 줄</label><textarea id="why">${esc(r.why||'')}</textarea>`}${nextBtn()}`}
+    <details><summary>한국어 번역 보기</summary>${text.map(l=>`<p class="ko">${esc(l.ko)}</p>`).join('')}<p class="ko">${esc(x.q.ko)}</p>${ix.map((i,p)=>`<p class="ko">${(od?p:i)+1}. ${esc(x.ch[i][1])}</p>`).join('')}</details>
+    ${r.ok?'':`<label class="note" for="why">왜 ${dn(r.pick)}번을 골랐는지 한 줄</label><textarea id="why">${esc(r.why||'')}</textarea>`}${nextBtn()}`}
   $('#view').innerHTML=card(lab+(x.type?' · '+x.type:''),h);
   document.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;rec({k:'reading',id:x.id,pick:k,ok:k===x.ans});render()});
   const w=$('#why');if(w)w.oninput=()=>{S.cur.res[S.cur.i].why=w.value;save()};bindNext();
