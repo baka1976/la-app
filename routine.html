@@ -153,6 +153,8 @@ const TEST=window.__TEST||null;
 const KEY=TEST?'la-test-'+TEST.id:'la-daily-v2';
 let S;try{S=JSON.parse(localStorage.getItem(KEY))||{}}catch(e){S={}}
 S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=S.notes||{};S.seen=S.seen||{};S.judges=S.judges||{};S.levels=S.levels||['N1'];S.hist=S.hist||[];S.ux=S.ux||[];S.tests=S.tests||[];S.wsc=S.wsc||{};S.pref=S.pref||{};S.words=S.words||{};S.srs=S.srs||{};
+// 2026-11-12 사용자 요청: 기본은 N1만. 기기에 예전에 켜 둔 N2·N3가 남아 섞여 나왔으므로 각 기기에서 한 번만 N1로 되돌린다(그 뒤 설정에서 바꾼 것은 그대로 둠)
+if(!TEST&&!S.pref.lv1112){S.levels=['N1'];S.pref.lv1112=1}
 if(TEST)S.levels=TEST.levels.slice();
 // 보기 설정(이 기기만): 글자 크기, 화면 테마
 const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';r.dataset.hand=S.pref.hand||'poor';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
