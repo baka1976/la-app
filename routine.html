@@ -269,6 +269,12 @@ function buildSession(){
   if((D.oc||[]).length){const OCx=take('oc',lvPool(D.oc),1);s.next.oc=OCx.next;OCx.items.forEach(x=>s.steps.push({k:'oc',id:x.id}))}
   const GF=take('gf',lvPool(D.mock.filter(x=>x.type==='grammar_form')),2,dup);GF.items.forEach(use);const SO=take('so',lvPool(D.mock.filter(x=>x.type==='sentence_order')),1,dup);SO.items.forEach(use);
   s.next.gf=GF.next;s.next.so=SO.next;GF.items.concat(SO.items).forEach(x=>s.steps.push({k:'gram',id:x.id}));
+  // 2026-11-12 사용자 요청: 실전모의고사 15회분(N1·N2 시사15)을 한 회차에 적어도 한 문제. 고른 레벨의 것만(N2 문제가 N1에 나오지 않게)
+  {const isS=x=>/^N\d-시사15-/.test(x.id);
+   if(![...MJ.items,...GF.items,...SO.items].some(isS)){const P=rr(D.mock.filter(x=>isS(x)&&inLv(x)&&x.lv!=null&&['orthography','word_formation','context','paraphrase','usage'].includes(x.type)));
+    const X=P.length?take('sisa',P,1,dup,'moji'):{items:[]};
+    if(X.items.length){s.next.sisa=X.next;const y=X.items[0];use(y);const j=s.steps.map(t=>t.k).lastIndexOf('moji');
+      if(j>=0&&MJ.items.length>=4){const old=s.steps[j].id;MJ.items=MJ.items.filter(x=>x.id!==old);s.steps[j]={k:'moji',id:y.id}}else s.steps.splice(j+1,0,{k:'moji',id:y.id})}}}
   // 오늘 문법 문항의 문형 → 문형 카드·작문
   let pt=GF.items.concat(SO.items).find(x=>x.pattern);
   if(!pt){const P=lvPool(D.mock.filter(x=>x.pattern)),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
