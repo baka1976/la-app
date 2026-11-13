@@ -173,8 +173,12 @@ function take(kind,pool,n,skip=()=>false,sk=kind){
 }
 // 간격 반복: 틀림 → 내일, 애매하게 맞힘 → 내일(단계 그대로), 확실히 맞힘 → 다음 단계(1·3·7일), 세 번 연달아 맞히면 끝(2026-11-12 사용자 요청: 4번 → 3번)
 const SRS_INT=[1,3,7];
+// 11-13: 같은 객관식을 두 번 이상 틀렸고 그 문제의 말이 단어장에 있으면, 같은 문제를 또 내지 않고 단어장 카드로 넘긴다(문제 모양을 외우게 되므로)
+const wordsOfKey=key=>Object.values(S.words).filter(w=>!w.del&&(w.keys||[]).includes(key));
 function srsUp(k,id,ok,unsure){const key=k+'|'+id,e=S.srs[key],now=Date.now(),d=today();
-  if(!ok){S.srs[key]={k,id,box:0,due:addDays(d,1),t:now,last:d,why:'wrong'};return}
+  if(!ok){const before=S.hist.filter(h=>!h.ok&&h.k===k&&h.id===id).length,ws=wordsOfKey(key);
+    if(before>=1&&ws.length&&!['hanyeok','pc','kw','rw','cw','wb3'].includes(k)){S.srs[key]={k,id,box:0,due:addDays(d,1),t:now,last:d,why:'wrong',done:true,card:1};ws.forEach(w=>{if(w.st==='done')w.st='';w.u=now});return}
+    S.srs[key]={k,id,box:0,due:addDays(d,1),t:now,last:d,why:'wrong'};return}
   if(unsure){S.srs[key]={k,id,box:e&&!e.done?e.box:0,due:addDays(d,1),t:now,last:d,why:'unsure'};return}
   if(!e||e.done)return;const box=e.box+1;S.srs[key]=box>=SRS_INT.length?{...e,done:true,t:now}:{...e,box,due:addDays(d,SRS_INT[box]),t:now}}
 // 예전 기록(틀린 문항 목록)을 간격 반복으로 옮긴다(앱을 열 때와 다른 기기 기록을 합친 뒤. 이미 있으면 건너뜀)
@@ -238,8 +242,15 @@ const lvPool=a=>{const f=a.filter(inLv);return f.length?f:a};
 const LISTEN=(()=>{const g=D.listen.filter(x=>x.id.startsWith('GS')),k=D.listen.filter(x=>!x.id.startsWith('GS')),o=[];
   for(let i=0;i<Math.max(g.length,k.length);i++){if(g[i])o.push(g[i]);if(i%2===0&&k[i/2])o.push(k[i/2])}return o.concat(k.slice(Math.ceil(g.length/2)))})();
 const LISTEN_U=[...new Map(LISTEN.map(x=>[x.id,x])).values()];
+// 11-13 사용자 수준(정답률 약 90%)에 비해 쉬운 문제가 많아 시간이 듦 → 최근 10문항(복습 제외)이 8개 이상이고 90% 이상 맞힌 영역은 절반으로(최소 1)
+function easyN(ks,n){const L=S.hist.filter(h=>h.m!=='rv'&&ks.includes(h.k)).slice(-10);if(L.length<8||L.filter(h=>h.ok).length/L.length<0.9)return n;return Math.max(1,Math.floor(n/2))}
+// 날짜로 정하는 교대(기기·동기화와 상관없이 하루씩 바뀜)
+const dayOdd=()=>Math.floor(Date.parse(today()+'T00:00:00Z')/864e5)%2;
+// 마지막으로 푼 때(긴 지문 교대용): 그 종류의 S.seen 가운데 가장 최근
+const lastSeen=p=>{let t=0;for(const k in S.seen)if(k.startsWith(p+'|')){const v=S.seen[k];if(v&&v.t>t)t=v.t}return t};
 function buildSession(){
-  const s={date:today(),steps:[],next:{},res:[]};
+  const s={date:today(),steps:[],next:{},res:[],easy:[]};
+  const nOf=(ks,n,name)=>{const m=easyN(ks,n);if(m<n)s.easy.push(name);return m};
   const DU=srsDue(),RV=DU.filter(e=>!e.wr).slice(0,5).concat(DU.filter(e=>e.wr).slice(0,2));RVID=new Set(RV.map(e=>e.id));   // 객관식 5 + 다시 쓰기 2
   RV.forEach(e=>{
     if(e.wr){const key=e.k+'|'+e.id,ag={last:e.last,why:'write'};
@@ -254,28 +265,30 @@ function buildSession(){
       if(fk){s.steps.push({...fk,again:{last:e.last,why:e.why,sib:2},sibOf:e.k+'|'+e.id});return}}
     if(sb){RVID.add(sb.st.id);s.steps.push({...sb.st,again:{last:e.last,why:e.why,sib:1},sibOf:e.k+'|'+e.id,gk:sb.key})}else s.steps.push({k:e.k,id:e.id,again:{last:e.last,why:e.why}})});
   // 청해: 즉시응답 1 + 과제·포인트·개요·통합 이해 2(유형이 돌아가며). 2026-11-06 한자 2지선다 퀴즈(교육한자, N1 아님)는 루틴에서 뺌(골라 풀기에만)
-  {const L4=listen4();const nB=L4.length?((S.ptr.alt||0)%2?1:2):0,L=take('listen',lvPool(LISTEN_U.filter(x=>(x.mondai||4)===4)),3-nB),LB=take('listen4',L4,nB,()=>false,'listen');
+  {const L4=listen4(),nL=nOf(['listen'],3,'청해');const nB=L4.length?Math.min(nL,dayOdd()?1:2):0,L=take('listen',lvPool(LISTEN_U.filter(x=>(x.mondai||4)===4)),nL-nB),LB=take('listen4',L4,nB,()=>false,'listen');
    s.next.listen=L.next;if(nB)s.next.listen4=LB.next;L.items.concat(LB.items).forEach(x=>s.steps.push({k:'listen',id:x.id}))}
   // 한자 읽기 4지선다(2026-11-06): 책 단어장의 읽기 + 규칙으로 만든 오답(장음·촉음·탁음·요음)
   // 2026-11-10 한 회차에 같은 말이 두 번(읽기 문제 + 뜻 카드 등) 나오지 않게: 이미 넣은 문항의 대상어를 모아 두고 건너뛴다
   const USED=new Set(),tw=x=>{if(!x)return '';if(x.jp)return x.jp;const m=/【(.+?)】/.exec(x.stem||'');return x.type==='usage'?(x.stem||'').trim():['context','word_formation','orthography'].includes(x.type)?x.choices[x.answer-1]:m?m[1]:''},gks=x=>!x||!x.id?[]:(GI.get((x.jp?'v5':/^KR-/.test(x.id)?'kr':/^CJ-/.test(x.id)?'cj':'mock')+'|'+x.id)||[]),
     dup=x=>{const w=tw(x);return(!!w&&USED.has(w))||gks(x).some(k=>USED.has(k))},use=x=>{const w=tw(x);if(w)USED.add(w);gks(x).forEach(k=>USED.add(k))};
   s.steps.forEach(st=>use(srsItem(st)));
-  if((D.kr||[]).length){const KR=take('kr',lvPool(D.kr),2,dup);s.next.kr=KR.next;KR.items.forEach(x=>{use(x);s.steps.push({k:'kr',id:x.id})})}
+  if((D.kr||[]).length){const KR=take('kr',lvPool(D.kr),nOf(['kr'],2,'한자 읽기'),dup);s.next.kr=KR.next;KR.items.forEach(x=>{use(x);s.steps.push({k:'kr',id:x.id})})}
   // 어휘·한자(2026-11-06 합침): 한자 읽기 4지선다 2 → 모의고사 문자어휘 4(한자 읽기 유형은 4지선다와 겹쳐 뺌) → 어휘 카드 2, 한 묶음으로 이어서
   const rr=a=>{const g={};a.forEach(x=>(g[x.type]=g[x.type]||[]).push(x));const q=Object.values(g),o=[];while(q.some(x=>x.length))q.forEach(x=>x.length&&o.push(x.shift()));return o};
-  const MJ=take('moji',rr(lvPool(D.mock.filter(x=>['orthography','word_formation','context','paraphrase','usage'].includes(x.type)))),4,dup);s.next.moji=MJ.next;MJ.items.forEach(x=>{use(x);s.steps.push({k:'moji',id:x.id})});
-  if(D.v5&&D.v5.length){const V=take('v5',lvPool(D.v5).filter(v=>!S.known.includes(v.jp)),2,dup);s.next.v5=V.next;V.items.forEach(x=>s.steps.push({k:'v5',id:x.id}))}
+  const MJ=take('moji',rr(lvPool(D.mock.filter(x=>['orthography','word_formation','context','paraphrase','usage'].includes(x.type)))),nOf(['moji'],4,'문자·어휘'),dup);s.next.moji=MJ.next;MJ.items.forEach(x=>{use(x);s.steps.push({k:'moji',id:x.id})});
+  if(D.v5&&D.v5.length){const V=take('v5',lvPool(D.v5).filter(v=>!S.known.includes(v.jp)),nOf(['v5'],2,'어휘 카드'),dup);s.next.v5=V.next;V.items.forEach(x=>s.steps.push({k:'v5',id:x.id}))}
+  // 11-13 단어장 카드 하루 3장: 두 번 이상 틀린 문제의 말 먼저 → 낮은 단계 → 오래 안 본 것. 오늘 넣은 말·오늘 이미 연습한 말은 뺌
+  if(!TEST)wbPick(3).forEach(st=>s.steps.push(st));
   // 조사 오문정정(JPT 6부 참고): 책 문장에서 한국어 습관(~을 타다·~에서 살다·~가 되다)대로 조사 하나만 바꾼 것
   if((D.oc||[]).length){const OCx=take('oc',lvPool(D.oc),1);s.next.oc=OCx.next;OCx.items.forEach(x=>s.steps.push({k:'oc',id:x.id}))}
-  const GF=take('gf',lvPool(D.mock.filter(x=>x.type==='grammar_form')),2,dup);GF.items.forEach(use);const SO=take('so',lvPool(D.mock.filter(x=>x.type==='sentence_order')),1,dup);SO.items.forEach(use);
+  const GF=take('gf',lvPool(D.mock.filter(x=>x.type==='grammar_form')),nOf(['gram'],2,'문법'),dup);GF.items.forEach(use);const SO=take('so',lvPool(D.mock.filter(x=>x.type==='sentence_order')),1,dup);SO.items.forEach(use);
   s.next.gf=GF.next;s.next.so=SO.next;GF.items.concat(SO.items).forEach(x=>s.steps.push({k:'gram',id:x.id}));
   // 2026-11-12 사용자 요청: 실전모의고사 15회분(N1·N2 시사15)을 한 회차에 적어도 한 문제. 고른 레벨의 것만(N2 문제가 N1에 나오지 않게)
   {const isS=x=>/^N\d-시사15-/.test(x.id);
    if(![...MJ.items,...GF.items,...SO.items].some(isS)){const P=rr(D.mock.filter(x=>isS(x)&&inLv(x)&&x.lv!=null&&['orthography','word_formation','context','paraphrase','usage'].includes(x.type)));
     const X=P.length?take('sisa',P,1,dup,'moji'):{items:[]};
     if(X.items.length){s.next.sisa=X.next;const y=X.items[0];use(y);const j=s.steps.map(t=>t.k).lastIndexOf('moji');
-      if(j>=0&&MJ.items.length>=4){const old=s.steps[j].id;MJ.items=MJ.items.filter(x=>x.id!==old);s.steps[j]={k:'moji',id:y.id}}else s.steps.splice(j+1,0,{k:'moji',id:y.id})}}}
+      if(j>=0&&MJ.items.length>=2){const old=s.steps[j].id;MJ.items=MJ.items.filter(x=>x.id!==old);s.steps[j]={k:'moji',id:y.id}}else s.steps.splice(j+1,0,{k:'moji',id:y.id})}}}
   // 오늘 문법 문항의 문형 → 문형 카드·작문
   let pt=GF.items.concat(SO.items).find(x=>x.pattern);
   if(!pt){const P=lvPool(D.mock.filter(x=>x.pattern)),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
@@ -296,12 +309,22 @@ function buildSession(){
   if(RU.length){let ri=(S.ptr.reading||0)%RU.length,g=0;while(g++<RU.length&&RU[ri].ids.some(id=>S.seen['reading|'+id]||RVID.has(id)))ri=(ri+1)%RU.length;
    RU[ri].ids.forEach(id=>rdS.push({k:'reading',id}));rdS.next=ri+1}
   // 11-13: 동기화가 포인터를 큰 값으로 합치므로 alt는 늘기만 해야 한다(전에는 2→1로 돌아가 2에 멈춰 독해가 안 나왔음)
-  {const alt=(S.ptr.alt||0)%2,useTG=tgS.length&&(alt===0||!rdS.length);s.next.alt=(S.ptr.alt||0)+1;
-   if(useTG){tgS.forEach(x=>s.steps.push(x));s.next.tg=tgS.next}else if(rdS.length){rdS.forEach(x=>s.steps.push(x));s.next.reading=rdS.next}}
+  // 11-13: 마지막으로 낸 날(날짜 번호)을 포인터에 남겨 더 오래된 쪽을 낸다. 날짜 번호는 늘기만 하므로 동기화(큰 값으로 합침)에도 안전
+  {const dn=Math.floor(Date.parse(today()+'T00:00:00Z')/864e5),useTG=tgS.length&&(!rdS.length||(S.ptr.dTG||S.ptr.dRD?(S.ptr.dTG||0)<=(S.ptr.dRD||0):lastSeen('tg')<=lastSeen('reading')));s.next.alt=(S.ptr.alt||0)+1;
+   if(useTG){tgS.forEach(x=>s.steps.push(x));s.next.tg=tgS.next;s.next.dTG=dn}else if(rdS.length){rdS.forEach(x=>s.steps.push(x));s.next.reading=rdS.next;s.next.dRD=dn}}
   // 회화 작문(2026-11-06, 읽기만 하던 회화 단계 대신): 이미 들은 청해 대화에서 내 차례 대사를 일본어로 써 보기
   {const K=kwPool().find(x=>!S.seen['kw|'+x.id]);if(K)s.steps.push({k:'kw',id:K.id})}
   // 말 바꾸기(우회 표현) 1: 책 유의어 문제·단어장 예문·문형630(원본 대조) 예문. 2026-11-06 작문(write2)은 문형 카드와 겹쳐 뺌
   if(!TEST||TEST.rw)pickSteps('rw',1).forEach(x=>s.steps.push(x));
+  // 11-13 회차가 28문항을 넘으면(복습이 많은 날) 덜 중요한 것부터 뺀다: 말 바꾸기 → 회화 작문 → 오문 정정 → 접속 구별 → 넣기 하나
+  {const MAX=28,drop=['rw','kw','oc','cj','fill'];s.cut=[];for(const k of drop){if(s.steps.length<=MAX)break;const j=s.steps.map(t=>t.k===k&&!t.again).lastIndexOf(true);if(j>=0){s.steps.splice(j,1);s.cut.push(KN[k]||k);if(k==='oc'||k==='cj')delete s.next[k]}}}
+  // 11-13 빠진 영역 채우기: 청해·어휘·문법·긴 지문은 매일 꼭 들어가게(레벨·중복 거르기를 풀어서라도)
+  {const has=ks=>s.steps.some(t=>ks.includes(t.k));s.fixed=[];
+   if(!has(['listen'])){const X=take('listen',LISTEN_U,1);if(X.items[0]){s.steps.splice(0,0,{k:'listen',id:X.items[0].id});s.next.listen=X.next;s.fixed.push('청해')}}
+   if(!has(['moji','kr','v5'])){const X=take('moji',D.mock.filter(x=>MOJI_T.includes(x.type)&&inLv(x)),1);if(X.items[0]){s.steps.push({k:'moji',id:X.items[0].id});s.next.moji=X.next;s.fixed.push('어휘')}}
+   if(!has(['gram'])){const X=take('gf',D.mock.filter(x=>x.type==='grammar_form'&&inLv(x)),1);if(X.items[0]){s.steps.push({k:'gram',id:X.items[0].id});s.next.gf=X.next;s.fixed.push('문법')}}
+   if(!has(['tg','reading'])){const X=rdS.length?rdS:tgS;X.forEach(x=>s.steps.push(x));if(X===rdS&&rdS.length)s.next.reading=rdS.next;else if(tgS.length)s.next.tg=tgS.next;if(X.length)s.fixed.push('긴 지문')}
+   if(s.fixed.length)console.warn('루틴 빠진 영역 채움:',s.fixed)}
   s.i=0;return s;
 }
 function listen4(){const g={};lvPool(LISTEN_U.filter(x=>x.mondai&&x.mondai!==4)).forEach(x=>(g[x.mondai]=g[x.mondai]||[]).push(x));
@@ -335,7 +358,7 @@ function playSeq(items){if(player)player.pause();if('speechSynthesis' in window)
     else{player=new Audio(AU(it.a));player.playbackRate=S.pref.rate||1;player.onended=()=>setTimeout(nxt,i>1?1000:700);player.play().catch(()=>setTimeout(nxt,100))}};nxt()}
 function play(list){if(player){player.pause()}let i=0;const nxt=()=>{if(i>=list.length)return;player=new Audio(AU(list[i++]));player.playbackRate=S.pref.rate||1;player.onended=()=>setTimeout(nxt,600);player.play().catch(()=>{})};nxt()}
 // 답 기록: 걸린 시간(ms, 10분까지)·확신도(conf)를 붙이고, 객관식은 풀이 이력(hist)에도 한 줄씩 남긴다(난이도 측정용)
-function rec(r){const s=S.cur;r.ms=Math.min(Date.now()-(s.t0||Date.now()),600000);if(CONF_K.includes(r.k))r.conf=(s.conf||{})[s.i]||'sure';s.res[s.i]=r;
+function rec(r){const s=S.cur;r.ms=Math.min(Date.now()-(s.t0||Date.now()),600000);if(CONF_K.includes(r.k)&&(s.conf||{})[s.i])r.conf=s.conf[s.i];s.res[s.i]=r;
   if((r.k==='reading'||r.k==='tg'||r.k==='kkr')&&r.id!=null)S.seen[r.k+'|'+r.id]={t:Date.now(),ok:r.ok};
   if(r.k==='fill')S.seen['fill|'+r.id]={t:Date.now(),ok:r.ok};
   if('ok' in r&&r.id!=null&&r.k!=='wb'&&r.k!=='fill')srsUp(r.k,r.id,r.ok,r.conf==='unsure');
@@ -932,6 +955,12 @@ function wordsView(){
 // 단어 단계: 0 = 1단계 뜻 쓰기, 1 = 2단계 읽기 쓰기(한자가 없는 말은 뜻을 보고 말 쓰기), 2 = 3단계 작문. 처음 단계는 「모르는 것」으로 정한다
 const wLv=w=>w.lv!=null?Math.min(w.lv,2):(()=>{const y=whyOf(w);return !y.length||y.includes('mean')?0:(y.includes('yomi')||y.includes('kanji'))?1:2})();
 const wStep=w=>wLv(w)>=2?{k:'wb3',id:w.w}:{k:'wb',id:w.w};
+function wbPick(n){const d0=new Date(today()+'T00:00:00').getTime(),bad=new Map();
+  S.hist.forEach(h=>{if(!h.ok){const k=h.k+'|'+h.id;bad.set(k,(bad.get(k)||0)+1)}});
+  const card=new Set(Object.entries(S.srs).filter(([,e])=>e.card).map(([k])=>k));
+  return Object.values(S.words).filter(w=>!w.del&&w.st!=='done'&&w.w&&(w.t||0)<d0&&!((w.u||0)>=d0&&w.n))
+    .map(w=>({w,hot:(w.keys||[]).some(k=>card.has(k)||(bad.get(k)||0)>=2)?0:1}))
+    .sort((a,b)=>a.hot-b.hot||wLv(a.w)-wLv(b.w)||((a.w.u||0)-(b.w.u||0))).slice(0,n).map(o=>wStep(o.w))}
 const WLN=['1단계 뜻','2단계 읽기','3단계 작문','외움'];
 // 한국어 뜻 채점: 쉼표로 나뉜 뜻 가운데 하나와 같거나 서로 포함하면 정답(어미 하다·함·한·적 등은 떼고 비교)
 const koNorm=s=>String(s||'').replace(/[\s~〜()（）「」'".…!?,]/g,'').replace(/(하다|되다|이다|하게|스럽다|롭다|적인|적|함|한|히|다)$/,'');
@@ -1064,10 +1093,7 @@ function render(){
      hanyeok:'책 번역이 있는 독해 지문 문장을 일본어로 · 책 원문과 비교',kw:'들었던 대화에서 내 차례 대사를 일본어로 · 책 대사와 비교',write2:'오늘 문법 문제의 문형으로 내 문장 만들기',wb:'저장한 단어의 읽기·뜻 떠올리기',rw:'떠오르지 않는 말을 다른 말로 전하기',kanji:'기초 한자 읽기(교육한자 · N1 아님)',p630:'문형 해설 읽기'}[st.k];
    const kd=$('.card .kind');if(P&&kd)kd.insertAdjacentHTML('afterend',`<p class="purpose">${P}</p>`)}
   if(st.again){const k=$('.card .kind'),n=dayDiff(st.again.last,today());if(k)k.insertAdjacentHTML('beforeend',` <span class="lvb" style="border-color:var(--bad);color:var(--bad)">다시 · ${n>0?n+'일 전':'오늘'} ${st.again.why==='write'?'다시 쓰기':st.again.why==='unsure'?'애매':'오답'}${st.again.sib?(st.again.why==='write'?' · 같은 말이 든 다른 문장':st.again.sib===2?' · 같은 말을 빈칸에 직접':' · 같은 말의 다른 문제'):''}</span>`)}
-  // 확신도: 답하기 전 객관식에만. 누르지 않으면 「확실」. 애매하게 맞힌 문항도 복습에 들어간다
-  if(CONF_K.includes(st.k)&&!s.res[s.i]){const k=$('.card .kind'),c=(s.conf||{})[s.i]||'sure';
-    k.insertAdjacentHTML('afterend',`<div class="chips"><span class="note">답할 때 느낌</span>${[['sure','확실'],['unsure','애매 · 찍음']].map(([v,n])=>`<button data-cf="${v}" class="${c===v?'on':''}">${n}</button>`).join('')}</div>`);
-    document.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{s.conf=s.conf||{};s.conf[s.i]=b.dataset.cf;save();document.querySelectorAll('[data-cf]').forEach(x=>x.classList.toggle('on',x===b))})}
+  // 11-13 확신도(확실/애매) 고르기는 없앰(사용자 결정: 의견은 글로 남기므로 필요 없음)
 }
 const CONF_K=['listen','kanji','vocab','v5','moji','gram','tg','reading','kr','oc','cj'];
 function lvSummary(){const c=(a,l)=>a.filter(x=>x.lv===l).length;
@@ -1089,7 +1115,7 @@ function home(){
   $('#view').innerHTML=card('오늘',`${TEST?'':lvChips()}${main}
    ${other?`<div class="row"><button id="other">하던 ${other.review?'복습':other.test?'레벨 테스트':'골라 풀기'} 이어서 (${other.i+1} / ${other.steps.length})</button></div>`:''}
    <div class="stat"><span>연속 ${streak()}일</span>${last?`<span>지난 학습 ${esc(last.date)} · 객관식 ${last.ok}/${last.n}</span>`:''}<span>복습할 문제 ${open}</span><span>출제 레벨 ${esc(S.levels.join('·'))}</span></div>
-   <p class="note">순서: 다시 볼 문제 → 청해 → 어휘·한자 → 오문 정정 → 문법 → 접속 구별 → 문형 카드 → 넣기(어제까지 맞힌 말을 보기 없이) → 번역(일→한·한→일) → 글의 문법·독해(하루씩 번갈아) → 회화 작문 → 말 바꾸기. 틀렸거나 애매했던 문제는 1·3·7일 간격으로 맨 앞 「다시」에 나오고(세 번 연달아 맞히면 빠짐)(같은 말을 쓰는 다른 책 문제가 있으면 번갈아 그 문제로), 이미 푼 문제는 루틴에 다시 나오지 않습니다.</p>
+   <p class="note">순서: 다시 볼 문제 → 청해 → 어휘·한자 → 단어장 카드 3장 → 오문 정정 → 문법 → 접속 구별 → 문형 카드 → 넣기(어제까지 맞힌 말을 보기 없이) → 번역(일→한·한→일) → 글의 문법·독해(하루씩 번갈아) → 회화 작문 → 말 바꾸기. 틀린 문제는 1·3·7일 간격으로 맨 앞 「다시」에 나오고(세 번 연달아 맞히면 빠짐)(같은 말을 쓰는 다른 책 문제가 있으면 번갈아 그 문제로), 같은 문제를 두 번 틀리면 그 말은 단어장 카드로 넘어갑니다. 최근 90% 넘게 맞히는 영역은 문제 수를 절반으로 줄입니다. 이미 푼 문제는 루틴에 다시 나오지 않습니다.</p>
    ${TEST?'':`<p class="note">${esc(syncLine())}</p>`}`);
   if(!TEST)lvBind();
   const st=$('#start');if(st)st.onclick=()=>{if(daily&&S.cur===daily)S.cur=null;S.pause=null;startSession(buildSession())};
@@ -1174,7 +1200,7 @@ const FBT=[['good','좋았던 점'],['bad','불편했거나 헷갈렸던 점 (�
 function fbSummary(){const H=S.hist.filter(h=>h.k!=='wb'),by={};H.forEach(h=>{const k=KN[h.k]||h.k;(by[k]=by[k]||[0,0,0])[0]++;if(h.ok)by[k][1]++;by[k][2]+=h.ms||0});
   const days=new Set(S.log.map(l=>l.date)).size,T=S.tests.slice(-1)[0];
   return [`사용 일수 ${days}일 · 학습 ${S.log.filter(l=>!l.kind).length}회 · 골라 풀기 ${S.log.filter(l=>l.kind==='custom').length}회 · 복습 ${S.log.filter(l=>l.kind==='review').length}회 · 레벨 테스트 ${S.tests.length}회`,
-    `객관식 ${H.length}문항 · 정답 ${H.filter(h=>h.ok).length} · 애매 ${H.filter(h=>h.c==='unsure').length}`,
+    `객관식 ${H.length}문항 · 정답 ${H.filter(h=>h.ok).length}`,
     ...Object.entries(by).map(([k,v])=>`  ${k}: ${v[1]}/${v[0]} · 평균 ${Math.round(v[2]/v[0]/1000)}초`),
     T?`레벨 테스트(최근): 언어지식 ${T.sc.lang} · 독해 ${T.sc.read} · 청해 ${T.sc.listen} (각 60점)`:'레벨 테스트: 안 함',
     `오답노트 ${Object.keys(S.notes).length}문항 · 단어장 ${Object.values(S.words).filter(w=>!w.del).length}개 · AI 판정 붙여넣기 ${Object.keys(S.judges).length}일 · 말 바꾸기 ${Object.keys(S.notes).filter(k=>k.startsWith('rw|')).length}개`,
@@ -1500,7 +1526,7 @@ function qBlock(st,r){const J=a=>a.filter(Boolean).join('\n'),pk=r&&r.pick!=null
   if(st.k==='vocab'&&x)return J([`단어: ${x.jp} = ${x.ko}`,x.ctx?`책 예문: ${x.ctx[0]}`:'',r&&r.picked?`내가 고른 뜻: ${r.picked}`:'']);
   if(st.k==='p630'&&x)return J([`문형: ${x.pattern} = ${x.meaning}`,x.ex[0]?`책 예문: ${x.ex[0][0]}`:'']);
   if(st.k==='talk'&&x)return J(x.lines.map(l=>l.ja));
-  if(st.k==='kw'){const y=kwItem(st.id);if(!y)return '';const i=r.li;return J([`연습: 회화 작문(대화 속 내 차례 대사를 일본어로)`,y.intro?`상황: ${y.intro.ja}`:'',`앞 대화:\n${y.lines.slice(0,i).map(l=>l.who+': '+l.ja).join('\n')}`,`내 차례(한국어): ${y.lines[i].ko}`,`내 답: ${r.mine||'(안 씀)'}`,`책 대사: ${y.lines[i].ja}`])}
+  if(st.k==='kw'){const y=kwItem(st.id);if(!y)return '';const i=r.li!=null?r.li:kwTarget(y);if(i<0||!y.lines[i])return '';return J([`연습: 회화 작문(대화 속 내 차례 대사를 일본어로)`,y.intro?`상황: ${y.intro.ja}`:'',`앞 대화:\n${y.lines.slice(0,i).map(l=>l.who+': '+l.ja).join('\n')}`,`내 차례(한국어): ${y.lines[i].ko}`,`내 답: ${r.mine||'(안 씀)'}`,`책 대사: ${y.lines[i].ja}`])}
   if(st.k==='ilyeok'||st.k==='hanyeok')return J([`문제: ${r.q}`,`내 답: ${r.mine||'(안 씀)'}`,`교재: ${r.a}`]);
   if(st.k==='write'||st.k==='write2')return J([`요구 문형: ${r.pat}`,`내 문장: ${r.mine||'(안 씀)'}`]);
   if(st.k==='rw'){const it=rwItem(st.id);if(!it)return '';const W=it.sub==='t'?'쓰지 말 문형':'쓰지 말 말';
@@ -1600,7 +1626,7 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
   const bar=(sc)=>sc==null?'<span class="note">문항이 더 필요해요</span>':`<b>${sc}</b> / 60 <span class="note">${sc<19?'(과락선 19 미만)':''}</span>`;
   const enough=SEC.filter(([s])=>e[s].n>=10).length;
   $('#view').innerHTML=card('내 실력',`<div class="chips"><span class="note">레벨</span>${LVS.map(l=>`<button data-lvv="${l}" class="${l===lv?'on':''}">${l}</button>`).join('')}</div>
-   <div><b>${lv} 추정 점수</b> <span class="note">(JLPT처럼 영역별 60점 환산 · 처음 푼 문제 최근 60개 · 애매하게 맞힌 건 절반 · 매일 조금씩 움직임)</span></div>
+   <div><b>${lv} 추정 점수</b> <span class="note">(JLPT처럼 영역별 60점 환산 · 처음 푼 문제 최근 60개 · 매일 조금씩 움직임)</span></div>
    ${T.length?scoreBoard(T[0].sc,lv,'최근 레벨 테스트 · '+T[0].date+' (테스트를 다시 봐야 바뀝니다)'):''}
    ${scoreBoard({lang:e.lang.sc,read:e.read.sc,listen:e.listen.sc,lang_n:e.lang.n,read_n:e.read.n,listen_n:e.listen.n},lv,'평소 풀이로 본 추정 점수 (최근 60문항씩)')}
    ${enough<3?'<p class="note">영역마다 10문항 이상 풀면 숫자가 안정됩니다. 「레벨 테스트」로 한 번에 기준점을 잡을 수 있어요.</p>':''}
@@ -1613,9 +1639,6 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
    <div class="stat"><span>단어 ${g.w.n}개 중 만남 ${g.w.met}</span><span>알아봄 ${g.w.rec}</span><span>쓸 수 있음 ${g.w.can}</span></div>`:'')(grpStats())}
    <div><b>약한 유형</b> <span class="note">(최근 40문항, 3문항 이상)</span></div>
    ${ty.length?ty.slice(0,6).map(t=>`<div class="row" style="justify-content:space-between"><span>${esc(t.t)} <span class="note">${t.n}문항 · 평균 ${Math.round(t.ms/1000)}초</span></span><b>${pct(t.p)}</b></div>`).join(''):'<p class="note">기록이 더 필요해요.</p>'}
-   <div><b>확신도</b> <span class="note">(최근 ${cb.n}문항)</span></div>
-   <div class="stat"><span>확신했는데 틀림 ${pct(cb.wrongSure)}</span><span>애매했는데 맞힘 ${pct(cb.rightUnsure)}</span><span>애매하게 답한 비율 ${pct(cb.unsureRate)}</span></div>
-   <p class="note">확신했는데 틀린 비율이 높으면 착각하고 있는 지식이 있다는 뜻이고, 애매했는데 맞힌 비율이 높으면 아는데 자신이 없는 상태입니다.</p>
    <div class="row"><button class="pri" id="lrep">실력 리포트 복사 (AI에게 분석 받기)</button></div><p class="note" id="lmsg"></p>
    <details><summary>리포트 내용 보기</summary><pre class="out" id="lout">${esc(levelReport(lv))}</pre></details>`);
   document.querySelectorAll('[data-lvv]').forEach(b=>b.onclick=()=>{LV_SEL=b.dataset.lvv;levelView()});
@@ -1644,7 +1667,6 @@ function levelReport(lv){const e=estimate(lv),ty=typeStats(lv),cb=calib(lv),w=we
   if(w.length>1)L.push(`\n주별 추세: `+w.map(p=>{const d=new Date(p.w);return `${d.getMonth()+1}/${d.getDate()} 언${p.e.lang.sc??'-'}·독${p.e.read.sc??'-'}·청${p.e.listen.sc??'-'}`}).join(' → '));
   if(T.length)L.push(`레벨 테스트: `+T.map(t=>`${t.date} ${t.sc.lang}/${t.sc.read}/${t.sc.listen}`).join(', '));
   if(ty.length)L.push(`\n유형별 정답률(낮은 순): `+ty.slice(0,8).map(t=>`${t.t} ${pct(t.p)}(${t.n}문항, 평균 ${Math.round(t.ms/1000)}초)`).join(' / '));
-  L.push(`확신도: 확신했는데 틀림 ${pct(cb.wrongSure)} · 애매했는데 맞힘 ${pct(cb.rightUnsure)} · 애매 비율 ${pct(cb.unsureRate)}`);
   {const W=wSeries();if(W.length)L.push(`쓰기 점수(AI 판정, 15점 만점 평균): `+W.slice(-6).map(w=>`${w.d.slice(5)} ${w.avg.toFixed(1)}`).join(' → ')+` · 항목 평균 문법 ${wAvg(0)}/5 · 문형 ${wAvg(1)}/5 · 자연스러움 ${wAvg(2)}/5`)}
   const days=new Set(S.log.filter(l=>!l.kind).map(l=>l.date));L.push(`학습 일수 ${days.size}일 · 연속 ${streak()}일 · 복습 대기 ${openNotes()}문제`);
   const wr=S.hist.filter(h=>!h.ok&&h.m!=='rv').slice(-8).map(h=>{const x=hItem(h);if(!x)return null;const t=x.stem||x.q&&x.q.ja||'';return `- [${KN[h.k]||h.k}${x.type&&TYN[x.type]&&TYN[x.type]!==KN[h.k]?' · '+TYN[x.type]:''}] ${String(t).replace(/[【】]/g,'').slice(0,60)}`}).filter(Boolean);
@@ -1700,8 +1722,51 @@ if(S.pause&&S.pause.closed)S.pause=null;
  Object.values(S.words).forEach(w=>{const e=(w.ex||[]).filter(x=>!/[가-힣]/.test((x&&x[0])||''));if(e.length!==(w.ex||[]).length){w.ex=e;w.u=now;ch=true}});
  Object.entries(S.judges).forEach(([d,j])=>{const c=S.wsc[d];if(!c||!j||!j.text)return;const w=parseWK(j.text);if(w.length&&JSON.stringify(w)!==JSON.stringify(c.items)){S.wsc[d]={...c,items:w,t:now};ch=true}});
  if(ch)save()}
-render();
-syncNow().then(r=>{if(r==='ok'&&VIEW!=='sess')render()});
+// ── 11-13 핵심 장면 자동 시험: routine.html?selftest ──
+// 이 기기 기록의 사본으로 엿새치 회차를 만들고 풀고 끝내고 판정을 넣어 본다. 동기화는 끄고, 끝나면 기록을 원래대로 돌려놓는다.
+const SELFTEST=/[?&]selftest\b/.test(location.search);
+async function selfTest(){
+  const out=[],ok=(c,m)=>out.push((c?'통과  ':'실패  ')+m),keep=localStorage.getItem(KEY),S0=JSON.stringify(S),tok=SY.token;SY.token=null;
+  const OBJ_K=['listen','kanji','vocab','v5','moji','gram','tg','reading','kr','oc','cj'];
+  try{
+    // 1) 확신도 칸이 없어졌는지, 쉬운 영역 줄이기·두 번 틀림 규칙이 맞게 도는지(함수 단위)
+    const h0=S.hist;S.hist=Array.from({length:10},(_,i)=>({k:'listen',id:'x'+i,ok:true,t:i}));
+    ok(easyN(['listen'],3)===1,'90% 넘게 맞힌 영역은 문제 수가 줄어듦 (청해 3 → 1)');
+    S.hist=Array.from({length:10},(_,i)=>({k:'listen',id:'x'+i,ok:i<7,t:i}));ok(easyN(['listen'],3)===3,'70%면 그대로 (청해 3)');S.hist=h0;
+    {const k='moji',id='__ST__',key=k+'|'+id,w0=S.words['__ST語'];S.words['__ST語']={w:'__ST語',r:'てすと',ko:'시험',keys:[key],t:1,u:1,ok:0,n:0,st:''};
+     S.hist.push({t:Date.now(),d:today(),k,id,ok:false});srsUp(k,id,false);ok(S.srs[key]&&S.srs[key].card&&S.srs[key].done,'같은 문제를 두 번 틀리면 단어장 카드로 넘어가고 다시 내지 않음');
+     {const P=wbPick(200),i=P.findIndex(st=>st.id==='__ST語'),hot=new Set(Object.entries(S.srs).filter(([,e])=>e.card).map(([k])=>k));ok(i>=0&&P.slice(0,i).every(st=>(S.words[st.id].keys||[]).some(k=>hot.has(k)||S.hist.filter(h=>!h.ok&&h.k+'|'+h.id===k).length>=2)),'두 번 틀린 말이 단어장 카드 앞쪽(다른 두 번 틀린 말 다음)에 옴')}}
+    // 2) 엿새치 회차: 영역이 빠지지 않는지, 긴 지문이 번갈아 나오는지, 풀고 끝내기·판정 넣기
+    const longs=[];
+    for(let day=1;day<=6;day++){window.__DAYOFF=day;S.cur=null;S.pause=null;
+      const s=buildSession(),ks=s.steps.map(t=>t.k),has=a=>ks.some(k=>a.includes(k));
+      ok(has(['listen'])&&has(['moji','kr','v5'])&&has(['gram'])&&has(['tg','reading']),`${today()} 청해·어휘·문법·긴 지문이 모두 들어감 (${s.steps.length}문항${s.easy.length?', 줄인 영역: '+s.easy.join('·'):''}${s.fixed.length?', 채운 영역: '+s.fixed.join('·'):''}${s.cut.length?', 뺀 것: '+s.cut.join('·'):''})`);
+      ok(s.steps.length>=12&&s.steps.length<=30,`${today()} 회차 길이 ${s.steps.length}`);
+      const miss=s.steps.filter(t=>OBJ_K.includes(t.k)&&t.id!=null&&!srsItem(t));ok(!miss.length,`${today()} 모든 문제를 팩에서 찾음`+(miss.length?' — 못 찾음: '+miss.map(t=>t.k+'|'+t.id).join(', '):''));
+      if(Object.values(S.words).some(w=>!w.del&&w.st!=='done'))ok(has(['wb','wb3']),`${today()} 단어장 카드가 들어감`);
+      longs.push(s.steps.some(t=>t.k==='reading'&&!t.again&&!t.sibOf)?'reading':s.steps.some(t=>t.k==='tg'&&!t.again&&!t.sibOf)?'tg':'없음');
+      startSession(s);
+      s.steps.forEach((st,i)=>{s.i=i;const x=OBJ_K.includes(st.k)?srsItem(st):null;
+        if(x&&st.id!=null){const a=x.answer||x.ans||1,good=(i+day)%6!==0;rec({k:st.k,id:st.id,pick:good?a:(a%2)+1,ok:good})}
+        else s.res[i]={k:st.k,mine:'テスト',...(st.k==='wb'?{lv:0}:{})}});
+      s.i=s.steps.length;render();
+      ok(!!$('#out')&&/번호 \w+/.test($('#out').textContent),`${today()} 끝 화면과 판정 요청문(번호) 나옴`);
+      ok(!document.querySelector('[data-cf]'),`${today()} 확신도 칸 없음`);
+      const keys=jKeys($('#out').textContent);
+      ok(jStale('[#moji|예전문제]\n정답은 1번',$('#out').textContent)&&(!keys.length||!jStale('[#'+keys[0]+']\n정답',$('#out').textContent)),`${today()} 예전 판정은 걸러지고 오늘 판정은 통과`);
+      if(keys.length){saveJudge(today(),'[#'+keys[0]+']\n정답은 1번입니다.\n단어: 試験（しけん）= 시험\n예문: 試験に合格した。 / 시험에 합격했다.','자동 시험',true);ok(!!S.judges[today()],`${today()} 판정 저장`)}
+    }
+    ok(longs.every((x,i)=>!i||x!==longs[i-1]),'글의 문법과 독해가 하루씩 번갈아 나옴 ('+longs.map(x=>x==='tg'?'글의 문법':'독해').join(' → ')+')');
+    VIEW='level';render();ok(/추정 점수/.test($('#view').textContent),'실력 탭이 열림');
+  }catch(e){ok(false,'오류로 멈춤: '+e.message+' '+(e.stack||'').split('\n')[1])}
+  finally{window.__DAYOFF=0;SY.token=tok;if(keep!=null)localStorage.setItem(KEY,keep);else localStorage.removeItem(KEY);S=JSON.parse(S0)}
+  const bad=out.filter(l=>l.startsWith('실패')).length;
+  document.title=(bad?'실패 '+bad:'모두 통과')+' · 자동 시험';
+  $('#view').innerHTML=card('자동 시험 결과',`<p><b>${bad?'실패 '+bad+'개':'모두 통과'}</b> (${out.length}개 확인) · 이 기기 기록은 원래대로 돌려놓았습니다.</p><pre class="out">${esc(out.join('\n'))}</pre><div class="row"><a href="${location.pathname}"><button class="pri">앱으로 돌아가기</button></a></div>`);
+  window.__ST=out;return out}
+if(SELFTEST){render();setTimeout(selfTest,300)}
+else{render();
+syncNow().then(r=>{if(r==='ok'&&VIEW!=='sess')render()})}
 </script>
 <script>
 /* 루틴 팩(LARTN1)을 기기(IndexedDB)에서 꺼내 본 화면을 실행. 없으면 파일을 고르게 한다. 팩은 저장소에 없음 */
