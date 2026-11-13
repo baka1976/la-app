@@ -1245,7 +1245,7 @@ function vListen(st,lab){
        <div><b class="jp">${esc(x.q.ja)}</b><div class="ko">${esc(x.q.ko)}</div></div>`
       :`<div class="turn"><div class="who">${esc(x.q.who||'')}</div><div><div class="jp">${esc(x.q.ja)}</div><div class="ko">${esc(x.q.ko)}</div></div></div>`}
      <div class="opts">${x.ch.map((c,i)=>`<div class="turn"><div class="who">${i+1}</div><div><div class="${i+1===x.ans?'res ok':''}"><span class="jp">${esc(c[0])}</span></div><div class="ko">${esc(c[1])}</div>${x.kk&&x.aud[i+1]?`<button data-rp="${i+1}" style="margin-top:4px">${ic('play',1)} ${i+1}번만 다시 듣기</button>`:''}</div></div>`).join('')}</div>
-     ${x.expl?`<p class="note">${x.cexpl?'정답·해설은 Claude 판정(책 정답표 없음)':'책 해설'}: ${esc(x.expl)}</p>`:''}${x.words?`<details><summary>단어</summary><p class="note">${esc(x.words)}</p></details>`:''}
+     ${x.expl?`<p class="note">${x.cexpl?'정답·해설은 Claude 판정(책 정답표 없음)':x.xexpl?'해설은 Claude 판단(책에 해설 없음, 정답은 책)':'책 해설'}: ${esc(x.expl)}</p>`:''}${x.words?`<details><summary>단어</summary><p class="note">${esc(x.words)}</p></details>`:''}
      ${ok?'':`<label class="note" for="why">왜 ${ans}번을 골랐는지, 왜 틀렸는지 한 줄 (결과지에 들어갑니다)</label><textarea id="why">${esc(r.why||'')}</textarea>`}
      ${nextBtn()}`}
   $('#view').innerHTML=card(lab,h,x.src);
