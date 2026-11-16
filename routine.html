@@ -1694,12 +1694,14 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
    ${(g=>GI.size?`<div><b>묶음 계단</b> <span class="note">(같은 말의 책 문제를 묶은 것 · 알아봄 = 서로 다른 문제로 맞힘 · 쓸 수 있음 = 보기 없이 넣기를 맞힘)</span></div>
    <div class="stat"><span>문형 ${g.p.n}개 중 만남 ${g.p.met}</span><span>알아봄 ${g.p.rec}</span><span>쓸 수 있음 ${g.p.can}</span></div>
    <div class="stat"><span>단어 ${g.w.n}개 중 만남 ${g.w.met}</span><span>알아봄 ${g.w.rec}</span><span>쓸 수 있음 ${g.w.can}</span></div>`:'')(grpStats())}
+   ${cpView()}
    <div><b>약한 유형</b> <span class="note">(최근 40문항, 3문항 이상)</span></div>
    ${ty.length?ty.slice(0,6).map(t=>`<div class="row" style="justify-content:space-between"><span>${esc(t.t)} <span class="note">${t.n}문항 · 평균 ${Math.round(t.ms/1000)}초</span></span><b>${pct(t.p)}</b></div>`).join(''):'<p class="note">기록이 더 필요해요.</p>'}
    <div class="row"><button class="pri" id="lrep">실력 리포트 복사 (AI에게 분석 받기)</button></div><p class="note" id="lmsg"></p>
    <details><summary>리포트 내용 보기</summary><pre class="out" id="lout">${esc(levelReport(lv))}</pre></details>`);
   document.querySelectorAll('[data-lvv]').forEach(b=>b.onclick=()=>{LV_SEL=b.dataset.lvv;levelView()});
   $('#ltest').onclick=()=>{const steps=buildTest(lv);if(!steps.length)return;startSession({date:today(),steps,next:{},res:[],i:0,custom:true,test:true,lv})};
+  cpBind();
   $('#lrep').onclick=()=>{const t=levelReport(lv);navigator.clipboard.writeText(t).then(()=>$('#lmsg').textContent='복사했습니다. AI 채팅에 붙여 넣으세요.',()=>{const d=$('#lout').closest('details');d.open=true;const r=document.createRange();r.selectNodeContents($('#lout'));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);$('#lmsg').textContent='복사가 막혀 있어 내용을 선택해 두었습니다.'})}}
 // 쓰기 점수(JLPT 환산과 별도): 날짜별 평균(15점 만점)과 항목별 평균(최근 10일)
 function wSeries(){return Object.entries(S.wsc).sort(([a],[b])=>a<b?-1:1).map(([d,v])=>({d,test:v.test,n:v.items.length,avg:v.items.reduce((a,x)=>a+x[0]+x[1]+x[2],0)/v.items.length}))}
@@ -1716,6 +1718,23 @@ function buildTest(lv){const keep=S.levels;S.levels=[lv];try{const st=[...pickSt
   const g=st.filter(x=>x.k==='gram').map(x=>find('mock',x.id)).find(x=>x&&x.pattern)||shuffle(lvPool(D.mock.filter(x=>x.pattern)))[0],tr=(pickTrans(1)[0]||{}).t;
   if(g)st.push({k:'write2',id:g.id});if(tr)st.push({k:'hanyeok',ja:tr[0],ko:tr[1],src:tr[2]});return st}finally{S.levels=keep}}
 function testScore(s){const r={};for(const[k,,ks]of SEC){const L=s.steps.map((st,i)=>({st,r:s.res[i]})).filter(o=>ks.includes(o.st.k)&&o.r&&'ok' in o.r);r[k]=L.length?Math.round(L.reduce((a,o)=>a+(o.r.ok?(o.r.conf==='unsure'?0.5:1):0),0)/L.length*60):0;r[k+'_n']=L.length}return r}
+// 2026-11-17 헷갈린 짝: 오답노트에 남은 「고른 보기」(pick, 책 번호)로 정답 말 ↔ 내가 고른 말 짝을 모은다(어휘 문맥·유의·표기, 문법 빈칸만)
+const CP_T=['context','paraphrase','orthography','word_formation','grammar_form'];
+function confPairs(){const m=new Map();for(const e of Object.values(S.notes||{})){if(!['moji','gram'].includes(e.k))continue;const x=find('mock',e.id);if(!x||!CP_T.includes(x.type)||x.passage)continue;
+  for(const a of e.a||[]){if(a.ok!==false||!a.pick)continue;const c=x.choices[x.answer-1],p=x.choices[a.pick-1];if(!c||!p||c===p)continue;
+    const k=c+'\u0001'+p,o=m.get(k)||{c,p,n:0,ids:[],t:0,g:x.type==='grammar_form',s:x.stem};o.n++;if(!o.ids.includes(e.k+'|'+e.id))o.ids.push(e.k+'|'+e.id);o.t=Math.max(o.t,a.t||0);m.set(k,o)}}
+  return[...m.values()].sort((a,b)=>b.n-a.n||b.t-a.t)}
+const cpDict=w=>{const e=dx().m.get(String(w).replace(/^[～〜]+|[～〜]+$/g,''));return e?{r:e[1]||'',ko:e[2]||''}:{r:'',ko:''}};
+function cpView(){const P=confPairs();if(!P.length)return'';
+  return`<div><b>헷갈린 짝</b> <span class="note">(틀릴 때 고른 말 ↔ 정답 말 · 오답노트 기록에서 · ${P.length}쌍)</span></div>
+   <div class="opts">${P.slice(0,8).map((o,i)=>{const a=cpDict(o.c),b=cpDict(o.p),inW=w=>S.words[w]&&!S.words[w].del;
+    return`<div class="wline"><div><span class="note">정답</span> <b class="jp" style="font-size:18px">${esc(o.c)}</b>${a.r&&a.r!==o.c?` <span class="note">${esc(a.r)}</span>`:''}${a.ko?` <span class="note">${esc(a.ko)}</span>`:''}</div>
+     <div><span class="note">고른 말</span> <span class="jp" style="font-size:18px">${esc(o.p)}</span>${b.r&&b.r!==o.p?` <span class="note">${esc(b.r)}</span>`:''}${b.ko?` <span class="note">${esc(b.ko)}</span>`:''}${o.n>1?` <span class="tag">${o.n}번</span>`:''}</div>
+     ${inW(o.c)&&inW(o.p)?'<p class="note">둘 다 단어장에 있음</p>':`<div class="row"><button data-cp="${i}" style="min-height:34px;padding:3px 10px;font-size:13px">두 말 단어장에 넣기</button></div>`}</div>`}).join('')}</div>`}
+function cpBind(){const P=confPairs();document.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{const o=P[+b.dataset.cp];if(!o)return;const now=Date.now(),key=o.ids[0];
+  [o.c,o.p].forEach(w=>{if(S.words[w]&&!S.words[w].del)return;const d=cpDict(w),old=S.words[w]||{};
+    S.words[w]={w,r:old.r||d.r,ko:old.ko||d.ko,kind:o.g?'p':(old.kind||''),ex:old.ex||[],keys:[...new Set([...(old.keys||[]),key])],t:now,u:now,ok:0,n:old.n||0,st:'',del:false,src:{k:key.split('|')[0],id:key.slice(key.indexOf('|')+1),d:today(),cp:1},s:String(o.s||'').replace(/[【】]/g,'').slice(0,90)}});
+  save();b.textContent='넣었습니다';b.disabled=true;syncNow()})}
 // AI에게 보낼 실력 리포트(무료 모델용): 숫자와 약점, 최근 오답 예를 묶고 분석·계획을 요청
 function levelReport(lv){const e=estimate(lv),ty=typeStats(lv),cb=calib(lv),w=weekly(lv).slice(-8),T=S.tests.filter(t=>t.lv===lv).slice(-3);
   const L=[`[LA 일본어 실력 리포트] ${today()} · 목표 레벨 ${lv}`,`※ JLPT식 60점 환산 추정(앱이 계산): 처음 푼 문제 최근 60개, 애매하게 맞힌 건 0.5점`];
