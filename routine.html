@@ -168,6 +168,28 @@ button.start{border:0;border-radius:16px;font-size:19px;font-weight:700;color:va
   background:linear-gradient(120deg,var(--g1,#fcd5df) 0%,var(--g2,#e3dafc) 55%,var(--g3,#d3e8fb) 100%);box-shadow:0 6px 16px var(--g-sh,rgba(150,130,220,.25))}
 button.opt{background:var(--card);padding:12px 14px}
 @media (hover:hover){button.opt:not(:disabled):hover{background:var(--soft)}}
+/* 2026-11-17 배색 고르기: 밝은 값은 :root[data-pal], 어두운 값은 그보다 강한 선택자로 덮음 */
+.chips .sw{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:6px;vertical-align:-2px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+:root[data-pal="sage"]{--bg:#f5f3ec;--card:#fffefa;--fg:#26302b;--mute:#6f7a74;--line:#e4e6dc;--accent:#5d8c78;--accent-ink:#fffefa;--soft:#e2efe7;--soft-ink:#3b6a56;--mark:#f3e6ad;--g1:#d4ecdd;--g2:#e9f0d6;--g3:#f7ead3;--g-ink:#2c4a3d;--g-sh:rgba(95,140,120,.25);--u1:#9fcab4;--u2:#e8d49a}
+:root[data-pal="peach"]{--bg:#faf4ef;--card:#fffdfb;--fg:#33292a;--mute:#7c6f6c;--line:#efe2da;--accent:#cc6f5a;--accent-ink:#fffdfb;--soft:#fbe5dc;--soft-ink:#9c4a37;--mark:#fbe2a3;--g1:#fddccd;--g2:#fbd6dc;--g3:#fbe8c6;--g-ink:#5a2e24;--g-sh:rgba(204,111,90,.25);--u1:#f4a990;--u2:#f5cf86}
+:root[data-pal="lav"]{--bg:#f7f3ec;--card:#fffdfa;--fg:#2b2a33;--mute:#77727f;--line:#ebe4da;--accent:#6c63b5;--accent-ink:#fff;--soft:#efeafc;--soft-ink:#4b4392;--mark:#fbe7a8;--g1:#fcd5df;--g2:#e3dafc;--g3:#d3e8fb;--g-ink:#2f2a55;--g-sh:rgba(150,130,220,.25);--u1:#f6b8c8;--u2:#b9aef5}
+:root[data-pal="ink"]{--bg:#f4f2ee;--card:#fffefc;--fg:#24262b;--mute:#6e6f74;--line:#e2dfd8;--accent:#3a3f4a;--accent-ink:#fffefc;--soft:#ebe8e2;--soft-ink:#2e323b;--mark:#efe0bb;--g1:#e9e5dc;--g2:#efe8d8;--g3:#e3e6ea;--g-ink:#24262b;--g-sh:rgba(40,40,50,.18);--u1:#c9b18a;--u2:#8a919e}
+@media (prefers-color-scheme: dark){
+  :root[data-pal="sage"]:not([data-theme="light"]){--bg:#171c1a;--card:#202725;--fg:#e6ece8;--mute:#9eaaa4;--line:#313b37;--accent:#9fd0b8;--accent-ink:#171c1a;--soft:#26352e;--soft-ink:#c4e6d4;--mark:#4f4a24;--g1:#2e4639;--g2:#38432c;--g3:#47402e;--g-ink:#e6ece8;--g-sh:rgba(0,0,0,.3)}
+  :root[data-pal="peach"]:not([data-theme="light"]){--bg:#1e1918;--card:#282120;--fg:#efe7e4;--mute:#ae9f9b;--line:#3c3230;--accent:#f2a690;--accent-ink:#1e1918;--soft:#3a2a26;--soft-ink:#f6cfc3;--mark:#55441f;--g1:#4d342c;--g2:#4a2f37;--g3:#4a3d27;--g-ink:#efe7e4;--g-sh:rgba(0,0,0,.3)}
+  :root[data-pal="lav"]:not([data-theme="light"]){--bg:#1b1a21;--card:#24232c;--fg:#ecebf2;--mute:#a5a2b2;--line:#34323f;--accent:#b3a9f2;--accent-ink:#1b1a21;--soft:#2f2c40;--soft-ink:#d4cdfb;--mark:#5a4d22;--g1:#4a3743;--g2:#3d3757;--g3:#2f4153;--g-ink:#ecebf2;--g-sh:rgba(0,0,0,.3)}
+  :root[data-pal="ink"]:not([data-theme="light"]){--bg:#17181b;--card:#202226;--fg:#e8e6e1;--mute:#a19f9a;--line:#33353a;--accent:#d8c7a6;--accent-ink:#17181b;--soft:#2b2d32;--soft-ink:#ece2cc;--mark:#4f4630;--g1:#2c2e33;--g2:#38342b;--g3:#2b3138;--g-ink:#e8e6e1;--g-sh:rgba(0,0,0,.3)}}
+:root[data-pal="sage"][data-theme="dark"]{--bg:#171c1a;--card:#202725;--fg:#e6ece8;--mute:#9eaaa4;--line:#313b37;--accent:#9fd0b8;--accent-ink:#171c1a;--soft:#26352e;--soft-ink:#c4e6d4;--mark:#4f4a24;--g1:#2e4639;--g2:#38432c;--g3:#47402e;--g-ink:#e6ece8;--g-sh:rgba(0,0,0,.3)}
+:root[data-pal="peach"][data-theme="dark"]{--bg:#1e1918;--card:#282120;--fg:#efe7e4;--mute:#ae9f9b;--line:#3c3230;--accent:#f2a690;--accent-ink:#1e1918;--soft:#3a2a26;--soft-ink:#f6cfc3;--mark:#55441f;--g1:#4d342c;--g2:#4a2f37;--g3:#4a3d27;--g-ink:#efe7e4;--g-sh:rgba(0,0,0,.3)}
+:root[data-pal="lav"][data-theme="dark"]{--bg:#1b1a21;--card:#24232c;--fg:#ecebf2;--mute:#a5a2b2;--line:#34323f;--accent:#b3a9f2;--accent-ink:#1b1a21;--soft:#2f2c40;--soft-ink:#d4cdfb;--mark:#5a4d22;--g1:#4a3743;--g2:#3d3757;--g3:#2f4153;--g-ink:#ecebf2;--g-sh:rgba(0,0,0,.3)}
+:root[data-pal="ink"][data-theme="dark"]{--bg:#17181b;--card:#202226;--fg:#e8e6e1;--mute:#a19f9a;--line:#33353a;--accent:#d8c7a6;--accent-ink:#17181b;--soft:#2b2d32;--soft-ink:#ece2cc;--mark:#4f4630;--g1:#2c2e33;--g2:#38342b;--g3:#2b3138;--g-ink:#e8e6e1;--g-sh:rgba(0,0,0,.3)}
+/* 2026-11-17 배경 고르기: 단색 / 은은한 빛 / 점 무늬 / 물감 번짐 (화면 뒤에 고정된 한 겹) */
+:root[data-bg="glow"] body::before,:root[data-bg="wash"] body::before,:root[data-bg="dots"] body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
+:root[data-bg="glow"] body::before{inset:-15% -10% auto;height:75vh;filter:blur(50px);opacity:.8;
+  background:radial-gradient(40% 50% at 18% 35%,var(--g1),transparent 70%),radial-gradient(35% 45% at 75% 25%,var(--g3),transparent 70%),radial-gradient(30% 40% at 50% 75%,var(--g2),transparent 70%)}
+:root[data-bg="dots"] body::before{background-image:radial-gradient(color-mix(in srgb,var(--accent) 22%,transparent) 1.2px,transparent 1.4px);background-size:22px 22px;opacity:.6}
+:root[data-bg="wash"] body::before{background:linear-gradient(160deg,var(--g1) 0%,transparent 45%),linear-gradient(330deg,var(--g3) 0%,transparent 50%),linear-gradient(90deg,var(--g2),transparent 60%);opacity:.75}
+@media (prefers-reduced-motion:no-preference){:root[data-bg="glow"] body::before{animation:bgDrift 20s ease-in-out infinite alternate}@keyframes bgDrift{to{transform:translate3d(4%,3%,0) scale(1.05)}}}
 /* 2026-11-17 PC 화면(가로 1024px 이상): 왼쪽 고정 메뉴 + 넓은 본문. 휴대폰·태블릿 세로는 위의 앱 모양 그대로 */
 @media (min-width:1024px){
   body{padding:0;background:linear-gradient(180deg,color-mix(in srgb,var(--soft) 55%,var(--bg)) 0,var(--bg) 340px) fixed,var(--bg)}
@@ -241,7 +263,9 @@ S.ptr=S.ptr||{};S.wrong=S.wrong||{};S.log=S.log||[];S.known=S.known||[];S.notes=
 if(!TEST&&!S.pref.lv1112){S.levels=['N1'];S.pref.lv1112=1}
 if(TEST)S.levels=TEST.levels.slice();
 // 보기 설정(이 기기만): 글자 크기, 화면 테마
-const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';r.dataset.hand=S.pref.hand||'poor';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
+// 2026-11-17 배색·배경 고르기(설정). 쪽빛이 기본(:root), 나머지는 :root[data-pal] 블록이 덮어씀
+const PALS=[['ai','쪽빛','#46659e,#f2b8cb'],['sage','세이지','#5d8c78,#e8d49a'],['peach','복숭아','#cc6f5a,#f5cf86'],['lav','라벤더','#6c63b5,#f6b8c8'],['ink','먹색','#3a3f4a,#c9b18a']];
+const applyPref=()=>{const r=document.documentElement;r.dataset.fs=S.pref.fs||'m';r.dataset.pal=S.pref.pal||'ai';r.dataset.bg=S.pref.bg||'plain';r.dataset.hand=S.pref.hand||'poor';if(S.pref.theme)r.dataset.theme=S.pref.theme;else delete r.dataset.theme};applyPref();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const PLAN=[['wb3',0,'단어 작문'],['cw',1,'조건 작문'],['fill',1,'넣기'],['kr',2,'어휘·한자'],['oc',1,'오문 정정'],['cj',1,'접속 구별'],['pc',1,'문형 카드'],['kw',1,'회화 작문'],['wb',0,'단어장'],['rw',1,'말 바꾸기'],['listen',3,'청해'],['kanji',3,'한자'],['vocab',6,'어휘'],['moji',4,'어휘·한자'],['v5',2,'어휘·한자'],['gram',3,'문법'],['pat',1,'문형'],['p630',1,'문형'],['pat2',1,'문형'],['ilyeok',1,'일→한 번역'],['hanyeok',1,'한→일 번역'],['tg',5,'글의 문법'],['reading',1,'독해'],['talk',1,'회화'],['write',1,'작문'],['write2',1,'작문']];
 // 2026-11-06 문제 고르기: 루틴·레벨 테스트·골라 풀기 어디서든 이미 푼 문제(S.seen)는 건너뛴다.
@@ -1245,6 +1269,8 @@ function setView(){
    <div><b>객관식 보기 순서</b> <span class="note">(답한 뒤에도 풀 때 순서 그대로 두고 책 번호를 함께 보여 줍니다 · 청해는 섞지 않음)</span></div><div class="chips">${[['','섞기'],['1','책 순서 그대로']].map(([v,n])=>`<button data-sf="${v}" class="${(S.pref.noshuf?'1':'')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>화면</b></div><div class="chips">${[['','기기 설정대로'],['light','밝게'],['dark','어둡게']].map(([v,n])=>`<button data-th="${v}" class="${(S.pref.theme||'')===v?'on':''}">${n}</button>`).join('')}</div>
+   <div><b>배색</b></div><div class="chips">${PALS.map(([v,n,c])=>`<button data-pl="${v}" class="${(S.pref.pal||'ai')===v?'on':''}"><span class="sw" style="background:linear-gradient(135deg,${c})"></span>${n}</button>`).join('')}</div>
+   <div><b>배경</b></div><div class="chips">${[['plain','단색'],['glow','은은한 빛'],['dots','점 무늬'],['wash','물감 번짐']].map(([v,n])=>`<button data-bgs="${v}" class="${(S.pref.bg||'plain')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>공책 글씨</b> <span class="note">(복습 탭의 오답노트·단어장)</span></div><div class="chips">${[['poor','또박또박 손글씨'],['gowun','단정한 글씨'],['melody','동글 손글씨'],['gaegu','자유 손글씨']].map(([v,n])=>`<button data-hd="${v}" class="${(S.pref.hand||'poor')===v?'on':''}" style="font-family:${{poor:'Poor Story',gowun:'Gowun Dodum',melody:'Hi Melody',gaegu:'Gaegu'}[v]}">${n}</button>`).join('')}</div>
    <div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
    <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
@@ -1256,6 +1282,8 @@ function setView(){
   document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
   document.querySelectorAll('button[data-hd]').forEach(b=>b.onclick=()=>{S.pref.hand=b.dataset.hd;save();applyPref();render()});
   document.querySelectorAll('button[data-th]').forEach(b=>b.onclick=()=>{S.pref.theme=b.dataset.th;save();applyPref();render()});
+  document.querySelectorAll('button[data-pl]').forEach(b=>b.onclick=()=>{S.pref.pal=b.dataset.pl;save();applyPref();render()});
+  document.querySelectorAll('button[data-bgs]').forEach(b=>b.onclick=()=>{S.pref.bg=b.dataset.bgs;save();applyPref();render()});
   $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
   document.querySelectorAll('button[data-rt]').forEach(b=>b.onclick=()=>{S.pref.rate=+b.dataset.rt;save();render()});
   if(!TEST){bindRec(render);bindSync(render)}bindAiSet(render)}
