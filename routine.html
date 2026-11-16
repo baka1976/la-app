@@ -167,7 +167,7 @@ button.pri{background:var(--accent);border-color:var(--accent)}
 button.start{border:0;border-radius:16px;font-size:19px;font-weight:700;color:var(--g-ink,#2f2a55);
   background:linear-gradient(120deg,var(--g1,#fcd5df) 0%,var(--g2,#e3dafc) 55%,var(--g3,#d3e8fb) 100%);box-shadow:0 6px 16px var(--g-sh,rgba(150,130,220,.25))}
 button.opt{background:var(--card);padding:12px 14px}
-button.opt:hover{background:var(--soft)}
+@media (hover:hover){button.opt:not(:disabled):hover{background:var(--soft)}}
 button.okb{background:var(--p-mint);border-color:var(--ok);box-shadow:none}
 button.badb{background:var(--p-pink);border-color:var(--bad);box-shadow:none}
 
@@ -876,7 +876,7 @@ function applyRw(d){const j=S.judges[d];if(!j)return;const now=Date.now();
 const altsHtml=w=>(w.alts||[]).length?`<div class="note"><span class="rp" style="font-size:inherit">바꿔 말하기</span> ${w.alts.map(a=>`<span class="jp">${esc(a)}</span>`).join(' · ')}</div>`:'';
 function noteQ(e){if(e.k==='rw'){const it=rwItem(e.id),a0=e.a[e.a.length-1]||{};return it?{t:RWN[it.sub]+' · '+(it.w||''),h:rwAsk(it)+rwRef(it,a0.mine)}:{t:'말 바꾸기',h:''}}
 const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?find(e.k,e.id):null,a0=e.a[e.a.length-1]||{};
-  if(['moji','gram','tg','kr','oc','cj'].includes(e.k)&&x)return{t:x.stem,h:`<div class="jp">${uline(x.stem)}</div><div class="opts">${x.choices.map((c,i)=>`<p class="${i+1===x.answer?'res ok':'note'}">${i+1}. ${esc(c)}</p>`).join('')}</div>${x.why?`<p>${esc(x.why)}</p>`:''}${Object.entries(x.wrong||{}).map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}${x.note?`<p class="note">${esc(x.note)}</p>`:''}`};
+  if(['moji','gram','tg','kr','oc','cj'].includes(e.k)&&x)return{t:x.stem,h:`<div class="jp">${uline(x.stem)}</div><div class="opts">${x.choices.map((c,i)=>`<p class="${i+1===x.answer?'res ok':'note'}">${i+1}. ${esc(c)}</p>`).join('')}</div>${x.ko?`<p class="ko">문장 뜻: ${esc(x.ko)}</p>`:''}${x.why?`<p>${esc(x.why)}</p>`:''}${Object.entries(x.wrong||{}).map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?k+'번':esc(k)}</b> ${esc(v)}</p>`).join('')}${x.note?`<p class="note">${esc(x.note)}</p>`:''}`};
   if(e.k==='listen'&&x)return{t:x.q.ja,h:`<p class="note">${esc(x.src||'')}</p><div class="jp">${esc(x.q.ja)}</div><div class="opts">${x.ch.map((c,i)=>`<p class="${i+1===x.ans?'res ok':'note'}">${i+1}. ${esc(c[0])}</p>`).join('')}</div>`};
   if(e.k==='kkr'){const y=find('kkr',e.id);if(y)return{t:y.s,h:`<div class="jp">${uline(y.s)}</div><p class="res ok">정답: ${esc(y.a)}</p><p class="note">${esc(y.src)}</p>${a0.mine?`<p class="note">내 답: <span class="jp">${esc(a0.mine)}</span></p>`:''}`}}
   if(e.k==='kanji'&&x)return{t:x.s,h:`<div class="jp">${esc(x.s)}</div><p class="res ok">정답: ${esc(x[x.ans])}</p>${x.ko?`<p class="ko">${esc(x.ko)}</p>`:''}`};
@@ -1325,6 +1325,7 @@ function vMock(st,lab){
   const od=x.type==='error_correction'?null:r?ordKeep(x.choices.length):ordOf(x.choices.length),dn=dnOf(od);
   h+=`<div class="opts">${(od||x.choices.map((_,i)=>i)).map((i,p)=>`<button class="opt ${r?(i+1===x.answer?'okb':i+1===r.pick?'badb':''):''}" data-k="${i+1}" ${r?'disabled':''}><span class="jp" style="font-size:17px">${(od?p:i)+1}. ${esc(x.choices[i])}</span>${r?bkTag(od,i+1):''}</button>`).join('')}</div>`;
   if(r){h+=shufNote()+`<div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답':'오답'} · 정답 ${dn(x.answer)}번${bkTag(od,x.answer)}${st.k==='oc'&&r.ms?` · ${Math.round(r.ms/1000)}초 (JPT 약 30초)`:''}</div>`;
+    if(x.ko)h+=`<p class="ko">문장 뜻: ${esc(x.ko)}${x.kox?' <span class="note">(Claude 번역)</span>':''}</p>`;
     if(x.why)h+=`<p>${esc(x.why)}</p>`;
     const w=Object.entries(x.wrong||{}).sort((a,b)=>(/^\d$/.test(a[0])?dn(+a[0]):9)-(/^\d$/.test(b[0])?dn(+b[0]):9));if(w.length)h+=`<div class="opts">${w.map(([k,v])=>`<p class="note"><b>${/^\d$/.test(k)?dn(+k)+'번':esc(k)}</b>${/^\d$/.test(k)?bkTag(od,k):''} ${esc(v)}</p>`).join('')}</div>`;
     if(x.note)h+=`<p class="note">${esc(x.note)}</p>`;
