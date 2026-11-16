@@ -2,7 +2,7 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>LA 오늘의 루틴</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+JP:wght@500;700&family=Poor+Story&family=Gowun+Dodum&family=Hi+Melody&family=Gaegu:wght@400;700&family=Klee+One:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+JP:wght@500;700&family=Poor+Story&family=Gowun+Dodum&family=Hi+Melody&family=Gaegu:wght@400;700&family=Klee+One:wght@400;600&family=Gowun+Batang:wght@400;700&display=swap">
 <style>
 /* 레이아웃: 한 장씩 넘기는 학습 카드 한 줄 + 위쪽 진행 막대. 책 출처를 카드마다 아래에 둔다. */
 :root{
@@ -134,6 +134,62 @@ button.on-star{border-color:var(--red);color:var(--red)}
 @media(prefers-reduced-motion:reduce){.page.flipN,.page.flipP{animation:none}}
 .pgjump{margin:2px 0 10px}.pgjump input[type=range]{flex:1;min-width:120px}.pgjump input[type=number]{width:70px}
 .pgnav{align-items:center;justify-content:space-between;gap:6px}
+/* 2026-11-17 화면 새 단장: 쪽빛(藍) + 벚꽃 파스텔, 제목 고운바탕, 그림자 카드, 알약 탭 */
+:root{--bg:#f3f4f8;--card:#ffffff;--fg:#232838;--mute:#6c7284;--line:#e1e4ee;--accent:#46659e;--accent-ink:#ffffff;--ok:#3f8f6b;--bad:#c2546a;--mark:#f9dde6;--soft:#e1e9f7;--soft-ink:#2f4c86;--g1:#d7e5f8;--g2:#e7e3f7;--g3:#f8dfe8;--g-ink:#27365e;--g-sh:rgba(70,101,158,.22);--u1:#f2b8cb;--u2:#8fb0e3;
+  --p-sky:#dcecfb;--p-mint:#d9f1e6;--p-lav:#e8e2fb;--p-peach:#fde3d6;--p-butter:#fbf0c9;--p-pink:#fbe1ea;
+  --shadow:0 1px 2px rgba(40,50,80,.05),0 6px 18px rgba(40,50,80,.06);--head:"Gowun Batang",var(--ui)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#161a24;--card:#1f2433;--fg:#e7eaf3;--mute:#9da4b8;--line:#30374a;--accent:#9db8ec;--accent-ink:#161a24;--ok:#86d1ab;--bad:#f19aac;--mark:#4d2f3c;--soft:#26304a;--soft-ink:#cbd9f6;--g1:#2a3a57;--g2:#352f52;--g3:#4a2e3d;--g-ink:#e7eaf3;--g-sh:rgba(0,0,0,.3);
+  --p-sky:#22303f;--p-mint:#203229;--p-lav:#2c2840;--p-peach:#3a2b25;--p-butter:#363020;--p-pink:#3a2630;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161a24;--card:#1f2433;--fg:#e7eaf3;--mute:#9da4b8;--line:#30374a;--accent:#9db8ec;--accent-ink:#161a24;--ok:#86d1ab;--bad:#f19aac;--mark:#4d2f3c;--soft:#26304a;--soft-ink:#cbd9f6;--g1:#2a3a57;--g2:#352f52;--g3:#4a2e3d;--g-ink:#e7eaf3;--g-sh:rgba(0,0,0,.3);
+  --p-sky:#22303f;--p-mint:#203229;--p-lav:#2c2840;--p-peach:#3a2b25;--p-butter:#363020;--p-pink:#3a2630;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25);color-scheme:dark}
+body{letter-spacing:-.005em}
+h1{font-family:var(--head);font-size:22px;font-weight:700;letter-spacing:-.01em}
+h1::after{content:"";display:block;width:28px;height:3px;border-radius:3px;margin-top:6px;background:linear-gradient(90deg,var(--u1,#f6b8c8),var(--u2,#b9aef5))}
+
+/* 카드: 굵은 테두리 대신 부드러운 그림자 */
+.card{border:0;border-radius:18px;box-shadow:var(--shadow);padding:18px}
+.kind{color:var(--soft-ink);letter-spacing:.04em}
+.lvb{border:0;background:var(--soft);color:var(--soft-ink);font-weight:700}
+.src{border-top:1px solid var(--line)}
+
+/* 탭: 상자 6개 → 한 줄 알약 막대, 글자 줄바꿈 없음 */
+.tabs{flex-wrap:nowrap;gap:2px;padding:4px;background:var(--card);border-radius:999px;box-shadow:var(--shadow)}
+.tabs button{border:0;background:transparent;border-radius:999px;min-height:38px;padding:4px 6px;white-space:nowrap;font-size:14px;color:var(--mute)}
+.tabs button.on{background:var(--soft);color:var(--soft-ink);font-weight:700}
+.tabs button.gear{min-width:0}
+
+/* 버튼 */
+button{border-radius:12px;border-color:var(--line);transition:background .15s,border-color .15s,transform .1s}
+button:active{transform:scale(.98)}
+button.pri{background:var(--accent);border-color:var(--accent)}
+button.start{border:0;border-radius:16px;font-size:19px;font-weight:700;color:var(--g-ink,#2f2a55);
+  background:linear-gradient(120deg,var(--g1,#fcd5df) 0%,var(--g2,#e3dafc) 55%,var(--g3,#d3e8fb) 100%);box-shadow:0 6px 16px var(--g-sh,rgba(150,130,220,.25))}
+button.opt{background:var(--card);padding:12px 14px}
+button.opt:hover{background:var(--soft)}
+button.okb{background:var(--p-mint);border-color:var(--ok);box-shadow:none}
+button.badb{background:var(--p-pink);border-color:var(--bad);box-shadow:none}
+
+/* 칩(레벨·영역) */
+.chips button{border-color:var(--line)}
+.chips button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.lvsel{border:0;background:var(--bg);border-radius:14px}
+.bar span{border:0;background:var(--card);box-shadow:inset 0 0 0 1px var(--line);padding:3px 10px}
+.bar span.on{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.bar span.done{background:var(--p-mint);color:var(--ok);box-shadow:none}
+
+/* 묻는 말·밑줄 */
+.qask b{background:linear-gradient(transparent 55%,var(--mark) 55%);padding:0 2px}
+u{background:linear-gradient(transparent 55%,var(--mark) 55%);border-bottom:0}
+textarea,input{border-radius:12px;background:var(--card)}
+.warn{border-radius:10px;border-left-width:4px}
+pre.out{border-radius:12px}
+.board{border:0;box-shadow:var(--shadow);background:linear-gradient(160deg,var(--p-lav),var(--card) 60%)}
+
+/* 문제 푸는 중 「그만하기」 줄은 탭 막대 모양을 쓰지 않음 */
+.tabs:has(#quit){background:transparent;box-shadow:none;padding:0;gap:8px;flex-wrap:wrap}
+.tabs #quit{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:12px;padding:6px 14px}
 </style></head><body>
 <div class="wrap">
   <header>
