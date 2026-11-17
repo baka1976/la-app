@@ -1692,6 +1692,8 @@ function vKw(st,lab){const x=kwItem(st.id),s=S.cur,r=s.res[s.i]||{};if(!x){s.i++
   $('#view').innerHTML=card(lab,h);
   const t=$('#ans');const put=o=>{s.res[s.i]={...(s.res[s.i]||{}),k:'kw',id:x.id,li:i,mine:t.value,q:x.lines[i].ko,a:x.lines[i].ja,...o};save()};t.oninput=()=>put({});
   const b=$('#show');if(b)b.onclick=()=>{put({shown:true});S.seen['kw|'+x.id]={t:Date.now(),ok:true};save();render()};bindNext()}
+// 2026-11-18 OK 비즈니스 회화: 대화가 끝나면 이 과의 핵심 표현(책 예문·번역)을 보여 준다
+const okKeys=x=>(x.keys&&x.keys.length)?`<details><summary>이 과의 핵심 표현 ${x.keys.length}개 (책 예문)</summary><div class="opts">${x.keys.map(k=>`<div class="turn"><div class="who">${esc(k.key)}</div><div><div class="jp">${esc(k.ja)}</div><div class="ko">${esc(k.ko)}</div>${k.ex.map(e=>`<div class="jp" style="margin-top:.4em">${esc(e[0])}</div><div class="ko note">${esc(e[1])}</div>`).join('')}</div></div>`).join('')}</div></details>`:'';
 function vTalk(st,lab){
   const x=find('talk',st.id),s=S.cur,r=s.res[s.i]||{k:'talk',id:x.id,step:0},me=x.lines[1].who;
   const upto=r.step;let h=`<p class="note">${esc(x.intro.ko)}</p><p class="note">당신은 「${esc(me)}」입니다. 상대 말을 읽고, 내 차례에는 한국어를 보고 일본어로 소리 내어 말한 뒤 [확인]을 누르세요.</p><div class="opts">`;
@@ -1703,7 +1705,7 @@ function vTalk(st,lab){
   }
   h+='</div>';
   if(pending!==null)h+=`<div class="row"><button class="pri" id="reveal">확인</button></div>`;
-  else{h+=`<p class="note">대화 끝. 한 번 더 소리 내어 처음부터 읽어 보세요.</p>${nextBtn()}`;if(!S.seen['talk|'+x.id]){S.seen['talk|'+x.id]={t:Date.now(),ok:true};save()}}
+  else{h+=`<p class="note">대화 끝. 한 번 더 소리 내어 처음부터 읽어 보세요.</p>${okKeys(x)}${nextBtn()}`;if(!S.seen['talk|'+x.id]){S.seen['talk|'+x.id]={t:Date.now(),ok:true};save()}}
   $('#view').innerHTML=card('회화 · '+lab,h,x.src);
   if(pending===null&&upto<x.lines.length){}
   const b=$('#reveal');if(b)b.onclick=()=>{let nx=pending+1;while(nx<x.lines.length&&x.lines[nx].who!==me)nx++;s.res[s.i]={...r,step:nx};save();render()};
