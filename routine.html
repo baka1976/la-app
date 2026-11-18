@@ -734,7 +734,7 @@ let DX=null;
 // 선 아이콘(이모지 대신): 책·별·바깥 링크·재생. 글자 색을 따라간다
 const IC={book:'<path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5c-.8 0-1.5-.7-1.5-1.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5z"/>',
   star:'<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>',ext:'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-  play:'<path d="M7 4.5v15l12-7.5z"/>'};
+  play:'<path d="M7 4.5v15l12-7.5z"/>',sound:'<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>'};
 const ic=(n,f)=>`<svg class="ic${f?' fill':''}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 function dx(){if(DX)return DX;const m=new Map(),st=new Map();let mx=2;
   (D.dict||[]).forEach(e=>{const w=e[0].replace(/^[～〜]+|[～〜]+$/g,'');if(w.length<2)return;if(!m.has(w))m.set(w,e);mx=Math.max(mx,w.length);
@@ -774,6 +774,10 @@ const naverA=(w,l)=>`<a class="btn" href="${NAVER(w)}" target="_blank" rel="noop
 const hlw=(s,w)=>{s=String(s||'');const i=w?s.indexOf(w):-1;return i<0?esc(s):esc(s.slice(0,i))+'<span class="hl">'+esc(w)+'</span>'+esc(s.slice(i+w.length))};
 const sentOf=(t,sf)=>{const L=String(t||'').replace(/[【】]/g,'').split(/(?<=[。！？\n])/).map(x=>x.trim()).filter(Boolean);const s=L.find(x=>x.includes(sf))||'';return s.length>90?s.slice(0,90)+'…':s};
 const liveW=w=>S.words[w]&&!S.words[w].del;
+// 2026-11-19 단어 듣기: 브라우저 일본어 음성으로. 가나 읽기가 있으면 읽기를 읽어 한자 오독을 피한다(문형의 〜·괄호는 뗌)
+const sayTxt=(w,r)=>{const k=String(r||'').trim();return(/^[ぁ-ゖァ-ヺー・ 　]+$/.test(k)?k:String(w||'')).replace(/[〜~～]/g,'').replace(/[（(].*?[)）]/g,'').trim()};
+const sayBtn=(w,r)=>{const x=sayTxt(w,r);return x&&'speechSynthesis' in window?`<button data-say="${esc(x)}" title="발음 듣기">${ic('sound')} 듣기</button>`:''};
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-say]');if(b){e.preventDefault();e.stopPropagation();speakTTS([[0,b.dataset.say]])}},true);
 // 단어장에 넣기/빼기. 풀이 중이면 그 문항에 「모른 단어」로 붙여 오답노트에도 남긴다
 // 2026-11-10 단어장 5단계: 모르는 이유(why: kanji 한자 / yomi 읽기 / mean 뜻 / use 쓰임), 종류(kind: '' 단어 / p 문형 / x 표현), 직접 등록, 이유별 카드
 const WHY=[['yomi','읽기'],['mean','뜻'],['use','쓰임'],['kanji','한자']],WHYN=Object.fromEntries(WHY),KINDN={'':'단어',p:'문형',x:'표현'};
@@ -797,7 +801,7 @@ function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
   return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
-    ${kjLine(w)}<div class="row"><button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}</div>${on?whyChips(sw):''}</div>`}
+    ${kjLine(w)}<div class="row">${sayBtn(w,r)}<button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}</div>${on?whyChips(sw):''}</div>`}
 // 한자 음훈(D.kj = {字:[한국 훈음, 음독, 훈독]}, 콕콕 N1 한자). 단어 안의 한자마다 훈음을 보이고, 글자를 누르면 네이버 한자 풀이
 const KJI=c=>(D.kj||{})[c];
 function kjLine(w){const cs=[...new Set(w.match(/[㐀-鿿]/g)||[])].slice(0,6);if(!cs.length)return'';
@@ -1110,7 +1114,7 @@ function wordsView(){
      ${w.from?`<div class="note">내가 쓴 표현: <span class="jp">${esc(w.from)}</span></div>`:''}${exHtml(w,wCore(w))}${altsHtml(w)}
      ${whyChips(w)}${!(w.why||[]).length&&whyOf(w).length?`<div class="note">틀린 문제로 짐작한 이유: ${whyOf(w).map(k=>WHYN[k]).join(' · ')}</div>`:''}
      <div class="note"><b>${WLN[w.st==='done'?3:wLv(w)]}</b> · ${esc(wSrc(w.src))}${w.n?` · 복습 ${w.n}회`:''}</div>
-     <div class="row"><button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}${wordQs(w).length?`<button data-wg="${esc(w.w)}">이 말의 책 문제 ${wordQs(w).length}</button>`:''}<button data-wx="${esc(w.w)}">빼기</button></div>
+     <div class="row">${sayBtn(wCore(w)||w.w,w.r)}<button data-wd="${esc(w.w)}">${w.st==='done'?'다시 외울 것으로':'외움 표시'}</button>${naverA(wCore(w)||w.w,'네이버')}${wordQs(w).length?`<button data-wg="${esc(w.w)}">이 말의 책 문제 ${wordQs(w).length}</button>`:''}<button data-wx="${esc(w.w)}">빼기</button></div>
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`;
   const wi=WP?list.findIndex(w=>w.w===WP):-1;
   if(wi>=0){bmSet('words',list[wi].w);h=`${rvSwitch()}${pgNav(wi,list.length,esc(gOf(list[wi])))}${pageWrap(cardOf(list[wi]))}`}
@@ -1166,7 +1170,7 @@ function vWb(st,lab){const s=S.cur,w=S.words[st.id],r=s.res[s.i];if(!w||w.del){s
     h+=shown?`<div class="res bad">답과 다릅니다</div><div><span class="note">단어장의 답</span> <b class="${mode==='mean'?'':'jp'}">${esc(ans)}</b></div><p class="note">${mode==='mean'?'뜻이 같은 말이면':'표기만 다르고 같은 말이면'} 「맞았다」를 누르세요.</p><div class="row"><button class="pri" data-sf2="1">같은 뜻 — 맞았다</button><button data-sf2="0">틀렸다</button></div>`
       :`<div class="row"><button class="pri" id="chk">확인</button><button id="dunno">모르겠음</button></div>`}
   else h+=`<div><span class="note">내 답</span> <span class="${mode==='mean'?'':'jp'}">${esc(r.mine||'(안 씀)')}</span></div><div class="res ${r.ok?'ok':'bad'}">${r.ok?'정답 — 다음에는 '+WLN[Math.min(lv+1,2)]:'오답 — 이 단계를 다시'}</div>
-    <div class="jp big">${esc(w.w)}</div>${w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}<p style="text-align:center"><b>${esc(w.ko)}</b></p>${exHtml(w,wCore(w))}${altsHtml(w)}<div class="row">${naverA(wCore(w)||w.w)}</div>${nextBtn()}`;
+    <div class="jp big">${esc(w.w)}</div>${w.r?`<div class="jp" style="text-align:center;color:var(--red)">${esc(w.r)}</div>`:''}<p style="text-align:center"><b>${esc(w.ko)}</b></p>${exHtml(w,wCore(w))}${altsHtml(w)}<div class="row">${sayBtn(wCore(w)||w.w,w.r)}${naverA(wCore(w)||w.w)}</div>${nextBtn()}`;
   $('#view').innerHTML=card('단어장 · '+WLN[lv],h);
   const ta=$('#ans'),fin=ok=>{const mine=(s.res[s.i]&&s.res[s.i].mine)||(ta?ta.value:'');w.n=(w.n||0)+1;w.lv=ok?Math.min(lv+1,2):lv;w.u=Date.now();rec({k:'wb',id:st.id,ok,mine,lv});render()};
   if(ta&&!ta.disabled)ta.oninput=()=>{s.res[s.i]={k:'wb',mine:ta.value,lv};save()};
