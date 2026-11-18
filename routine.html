@@ -799,7 +799,7 @@ function toggleWord(e,ctx){const w=e[0],now=Date.now();
   save()}
 function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
-  return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:KJ.test(w)?'<span class="r" style="opacity:.7">읽기 없음</span>':''}${e[3]?' <span class="note">(읽기·뜻: Claude)</span>':''}</div>
+  return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:KJ.test(w)?'<span class="r" style="opacity:.7">읽기 없음</span>':''}${e[3]?` <span class="note">(${e[3]==='r'?'읽기':'읽기·뜻'}: Claude)</span>`:''}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
     ${kjLine(w)}<div class="row">${sayBtn(w,r)}<button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}</div>${on?whyChips(sw):''}</div>`}
 // 한자 음훈(D.kj = {字:[한국 훈음, 음독, 훈독]}, 콕콕 N1 한자). 단어 안의 한자마다 훈음을 보이고, 글자를 누르면 네이버 한자 풀이
