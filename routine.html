@@ -799,7 +799,7 @@ function toggleWord(e,ctx){const w=e[0],now=Date.now();
   save()}
 function wordRow(h,ctx){const e=h.e,w=e[0],on=liveW(w),sw=S.words[w];
   const r=(sw&&sw.r)||e[1],ko=(sw&&sw.ko)||e[2];
-  return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:'<span class="r" style="opacity:.7">읽기 없음</span>'}</div>
+  return `<div class="wrow"><div><span class="w">${esc(w)}</span>${r?`<span class="r">${esc(r)}</span>`:KJ.test(w)?'<span class="r" style="opacity:.7">읽기 없음</span>':''}${e[3]?' <span class="note">(읽기·뜻: Claude)</span>':''}</div>
     <div class="m">${ko?esc(ko):'<span class="note">앱 사전에 없는 말 · 네이버에서 확인</span>'}</div>
     ${kjLine(w)}<div class="row">${sayBtn(w,r)}<button data-tw="${esc(w)}" class="${on?'on-star':''}">${on?ic('star',1)+' 단어장에 있음':ic('star')+' 모르는 단어로 저장'}</button>${naverA(w,'네이버')}</div>${on?whyChips(sw):''}</div>`}
 // 한자 음훈(D.kj = {字:[한국 훈음, 음독, 훈독]}, 콕콕 N1 한자). 단어 안의 한자마다 훈음을 보이고, 글자를 누르면 네이버 한자 풀이
@@ -1109,7 +1109,7 @@ function wordsView(){
    <div class="chips"><span class="note">단계별</span>${[0,1,2].map(k=>{const c=todo.filter(w=>wLv(w)===k).length;return `<button data-wc="${k}" ${c?'':'disabled'}>${WLN[k]} ${c}</button>`}).join('')}</div>
    <p class="note">문제를 푼 뒤 저장한 단어, 직접 등록한 말, 틀린 어휘·한자·문형, AI 판정에서 설명한 단어·문형과 고쳐 준 표현이 모입니다. 복습은 세 단계입니다: 1 뜻 쓰기 → 2 읽기 쓰기 → 3 그 말로 작문. 1·2단계는 직접 쓰면 바로 채점하고, 3단계만 AI 판정을 받아 「외움」으로 갑니다.</p>`;
   const cardOf=w=>`<div class="wrow">
-     <div>${w.kind==='p'?'<span class="tag">문형</span> ':w.kind==='x'?'<span class="tag">표현</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
+     <div>${w.kind==='p'?'<span class="tag">문형</span> ':w.kind==='x'?'<span class="tag">표현</span> ':''}<span class="w"><span class="hl">${esc(w.w)}</span></span>${w.r?`<span class="r">${esc(w.r)}</span>`:w.kind==='p'||!KJ.test(w.w)?'':'<span class="r" style="opacity:.7">읽기 없음</span>'}${w.st==='done'?' <span class="stamp ok">외움</span>':''}</div>
      <div class="m">${w.ko?esc(w.ko):'<span class="note">뜻 없음 · 네이버에서 확인 뒤 「고치기」로 적어 두세요</span>'}</div>
      ${w.from?`<div class="note">내가 쓴 표현: <span class="jp">${esc(w.from)}</span></div>`:''}${exHtml(w,wCore(w))}${altsHtml(w)}
      ${whyChips(w)}${!(w.why||[]).length&&whyOf(w).length?`<div class="note">틀린 문제로 짐작한 이유: ${whyOf(w).map(k=>WHYN[k]).join(' · ')}</div>`:''}
