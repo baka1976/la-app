@@ -514,7 +514,7 @@ function pickTrans(n){const L=D.trans,out=[];if(!L.length)return out;const p0=S.
   return out}
 // 회화 작문 재료: 지인판은 회화 자료, 본 앱은 이미 들은(푼) 청해 대화 중 두 사람 이상·네 줄 이상인 것
 // 2026-11-18 OK 비즈니스 회화(역할 읽기로 본 장면)도 회화 작문 재료로
-function kwPool(){const src=[...LISTEN_U.filter(x=>x.lines&&x.lines.length>=4&&S.seen['listen|'+x.id]),...(D.talk||[]).filter(x=>/^OKB-/.test(x.id)&&S.seen['talk|'+x.id])];
+function kwPool(){const src=[...LISTEN_U.filter(x=>x.lines&&x.lines.length>=4&&S.seen['listen|'+x.id]),...(D.talk||[]).filter(x=>/^(OKB|BSK)-/.test(x.id)&&S.seen['talk|'+x.id])];
   return src.filter(x=>new Set(x.lines.map(l=>l.who)).size>=2&&kwTarget(x)>=1)}
 function kwTarget(x){const me=x.lines[1]&&x.lines[1].who;for(let i=1;i<x.lines.length;i++){const l=x.lines[i];if(l.who===me&&l.ja.length>=8&&l.ja.length<=70)return i}return -1}
 const kwItem=id=>LISTEN_U.find(x=>x.id===id)||(D.talk||[]).find(x=>x.id===id);
@@ -1345,7 +1345,7 @@ const PICK=[
   ['reading','독해 (지문 단위)',()=>{const RU=[];lvPool(D.reading).forEach(x=>{const u=RU[RU.length-1];if(x.pid&&u&&u.pid===x.pid)u.g.push({k:'reading',id:x.id});else RU.push({pid:x.pid,sk:'reading|'+x.id,g:[{k:'reading',id:x.id}]})});return RU}],
   ['tg','글의 문법 (지문 단위)',()=>{const m=new Map();lvPool(D.mock.filter(x=>x.type==='text_grammar')).forEach(x=>{if(!m.has(x.passage))m.set(x.passage,{sk:'tg|'+x.id,g:[]});m.get(x.passage).g.push({k:'tg',id:x.id})});return [...m.values()]}],
   ['trans','번역 (일→한 · 한→일)',()=>D.trans.map((a,i)=>({k:i%2?'hanyeok':'ilyeok',ja:a[0],ko:a[1],src:a[2],tid:a[3],sk:'tr|'+i}))],
-  ['talk','비즈니스 회화 (역할 읽기 · OK 비즈니스 28장면)',()=>(D.talk||[]).filter(x=>/^OKB-/.test(x.id)).map(x=>({k:'talk',id:x.id,sk:'talk|'+x.id}))],
+  ['talk','비즈니스 회화 (역할 읽기 · OK 비즈니스 28장면 · 상담회화 기본편 20과)',()=>(D.talk||[]).filter(x=>/^(OKB|BSK)-/.test(x.id)).map(x=>({k:'talk',id:x.id,sk:'talk|'+x.id}))],
   ['kw','회화 작문 (들은 대화)',()=>kwPool().map(x=>({k:'kw',id:x.id,sk:'kw|'+x.id}))],
   ['rw','말 바꾸기 (우회 표현)',()=>rwPool()]];
 let PK={a:'moji',n:10};
@@ -1683,7 +1683,7 @@ function vReading(st,lab){
 }
 function vKw(st,lab){const x=kwItem(st.id),s=S.cur,r=s.res[s.i]||{};if(!x){s.i++;save();return render()}
   const i=r.li!=null?r.li:kwTarget(x),me=x.lines[i].who;
-  let h=`${x.intro?`<p class="note">${esc(x.intro.ja)}<br>${esc(x.intro.ko)}</p>`:''}<p class="note">${/^OKB-/.test(x.id)?'이미 읽은':'이미 들은'} 대화입니다. 당신은 「${esc(me)}」입니다. 앞의 대화를 읽고, 내 차례의 대사를 한국어 뜻에 맞게 일본어로 써 보세요.</p>
+  let h=`${x.intro?`<p class="note">${esc(x.intro.ja)}<br>${esc(x.intro.ko)}</p>`:''}<p class="note">${/^(OKB|BSK)-/.test(x.id)?'이미 읽은':'이미 들은'} 대화입니다. 당신은 「${esc(me)}」입니다. 앞의 대화를 읽고, 내 차례의 대사를 한국어 뜻에 맞게 일본어로 써 보세요.</p>
    <div class="opts">${x.lines.slice(0,i).map(l=>`<div class="turn"><div class="who">${esc(l.who)}</div><div><div class="jp">${esc(l.ja)}</div><details><summary class="note">뜻</summary><div class="ko">${esc(l.ko||'')}</div></details></div></div>`).join('')}
    <div class="turn"><div class="who">나</div><div><div><b>${esc(x.lines[i].ko||'')}</b></div></div></div></div>
    <textarea id="ans" placeholder="日本語で · 일본어 입력이 안 되면 한글 발음 표기도 됩니다">${esc(r.mine||'')}</textarea>`;
