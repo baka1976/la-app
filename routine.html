@@ -425,7 +425,10 @@ function wrPick(){for(const key of Object.keys(GRP)){const s=grpState(key);if(!s
 // 고른 레벨에 자료가 하나도 없는 영역은 전체에서 낸다(예: 청해·독해는 지금 N1 자료뿐)
 const LVS=['N1','N2','N3','N4','N5'];
 const inLv=x=>!x||x.lv==null||S.levels.includes(x.lv);
-const lvPool=a=>{const f=a.filter(inLv);return f.length?f:a};
+// 11-19 QA: 고른 레벨에 문항이 없으면 전부(대개 N1)가 아니라 가장 가까운 레벨로 채운다(N3 → N2 → N1). N3 학습자에게 N1 어휘·문법·독해가 나오던 것
+const lvPool=a=>{const f=a.filter(inLv);if(f.length)return f;const W=S.levels.map(l=>LVS.indexOf(l)).filter(i=>i>=0),dist=x=>{const n=LVS.indexOf(x.lv);return n<0||!W.length?99:Math.min(...W.map(w=>Math.abs(w-n)+(n>w?.5:0)))};
+  let bd=99;for(const x of a)bd=Math.min(bd,dist(x));return bd<99?a.filter(x=>dist(x)===bd):a};
+const lvOnly=a=>{const f=a.filter(inLv);return f.length>=10?f:[]};   // 접속 구별·오문 정정은 N1 문형 전용: 그 레벨 문항이 10개 미만이면 아예 내지 않음(N2 오문 정정 3개만 돌아가며 나오던 것)
 // 청해는 두 책을 번갈아
 const LISTEN=(()=>{const g=D.listen.filter(x=>x.id.startsWith('GS')),k=D.listen.filter(x=>!x.id.startsWith('GS')),o=[];
   for(let i=0;i<Math.max(g.length,k.length);i++){if(g[i])o.push(g[i]);if(i%2===0&&k[i/2])o.push(k[i/2])}return o.concat(k.slice(Math.ceil(g.length/2)))})();
@@ -468,7 +471,7 @@ function buildSession(){
   // 11-13 단어장 카드 하루 3장: 두 번 이상 틀린 문제의 말 먼저 → 낮은 단계 → 오래 안 본 것. 오늘 넣은 말·오늘 이미 연습한 말은 뺌
   if(!TEST)wbPick(3).forEach(st=>s.steps.push(st));
   // 조사 오문정정(JPT 6부 참고): 책 문장에서 한국어 습관(~을 타다·~에서 살다·~가 되다)대로 조사 하나만 바꾼 것
-  if((D.oc||[]).length){const OCx=take('oc',lvPool(D.oc),1);s.next.oc=OCx.next;OCx.items.forEach(x=>s.steps.push({k:'oc',id:x.id}))}
+  if((D.oc||[]).length){const OCx=take('oc',lvOnly(D.oc),1);s.next.oc=OCx.next;OCx.items.forEach(x=>s.steps.push({k:'oc',id:x.id}))}
   const GF=take('gf',lvPool(D.mock.filter(x=>x.type==='grammar_form')),nOf(['gram'],2,'문법'),dup);GF.items.forEach(use);const SO=take('so',lvPool(D.mock.filter(x=>x.type==='sentence_order')),1,dup);SO.items.forEach(use);
   s.next.gf=GF.next;s.next.so=SO.next;GF.items.concat(SO.items).forEach(x=>s.steps.push({k:'gram',id:x.id}));
   // 2026-11-12 사용자 요청: 실전모의고사 15회분(N1·N2 시사15)을 한 회차에 적어도 한 문제. 고른 레벨의 것만(N2 문제가 N1에 나오지 않게)
@@ -482,7 +485,7 @@ function buildSession(){
   if(!pt){const P=lvPool(D.mock.filter(x=>x.pattern)),pi=(S.ptr.pt||0)%P.length;pt=P[pi];s.next.pt=pi+1}
   // 2026-11-06 문형630 「알고 있었다/몰랐다」 카드와 문형 읽기 카드(pat2)는 뺌
   // 접속 구별(cj): 문형630 N1 예문의 문형 자리 + 앞말에 붙을 수 없는 N1 문형 오답 / 문형 카드(pc): 뜻·접속·예문을 보고 책 예문 하나를 한국어에서 일본어로
-  if((D.cj||[]).length){const C=take('cj',lvPool(D.cj),1,dup);s.next.cj=C.next;C.items.forEach(x=>s.steps.push({k:'cj',id:x.id}))}
+  if((D.cj||[]).length){const C=take('cj',lvOnly(D.cj),1,dup);s.next.cj=C.next;C.items.forEach(x=>s.steps.push({k:'cj',id:x.id}))}
   {const PC=lvPool((D.p630||[]).filter(x=>x.chk==='scan'&&pcTask(x)));if(PC.length){const C=take('pc',PC,1);s.next.pc=C.next;C.items.forEach(x=>s.steps.push({k:'pc',id:x.id}))}}
   // 번역: 책 번역이 있는 독해 지문 문장. 이미 옮긴 문장은 건너뛰고, 번역(일→한·한→일)은 서로 다른 지문에서
   // 넣기(계단 2) 2개: 어제까지 맞힌 말을 보기 없이. 옮기기(계단 3): 넣기를 맞힌 말이 든 책 문장이 있으면 오늘의 한→일 문장으로
