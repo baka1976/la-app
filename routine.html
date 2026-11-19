@@ -44,6 +44,7 @@ button.okb{border-color:var(--ok);box-shadow:inset 0 0 0 2px var(--ok)}
 button.badb{border-color:var(--bad);box-shadow:inset 0 0 0 2px var(--bad)}
 button:disabled{opacity:1;cursor:default}
 .opts{display:flex;flex-direction:column;gap:8px}
+img.fig{display:block;width:100%;max-width:560px;height:auto;margin:0 auto;border-radius:8px;border:1px solid var(--line);background:#fff;padding:6px;box-sizing:border-box}   /* 11-19 청해 그림 보기(책 그림, 흑백) — 어두운 화면에서도 흰 바탕 */
 textarea{font:inherit;width:100%;box-sizing:border-box;min-height:70px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--bg);color:var(--fg)}
 .res{font-weight:700}.res.ok{color:var(--ok)}.res.bad{color:var(--bad)}
 .turn{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start}
@@ -1452,7 +1453,8 @@ function vListen(st,lab){
   const HOW={4:'짧은 말을 듣고 가장 알맞은 대답을 고르세요. 보기는 음성으로만 나옵니다.',1:'대화를 듣고 질문에 답하세요. 들은 뒤 무엇을 해야 하는지가 포인트입니다. 보기를 먼저 읽어 두세요.',
     2:'질문을 먼저 듣고 보기를 읽은 뒤 대화를 들으세요. 이유·생각 같은 「포인트」를 묻습니다. 질문 뒤에 보기를 읽는 조용한 시간(약 20초)이 있고 그다음에 대화가 나옵니다.',3:'이야기를 듣고 전체 내용(주제·요지)을 고르세요. 질문과 보기는 음성으로만 나옵니다.',5:'긴 대화를 듣고 여러 정보를 비교해 답하세요. 보기를 먼저 읽어 두세요.'}[M];
   let h=`<p class="note"><b>${esc(x.type||'즉시 응답')}</b> · ${HOW}</p>
-   <div class="row"><button id="play">${ic('play',1)} 듣기</button></div>`;
+   <div class="row"><button id="play">${ic('play',1)} 듣기</button></div>
+   ${x.fig?`<img class="fig" src="${x.fig}" alt="보기 그림 1~4">`:''}`;   // 11-19 그림 보기: 그림 안의 번호로 고른다
   const od=null;   // 2026-11-12: 청해는 음성이 책 번호로 보기를 읽으므로 섞지 않는다
   h+=txt&&!ans?`<div class="opts">${(od||x.ch.map((_,i)=>i)).map((i,p)=>`<button class="opt" data-k="${i+1}"><span class="jp">${(od?p:i)+1}. ${esc(x.ch[i][0])}</span></button>`).join('')}</div>`
     :`<div class="row" id="nums">${Array.from({length:n},(_,i)=>i+1).map(k=>`<button data-k="${k}" class="${ans?(k===x.ans?'okb':k===ans?'badb':''):''}" ${ans?'disabled':''}>${k}</button>`).join('')}</div>`;
