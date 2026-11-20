@@ -408,6 +408,14 @@ body.pres .onum{display:none}
 .lpb{min-height:0;padding:9px 14px;border-radius:99px!important;border:0!important;background:var(--accent)!important;color:var(--accent-ink,#fff)!important;font-weight:800;font-size:14px}
 .lpb:disabled{background:var(--line)!important;color:var(--mute)!important;opacity:.6}
 .lpno{font-size:13px;color:var(--mute);white-space:nowrap}.lpno b{font-size:17px;color:var(--fg);font-weight:900}
+/* 문제 속 내 단어장 별 */
+.wbw{cursor:pointer;border-radius:4px}
+.wbs{font-family:var(--ui);font-size:.5em;letter-spacing:-.08em;color:#ff5d8f;font-weight:900;margin-left:1px;vertical-align:super;line-height:0}
+.wbs.s2{color:#f0583c}.wbs.s3{color:#e0263f}
+.wbrow .wbs{font-size:12px;vertical-align:1px}
+.wbhits{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:14px;border:1px dashed var(--line);margin:8px 0}
+.wbrow{text-align:left;min-height:0;padding:7px 10px;background:var(--bg);border:0;border-radius:10px;font-size:14px}
+.wbtip{position:absolute;z-index:70;max-width:260px;padding:7px 11px;border-radius:10px;background:var(--fg);color:var(--bg);font-size:12.5px;font-weight:700;box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none}
 /* 청해 재생 상태 */
 .ltime.warn{color:#c98a1a;font-weight:700}
 .pstat{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:2px 0 6px}
@@ -1541,7 +1549,7 @@ function render(){
 }
 // 2026-11-17 PC 전용 구조: 화면을 그린 뒤 PC(가로 1024px 이상)일 때만 덧붙인다. 휴대폰에서는 아무것도 하지 않음
 const isPC=()=>matchMedia('(min-width:1024px)').matches;let PC_I=null;
-{const _r=render;render=function(){_r();try{pcAfter()}catch(e){console.error(e)}try{hitAfter()}catch(e){console.error(e)}}}
+{const _r=render;render=function(){_r();try{pcAfter()}catch(e){console.error(e)}try{hitAfter()}catch(e){console.error(e)}try{wbAfter()}catch(e){console.error(e)}}}
 function pcAfter(){const pc=isPC(),pres=pc&&VIEW==='sess'&&!!S.cur&&S.cur.i<S.cur.steps.length;document.body.classList.toggle('pres',pres);
   const t=$('#tabs'),b=t&&t.querySelector('button.on');if(pc&&b){t.style.setProperty('--pl',b.offsetLeft+'px');t.style.setProperty('--pw',b.offsetWidth+'px')}
   const k=$('#preskeys');if(pres&&!k)document.body.insertAdjacentHTML('beforeend','<div class="pres-keys" id="preskeys">1~4 보기 고르기 · Enter 다음</div>');else if(!pres&&k)k.remove();
@@ -1620,6 +1628,43 @@ function pickReadQ(min){const pool=PICK.find(p=>p[0]==='reading')[2](),age=x=>{c
   for(const x of shuffle(pool).sort((a,b)=>age(a)-age(b))){if(out.length>=min||u>=4)break;const g=x.g||[x];if(out.length&&out.length+g.length>12)continue;g.forEach(s=>{const{sk,...st}=s;out.push(st)});u++}return out}
 function pickSteps(a,n){const pool=PICK.find(p=>p[0]===a)[2](),age=x=>{const v=S.seen[x.sk];return v?v.t:0};
   const ord=shuffle(pool).sort((x,y)=>age(x)-age(y)),out=[];for(const x of ord){if(out.length>=n)break;(x.g||[x]).forEach(s=>{const{sk,...st}=s;out.push(st)})}return out}
+// ── 2026-11-20 문제 속 내 단어장 별 표시 ──
+// 풀 때: 처음 보는 문제의 문제 글·지문·예문 속 단어장 말(외울 것)에 작은 별. 별 수 = 틀린 횟수(1~3). 보기에는 안 붙임(답의 힌트가 되므로),
+//   한 문제에 최대 3개(틀린 횟수 많은 순). 복습 문제·전에 푼 문제·청해는 풀 때 표시하지 않음(문제 모양으로 외우지 않게).
+// 답한 뒤: 보기·대본까지 모두 표시 + 읽기·뜻·틀린 횟수 목록. 별을 누르면 풀 때는 상태만, 답한 뒤에는 단어 창.
+// 설정 S.pref.wbstar: solve(풀 때, 기본) · after(답한 뒤만) · off
+let WBC=null;
+function wbIndex(){const key=Object.keys(S.words).length+'|'+S.hist.length;if(WBC&&WBC.key===key)return WBC;
+  const miss={};S.hist.forEach(h=>{if(h.ok)return;const k=h.k+'|'+h.id;(miss[k]=(miss[k]||0)+1)});
+  const L=[];for(const w of Object.values(S.words)){if(w.del||w.st==='done'||!w.w)continue;const core=(w.kind==='p'?pCore(w.w):w.w).replace(/^[～〜~]/,'');if(core.length<2)continue;
+    let m=(miss['wb|'+w.w]||0)+(miss['wb3|'+w.w]||0);new Set([...(w.keys||[]),...(w.src&&w.src.id!=null?[w.src.k+'|'+w.src.id]:[])]).forEach(k=>{m+=miss[k]||0});
+    const forms=[core];if(KJ.test(core)){const st=core.endsWith('する')?core.slice(0,-2):/[うくぐすつぬぶむるい]$/.test(core)?core.slice(0,-1):'';if(st.length>=2&&KJ.test(st)&&st!==core)forms.push(st)}
+    L.push({w:w.w,forms,m,stars:Math.min(3,Math.max(1,m)),x:w})}
+  const all=L.flatMap(o=>o.forms.map(f=>[f,o])).sort((a,b)=>b[0].length-a[0].length);
+  WBC={key,map:new Map(all),re:all.length?new RegExp(all.map(([f])=>f.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g'):null};return WBC}
+function wbMark(scope,limit,skip){const I=wbIndex();if(!I.re)return[];const found=new Map();
+  const tw=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const p=n.parentElement;if(!p||p.closest('.wbw,textarea,input,script,style,.ko,.ko2,.note,.purpose,.kind,.wbhits,.pstat,.fxcombo'+(skip?','+skip:'')))return NodeFilter.FILTER_REJECT;return /[ぁ-んァ-ヶ㐀-鿿]/.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});
+  const nodes=[];while(tw.nextNode())nodes.push(tw.currentNode);
+  const hits=[];for(const n of nodes){I.re.lastIndex=0;let m;while((m=I.re.exec(n.nodeValue))){const o=I.map.get(m[0]);if(o&&!found.has(o.w)){found.set(o.w,o);hits.push({n,i:m.index,len:m[0].length,o})}}}
+  hits.sort((a,b)=>b.o.m-a.o.m);const use=hits.slice(0,limit);
+  // 같은 글자 마디에서 뒤쪽부터 감싸야 위치가 어긋나지 않는다
+  use.sort((a,b)=>(nodes.indexOf(a.n)-nodes.indexOf(b.n))||(b.i-a.i)).forEach(h=>{try{const r=document.createRange();r.setStart(h.n,h.i);r.setEnd(h.n,h.i+h.len);const s=document.createElement('span');s.className='wbw';s.dataset.ww=h.o.w;
+    r.surroundContents(s);s.insertAdjacentHTML('beforeend',`<sup class="wbs s${h.o.stars}" aria-label="내 단어장 · 틀린 ${h.o.m}번">${'★'.repeat(h.o.stars)}</sup>`)}catch(e){}});
+  return use.map(h=>h.o)}
+function wbAfter(){if(VIEW!=='sess'||!S.cur)return;const s=S.cur,st=s.steps[s.i];if(!st)return;const md=S.pref.wbstar||'solve';if(md==='off')return;
+  const c=$('#view .card');if(!c)return;const r=s.res[s.i],done=!!r&&(('ok' in r)||r.pick!=null||r.shown||r.skip);
+  const seenB=!!(st.again||st.sibOf||s.review||(()=>{const sk=seenKey(st);return sk&&S.seen[sk]&&(S.seen[sk].t||0)<(s.t0||Date.now())-500})()||S.hist.some(h=>h.k===st.k&&h.id===st.id&&h.t<(s.t0||Date.now())-500));
+  if(!done){if(md!=='solve'||seenB||st.k==='listen')return;s.wbs=s.wbs||{};const ws=wbMark(c,3,'.opts,button.opt,#nums,.opt');s.wbs[s.i]=ws.map(o=>o.w);
+    c.querySelectorAll('.wbw').forEach(e=>e.onclick=ev=>{ev.stopPropagation();const o=wbIndex().map.get(e.dataset.ww)||{};wbTip(e,`내 단어장 · ${o.m?'틀린 '+o.m+'번':'외울 것'} · 뜻은 답한 뒤에`)});return}
+  const ws=wbMark(c,12,'');if(!ws.length)return;
+  // 풀 때 별을 봤던 말이 든 문제를 맞히면 그 말의 「다시 만나 맞힘」을 올린다(한 문제에 한 번)
+  const pre=((s.wbs||{})[s.i]||[]);if(r&&r.ok===true&&pre.length&&!(s.wbm||{})[s.i]){s.wbm=s.wbm||{};s.wbm[s.i]=1;pre.forEach(w=>{const x=S.words[w];if(x){x.meet=(x.meet||0)+1;x.u=Date.now()}});save()}
+  const box=`<div class="wbhits"><div class="note"><b>이 문제 속 내 단어장</b>${pre.length?' · 풀 때 별을 본 말 '+pre.length:''}</div>${ws.map(o=>`<button class="wbrow" data-wbo="${esc(o.w)}"><span class="wbs s${o.stars}">${'★'.repeat(o.stars)}</span> <span class="jp">${esc(o.w)}</span>${o.x.r?` <span class="rp">${esc(o.x.r)}</span>`:''} <span class="m2">${esc((o.x.ko||'').slice(0,30))}</span> <span class="note">${o.m?'틀린 '+o.m+'번':'외울 것'}${o.x.meet?' · 다시 만나 맞힘 '+o.x.meet:''}</span></button>`).join('')}</div>`;
+  const nx=c.querySelector('#next');(nx?nx.closest('.row'):null)?nx.closest('.row').insertAdjacentHTML('beforebegin',box):c.insertAdjacentHTML('beforeend',box);
+  const open=w=>lookSheet('',w,{src:{k:'wb',d:today()}});
+  c.querySelectorAll('[data-wbo]').forEach(b=>b.onclick=()=>open(b.dataset.wbo));c.querySelectorAll('.wbw').forEach(e=>e.onclick=ev=>{ev.stopPropagation();open(e.dataset.ww)})}
+function wbTip(el,txt){document.querySelectorAll('.wbtip').forEach(x=>x.remove());const t=document.createElement('div');t.className='wbtip';t.textContent=txt;document.body.appendChild(t);
+  const r=el.getBoundingClientRect();t.style.left=Math.max(8,Math.min(innerWidth-t.offsetWidth-8,r.left+scrollX))+'px';t.style.top=(r.bottom+scrollY+6)+'px';setTimeout(()=>t.remove(),2600)}
 // ── 2026-11-20 장 넘김(작문·실력·설정): 긴 화면을 옆으로 넘기는 장으로. 화면 글 안의 <!--PG:장 이름--> 표시로 나눔.
 // 장 이름 칩 · 쪽 번호 · 점 · ‹ ›(PC) · ← → 키 · 손가락 밀기. 다시 그려도(설정 바꾸기 등) 보던 장 그대로
 const PGI={};
@@ -1681,6 +1726,7 @@ function setView(){
    <p class="note">${lvSummary()}</p>`}
    <div><b>청해 속도</b></div><div class="chips">${[[0.9,'느리게'],[1,'보통'],[1.15,'조금 빠르게'],[1.3,'빠르게']].map(([v,n])=>`<button data-rt="${v}" class="${(S.pref.rate||1)==v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>청해 조용한 구간</b> <span class="note">(실제 시험의 「보기 읽는 시간」「답 고르는 시간」 무음)</span></div><div class="chips">${[['auto','자동으로 넘기기'],['btn','버튼으로 넘기기'],['exam','시험처럼 기다리기']].map(([v,n])=>`<button data-ls="${v}" class="${(S.pref.lsil||'auto')===v?'on':''}">${n}</button>`).join('')}</div>
+   <div><b>문제 속 내 단어장 표시</b> <span class="note">(단어장 말에 작은 별 · 별 수 = 틀린 횟수 · 보기·복습 문제·청해는 답한 뒤에만)</span></div><div class="chips">${[['solve','풀 때 별 표시'],['after','답한 뒤에만'],['off','끄기']].map(([v,n])=>`<button data-wbst="${v}" class="${(S.pref.wbstar||'solve')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>객관식 보기 순서</b> <span class="note">(답한 뒤에도 풀 때 순서 그대로 두고 책 번호를 함께 보여 줍니다 · 청해는 섞지 않음)</span></div><div class="chips">${[['','섞기'],['1','책 순서 그대로']].map(([v,n])=>`<button data-sf="${v}" class="${(S.pref.noshuf?'1':'')===v?'on':''}">${n}</button>`).join('')}</div>
    <!--PG:화면--><div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>화면</b></div><div class="chips">${[['','기기 설정대로'],['light','밝게'],['dark','어둡게']].map(([v,n])=>`<button data-th="${v}" class="${(S.pref.theme||'')===v?'on':''}">${n}</button>`).join('')}</div>
@@ -1705,6 +1751,7 @@ function setView(){
   $('#uxs').onclick=()=>{const t=$('#uxt').value.trim();if(!t)return;S.ux.push({t:Date.now(),text:t});save();syncNow();render()};
   document.querySelectorAll('button[data-rt]').forEach(b=>b.onclick=()=>{S.pref.rate=+b.dataset.rt;save();render()});
   document.querySelectorAll('button[data-ls]').forEach(b=>b.onclick=()=>{S.pref.lsil=b.dataset.ls;save();render()});
+  document.querySelectorAll('button[data-wbst]').forEach(b=>b.onclick=()=>{S.pref.wbstar=b.dataset.wbst;save();render()});
   if(!TEST){bindRec(render);bindSync(render)}bindAiSet(render)}
 // ── 2026-11-05 지인판(시험판) 모드: window.__TEST가 있으면 단계별 시험판으로 동작 ──
 // 기록은 단계마다 따로(la-test-<id>), 자동 동기화·기록 옮기기 없음, 처음 안내 · 피드백 탭
