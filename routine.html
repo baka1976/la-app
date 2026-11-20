@@ -379,6 +379,23 @@ mark.wins{background:color-mix(in srgb,var(--ok) 25%,transparent);color:inherit;
 
 /* PC 발표 화면은 번호 배지가 따로 붙으므로 글자 속 번호는 숨김(11-20: 「1 1.」 두 번 보이던 것) */
 body.pres .onum{display:none}
+/* 2026-11-20 장 넘김 · 노트 전환 */
+.pgr-h{display:flex;align-items:center;gap:10px;margin:2px 0 6px}
+.pgr-ch{flex:1;min-width:0;flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;padding:2px 0}.pgr-ch::-webkit-scrollbar{display:none}.pgr-ch button{flex:none;white-space:nowrap}
+.pgr-no{font-size:12px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}.pgr-no b{font-size:18px;color:var(--fg);font-weight:900}
+.pgr-w{position:relative}
+.pgr-t{display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;align-items:flex-start;transition:height .3s cubic-bezier(.16,1,.3,1);overscroll-behavior-x:contain}
+.pgr-t::-webkit-scrollbar{display:none}
+.pgr-p{flex:0 0 100%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;gap:10px;padding:2px;opacity:.45;transition:opacity .35s}
+.pgr-p.cur{opacity:1}
+.pgr-a{position:absolute;top:90px;z-index:3;width:40px;height:40px;min-height:0;border-radius:50%!important;padding:0;display:grid;place-items:center;font-size:22px;line-height:1;background:var(--card);border:1px solid var(--line);box-shadow:0 6px 16px rgba(0,0,0,.15)}
+.pgr-a.l{left:-12px}.pgr-a.r{right:-12px}.pgr-a:disabled{opacity:0;pointer-events:none}
+@media (max-width:1023px){.pgr-a{display:none}}
+.pgr-d{display:flex;justify-content:center;gap:6px;margin-top:12px}.pgr-d i{width:7px;height:7px;border-radius:7px;background:var(--line);transition:width .35s cubic-bezier(.2,.9,.25,1.25),background .3s}.pgr-d i.on{width:22px;background:var(--fg)}
+.pgr-hint{text-align:center;margin:4px 0 0}
+.nseg{display:flex;padding:4px;border-radius:99px;background:var(--soft,var(--bg));margin:0 0 10px}
+.nseg button{flex:1;border:0;background:none;border-radius:99px;padding:9px 6px;font-weight:800;color:var(--mute);min-height:0}.nseg button.on{background:var(--fg);color:var(--bg)}
+.nseg em{font-style:normal;font-size:12px;margin-left:4px;opacity:.75}
 /* 청해 재생 상태 */
 .ltime.warn{color:#c98a1a;font-weight:700}
 .pstat{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:2px 0 6px}
@@ -1232,15 +1249,15 @@ const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?f
   if(a0.q)return{t:a0.q,h:`<div class="jp">${esc(a0.q)}</div>${a0.a?`<p class="note">교재: ${esc(a0.a)}</p>`:''}`};
   if(a0.pat)return{t:'문형 '+a0.pat,h:`<p>문형 ${esc(a0.pat)}</p>`};
   return{t:e.id||'(문항)',h:''}}
-let NF='todo',RV='notes',WF='todo',NP=null,WP=null;   // NP·WP = 지금 펼친 오답노트·단어장 낱장
+let NF='todo',RV='words',WF='todo',NP=null,WP=null;   // NP·WP = 지금 펼친 오답노트·단어장 낱장
 // 낱장에서 좌우로 밀면 이전·다음(휴대폰)
-let SWX=null;document.addEventListener('touchstart',e=>{SWX=VIEW==='review'&&(NP||WP)&&!$('#sheet')?[e.touches[0].clientX,e.touches[0].clientY]:null},{passive:true});
+let SWX=null;document.addEventListener('touchstart',e=>{SWX=(VIEW==='review'||VIEW==='note')&&(NP||WP)&&!$('#sheet')?[e.touches[0].clientX,e.touches[0].clientY]:null},{passive:true});
 document.addEventListener('touchend',e=>{if(!SWX)return;const dx=e.changedTouches[0].clientX-SWX[0],dy=e.changedTouches[0].clientY-SWX[1];SWX=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*2&&!String(getSelection())){const b=$(dx<0?'#pnext':'#pprev');if(b&&!b.disabled)b.click()}},{passive:true});
 // 복습 탭: 오답노트 / 단어장 두 공책
 const openNotes=()=>Object.entries(S.notes).filter(([k,e])=>NG.todo.includes(noteStat(e,k))).length;
-const rvSwitch=()=>{const nw=Object.values(S.words).filter(w=>!w.del&&w.st!=='done').length;
-  return `<div class="chips">${[['notes','오답노트',openNotes()],['words','단어장',nw]].map(([k,n,c])=>`<button data-rv="${k}" class="${RV===k?'on':''}">${n} · 아직 ${c}</button>`).join('')}</div>`};
-const bindRv=()=>document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>{RV=b.dataset.rv;NP=WP=null;notesView()});
+const rvSwitch=()=>{if(VIEW==='note')return noteSeg();const nw=Object.values(S.words).filter(w=>!w.del&&w.st!=='done').length;
+  return `<div class="nseg">${[['words','단어장',' · 아직 '+nw],['pick','골라 풀기','']].map(([k,n,c])=>`<button data-rv="${k}" class="${RV===k?'on':''}">${n}<em>${c}</em></button>`).join('')}</div>`};
+const bindRv=()=>{bindNoteSeg();document.querySelectorAll('[data-rv]').forEach(b=>b.onclick=()=>{RV=b.dataset.rv;NP=WP=null;VIEW='review';render()})};
 const pgNav=(i,n,extra)=>`<div class="row pgnav"><button id="pidx">← 차례</button><span class="note">${i+1} / ${n}쪽${extra?' · '+extra:''}</span><span><button id="pprev" ${i?'':'disabled'}>이전</button> <button id="pnext" class="pri" ${i<n-1?'':'disabled'}>다음</button></span></div>${n>2?`<div class="row pgjump"><input type="range" id="pgr" min="1" max="${n}" value="${i+1}" aria-label="쪽 이동"><input type="number" id="pgn" min="1" max="${n}" value="${i+1}" aria-label="쪽 번호"><button id="pgg">쪽으로</button></div>`:''}`;
 // 2026-11-12 책처럼 넘기기: 차례(묶음 바로 가기)·찾기·책갈피·쪽 바로 가기·넘기는 움직임. 복습 탭(오답노트·단어장)만
 let RVQ='',PGD=0;const RVS={notes:'date',words:'date'};
@@ -1261,14 +1278,14 @@ const bindTools=(re,goBm)=>{const q=$('#rvq');if(q){const f=()=>{RVQ=q.value.tri
 const bindPg=(i,n,goI)=>{const on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('pidx',()=>goI(-1));on('pprev',()=>{PGD=-1;goI(i-1)});on('pnext',()=>{PGD=1;goI(i+1)});
   const r=$('#pgr'),m=$('#pgn'),j=v=>{v=Math.max(1,Math.min(n,+v||1))-1;if(v!==i){PGD=v>i?1:-1;goI(v)}};
   if(r){r.oninput=()=>{m.value=r.value};r.onchange=()=>j(r.value);on('pgg',()=>j(m.value));m.onkeydown=e=>{if(e.key==='Enter')j(m.value)}}};
-document.addEventListener('keydown',e=>{if(VIEW!=='review'||!(NP||WP)||$('#sheet')||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;const b=e.key==='ArrowRight'?$('#pnext'):e.key==='ArrowLeft'?$('#pprev'):null;if(b&&!b.disabled)b.click()});
+document.addEventListener('keydown',e=>{if(!(VIEW==='review'||VIEW==='note')||!(NP||WP)||$('#sheet')||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;const b=e.key==='ArrowRight'?$('#pnext'):e.key==='ArrowLeft'?$('#pprev'):null;if(b&&!b.disabled)b.click()});
 // AI 답 글: 머리줄(#)·굵게(**)만 살리고 나머지는 줄바꿈 그대로
 const aiHtml=t=>esc(String(t).split('\n').filter(l=>!/^\s*(?:[-*•>]\s*)?(?:\*\*)?(단어|문형|예문\s*\d*)(?:\*\*)?\s*[:：]/.test(l)).join('\n').replace(/\n{3,}/g,'\n\n').trim()).split('\n').map(l=>/^#{1,4}\s/.test(l)?`<b>${l.replace(/^#+\s*/,'')}</b>`:l.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')).join('\n');
 // 단어·문형 한 줄(오답노트 안): 형광펜 단어 + 빨간 펜 읽기 + 뜻 + 예문 3개
 const wLine=x=>`<div class="wline"><div>${x.kind==='p'?'<span class="tag">문형</span> ':''}<span class="jp hl" style="font-size:19px">${esc(x.w)}</span>${x.r&&x.r!==x.w?` <span class="rp">${esc(x.r)}</span>`:''} <span class="m2">${esc(x.ko||'')}</span></div>${exHtml(x,wCore(x))}</div>`;
 function notesView(){
   if(RV==='words')return wordsView();
-  const all=Object.entries(S.notes).map(([key,e])=>({key,e,st:noteStat(e,key),t:Math.max(...e.a.map(a=>a.t))})).sort((a,b)=>b.t-a.t);
+  const all=Object.entries(S.notes).filter(([key,e])=>!(VIEW==='note'&&WRK.includes(e.k))).map(([key,e])=>({key,e,st:noteStat(e,key),t:Math.max(...e.a.map(a=>a.t))})).sort((a,b)=>b.t-a.t);
   const inG=(n,g)=>g==='all'||NG[g].includes(n.st);
   const list=all.filter(n=>inG(n,NF)),rev=all.filter(n=>n.st==='open'&&OBJ.includes(n.e.k));
   const dates=[...new Set(S.log.map(l=>l.date))].reverse(),jd=dates[0]||today();
@@ -1302,7 +1319,7 @@ function notesView(){
   else{NP=null;const gs=rvGrp(IT),bm=IT.find(x=>x.key===BM.notes);h+=rvTools('찾기 (문제 글·단어·뜻)',[['date','날짜별'],['kind','영역별']],gs,bm?bm.txt.slice(0,28):'');
     if(!IT.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
     let lastG=null,gi=0;for(const it of IT){if(it.g!==lastG){h+=`<h3 id="toc${gi++}">${esc(it.g)}</h3>`;lastG=it.g}h+=`<button class="idx" data-np="${esc(it.key)}">${it.sum}</button>`}h+=judgeUI(jd)}
-  $('#view').innerHTML=nbCard('복습 · 오답노트',h);PGD=0;bindRv();
+  $('#view').innerHTML=nbCard('노트 · 오답노트',h);PGD=0;bindRv();
   document.querySelectorAll('[data-nf]').forEach(b=>b.onclick=()=>{NF=b.dataset.nf;NP=null;notesView()});
   document.querySelectorAll('[data-np]').forEach(b=>b.onclick=()=>{NP=b.dataset.np;notesView();scrollTo(0,0)});
   bindPg(pi,IT.length,i=>{NP=i<0?null:IT[i].key;notesView();scrollTo(0,0)});bindTools(()=>{NP=null;notesView()},()=>{NP=BM.notes;notesView();scrollTo(0,0)});
@@ -1472,7 +1489,7 @@ function tabs(){const t=$('#tabs');
   if(VIEW==='sess'){const s=S.cur,nm=s&&s.review?'복습':s&&s.test?'레벨 테스트':s&&s.custom?'골라 풀기':'오늘 학습';
     t.innerHTML=`<button id="quit" style="flex:0 0 auto">← 그만하기</button><span class="note" style="align-self:center">${nm} · ${s?Math.min(s.i+1,s.steps.length):0} / ${s?s.steps.length:0} · 나중에 이어서 할 수 있어요</span>`;
     $('#quit').onclick=()=>{VIEW=s&&s.review?'review':s&&s.test?'level':s&&s.custom?(s.area==='wr'?'write':'pick'):'today';render()};return}
-  t.innerHTML=[['today','오늘'],['review','복습'],['write','작문'],['pick','골라 풀기'],['level','실력'],...(TEST?[['fb','피드백']]:[]),['set','설정']].map(([k,n])=>`<button data-tab="${k}" class="${VIEW===k?'on':''}${k==='set'?' gear':''}" ${k==='set'?'aria-label="설정" title="설정"':''}>${n}</button>`).join('');
+  t.innerHTML=[['today','오늘'],['review','복습'],['note','노트'],['write','작문'],['level','실력'],...(TEST?[['fb','피드백']]:[]),['set','설정']].map(([k,n])=>`<button data-tab="${k}" class="${VIEW===k?'on':''}${k==='set'?' gear':''}" ${k==='set'?'aria-label="설정" title="설정"':''}>${n}</button>`).join('');
   document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{const go=()=>{VIEW=b.dataset.tab;render()};if(isPC()&&document.startViewTransition&&!matchMedia('(prefers-reduced-motion:reduce)').matches)document.startViewTransition(go);else go()})}
 const active=s=>s&&!s.closed&&s.i<s.steps.length;
 // 새 풀이 시작: 오늘 학습을 하던 중에 복습·골라 풀기를 시작하면 오늘 학습은 잠시 보관했다가 끝나면 되돌린다
@@ -1480,7 +1497,7 @@ function startSession(sess){if(active(S.cur)&&!S.cur.review&&!S.cur.custom&&(ses
 function render(){
   {const sb=document.getElementById('selbtn');if(sb)sb.remove()}
   tabs();
-  if(VIEW!=='sess'){$('#bar').innerHTML='';CURLV=null;return ({today:home,review:notesView,write:writeView,pick:pickView,level:levelView,set:setView,fb:fbView})[VIEW]()}
+  if(VIEW!=='sess'){$('#bar').innerHTML='';CURLV=null;return ({today:home,review:reviewView,note:noteView,write:writeView,pick:reviewView,level:levelView,set:setView,fb:fbView})[(VIEW==='pick'?(RV='pick','review'):VIEW)]()}
   const s=S.cur;drawBar();
   if(!s){VIEW='today';return render()}
   if(s.i>=s.steps.length)return finish();
@@ -1577,6 +1594,43 @@ function pickReadQ(min){const pool=PICK.find(p=>p[0]==='reading')[2](),age=x=>{c
   for(const x of shuffle(pool).sort((a,b)=>age(a)-age(b))){if(out.length>=min||u>=4)break;const g=x.g||[x];if(out.length&&out.length+g.length>12)continue;g.forEach(s=>{const{sk,...st}=s;out.push(st)});u++}return out}
 function pickSteps(a,n){const pool=PICK.find(p=>p[0]===a)[2](),age=x=>{const v=S.seen[x.sk];return v?v.t:0};
   const ord=shuffle(pool).sort((x,y)=>age(x)-age(y)),out=[];for(const x of ord){if(out.length>=n)break;(x.g||[x]).forEach(s=>{const{sk,...st}=s;out.push(st)})}return out}
+// ── 2026-11-20 장 넘김(작문·실력·설정): 긴 화면을 옆으로 넘기는 장으로. 화면 글 안의 <!--PG:장 이름--> 표시로 나눔.
+// 장 이름 칩 · 쪽 번호 · 점 · ‹ ›(PC) · ← → 키 · 손가락 밀기. 다시 그려도(설정 바꾸기 등) 보던 장 그대로
+const PGI={};
+function pagerize(id,html){const parts=html.split(/<!--PG:(.*?)-->/),head=parts[0],pages=[];for(let k=1;k<parts.length;k+=2)if(parts[k+1]&&parts[k+1].trim())pages.push({t:parts[k],h:parts[k+1]});
+  if(!pages.length)return html;const i=Math.min(PGI[id]||0,pages.length-1);
+  return `${head}<div class="pgr" id="pgr_${id}"><div class="pgr-h"><div class="chips pgr-ch">${pages.map((pg,k)=>`<button data-pk="${k}" class="${k===i?'on':''}">${esc(pg.t)}</button>`).join('')}</div><span class="pgr-no"><b>${i+1}</b> / ${pages.length}</span></div>
+   <div class="pgr-w"><button class="pgr-a l" aria-label="이전 장">‹</button><button class="pgr-a r" aria-label="다음 장">›</button><div class="pgr-t">${pages.map((pg,k)=>`<section class="pgr-p${k===i?' cur':''}">${pg.h}</section>`).join('')}</div></div>
+   <div class="pgr-d">${pages.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div><p class="note pgr-hint">옆으로 밀어서 넘기기${isPC()?' · ‹ › 또는 ← → 키':''}</p></div>`}
+function bindPager(id){const R=$('#pgr_'+id);if(!R)return;const T=R.querySelector('.pgr-t'),P=[...T.children],ch=R.querySelectorAll('.pgr-ch button'),dots=R.querySelectorAll('.pgr-d i'),no=R.querySelector('.pgr-no b'),L=R.querySelector('.pgr-a.l'),Rb=R.querySelector('.pgr-a.r');
+  let cur=Math.min(PGI[id]||0,P.length-1);const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const fit=()=>{const h=P[cur]&&P[cur].offsetHeight;T.style.height=h?h+'px':'auto'};
+  const mark=i=>{cur=i;PGI[id]=i;no.textContent=i+1;ch.forEach((b,k)=>b.classList.toggle('on',k===i));dots.forEach((d,k)=>d.classList.toggle('on',k===i));L.disabled=i===0;Rb.disabled=i===P.length-1;P.forEach((pg,k)=>pg.classList.toggle('cur',k===i));fit();
+    const cb=ch[i];if(cb){const c=cb.parentNode;c.scrollTo({left:cb.offsetLeft-c.offsetLeft-c.clientWidth/2+cb.offsetWidth/2,behavior:still?'auto':'smooth'})}};
+  const go=i=>{i=Math.max(0,Math.min(P.length-1,i));T.scrollTo({left:i*T.clientWidth,behavior:still?'auto':'smooth'});mark(i)};
+  T.scrollLeft=cur*T.clientWidth;mark(cur);
+  let tm=0;T.addEventListener('scroll',()=>{clearTimeout(tm);tm=setTimeout(()=>{const i=Math.round(T.scrollLeft/Math.max(1,T.clientWidth));if(i!==cur)mark(i)},90)},{passive:true});
+  ch.forEach(b=>b.onclick=()=>go(+b.dataset.pk));L.onclick=()=>go(cur-1);Rb.onclick=()=>go(cur+1);R.__go=d=>go(cur+d);
+  if(window.ResizeObserver){const ro=new ResizeObserver(()=>fit());P.forEach(pg=>ro.observe(pg))}}
+document.addEventListener('keydown',e=>{if(VIEW==='sess'||$('#sheet')||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;const R=document.querySelector('.pgr');if(!R||!R.__go)return;
+  if(e.key==='ArrowRight'){e.preventDefault();R.__go(1)}else if(e.key==='ArrowLeft'){e.preventDefault();R.__go(-1)}});
+// ── 2026-11-20 노트 탭: 오답노트(객관식) · 첨삭노트(작문 판정) ──
+let NOTE_S='mis',FXF='todo',FXKF='all';
+const noteSeg=()=>{const mis=Object.entries(S.notes).filter(([k,e])=>!WRK.includes(e.k)&&['open','memo','fix'].includes(noteStat(e,k))).length,fx=wItems().filter(x=>(x.j&&WV.indexOf(x.j.v)>=2&&!x.out)||x.pend).length;
+  return `<div class="nseg"><button data-ns="mis" class="${NOTE_S==='mis'?'on':''}">오답노트 <em>${mis}</em></button><button data-ns="fix" class="${NOTE_S==='fix'?'on':''}">첨삭노트 <em>${fx}</em></button></div>`};
+const bindNoteSeg=()=>document.querySelectorAll('[data-ns]').forEach(b=>b.onclick=()=>{NOTE_S=b.dataset.ns;NP=null;scrollTo(0,0);render()});
+function fixView(){WLIST=wItems();const st=x=>x.pend?'pend':x.j&&!x.out&&WV.indexOf(x.j.v)<2?'pass':'todo';
+  const KF=[['all','전부'],['tr','번역'],['art','기사'],['cw','조건 작문'],['etc','그 밖']],kOf=x=>['ilyeok','hanyeok'].includes(x.e.k)?'tr':x.e.k==='art'?'art':x.e.k==='cw'?'cw':'etc';
+  const L=WLIST.filter(x=>(x.j||x.pend)&&(FXF==='all'||(FXF==='todo'?st(x)!=='pass':st(x)==='pass'))&&(FXKF==='all'||kOf(x)===FXKF));
+  $('#view').innerHTML=card('노트 · 첨삭노트',`${noteSeg()}
+   <div class="chips">${[['todo','고칠 곳·검수 대기'],['pass','통과'],['all','전부']].map(([k,n])=>`<button data-ff="${k}" class="${FXF===k?'on':''}">${n}</button>`).join('')}</div>
+   <div class="chips">${KF.map(([k,n])=>`<button data-fk="${k}" class="${FXKF===k?'on':''}">${n}</button>`).join('')}</div>
+   <p class="note">AI 판정을 받은 작문이 모입니다(번역 세트·기사 작문·조건 작문·루틴의 번역). 틀린 글자는 빨간 취소선, 고친 글자는 초록. 「고쳐 쓰기」는 기준 문장을 가리고 다시 쓰기, 「판정이 이상함」은 점수에서 빼고 다른 AI에 다시 묻기.</p>
+   ${L.length?L.slice(0,WSHOW).map(x=>wCard(x,WLIST.indexOf(x))).join('')+(L.length>WSHOW?`<div class="row"><button id="wmore">더 보기 (${L.length-WSHOW})</button></div>`:''):'<p class="note">해당하는 작문이 없습니다. 작문 탭에서 번역 세트나 기사 작문을 쓰고 판정을 받으면 여기 쌓입니다.</p>'}`);
+  bindNoteSeg();document.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{FXF=b.dataset.ff;fixView()});document.querySelectorAll('[data-fk]').forEach(b=>b.onclick=()=>{FXKF=b.dataset.fk;fixView()});wBind()}
+function noteView(){if(NOTE_S==='fix')return fixView();RV='notes';notesView()}
+// 복습 탭: 단어장 · 골라 풀기
+function reviewView(){if(RV==='notes')RV='words';if(RV==='pick'){pickView();const c=$('#view .card');if(c){const k=c.querySelector('.kind');(k||c).insertAdjacentHTML(k?'afterend':'afterbegin',rvSwitch());bindRv()}return}notesView()}
 function pickView(){const unit=['reading','tg'].includes(PK.a)?'지문':'문항',ns=unit==='지문'?[1,2,3]:[5,10,20];if(!ns.includes(PK.n))PK.n=ns[1];
   const cnt=a=>PICK.find(p=>p[0]===a)[2]().length;
   $('#view').innerHTML=card('골라 풀기',`<p class="note">영역을 고르고 개수를 정하세요. 아직 안 푼 문제부터, 그다음 오래전에 푼 문제 순서로 나옵니다. 틀린 문제는 복습에 들어갑니다(오늘 루틴의 순서에는 영향 없음).</p>
@@ -1591,24 +1645,24 @@ const lvChips=()=>`<div class="lvsel"><div class="chips"><b>출제 레벨</b>${L
 function lvBind(){document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const l=b.dataset.lv,on=S.levels.includes(l);if(on&&S.levels.length===1)return;S.levels=on?S.levels.filter(x=>x!==l):LVS.filter(x=>x===l||S.levels.includes(x));save();render()})}
 // 설정: 출제 레벨 · 보기 · 동기화 · 기록 옮기기 · 자료 안내 · 불편 메모
 function setView(){
-  $('#view').innerHTML=card('설정',`${TEST?'':`${lvChips()}
+  $('#view').innerHTML=card('설정',pagerize('set',`<!--PG:학습-->${TEST?'':`${lvChips()}
    <p class="note">${lvSummary()}</p>`}
    <div><b>청해 속도</b></div><div class="chips">${[[0.9,'느리게'],[1,'보통'],[1.15,'조금 빠르게'],[1.3,'빠르게']].map(([v,n])=>`<button data-rt="${v}" class="${(S.pref.rate||1)==v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>청해 조용한 구간</b> <span class="note">(실제 시험의 「보기 읽는 시간」「답 고르는 시간」 무음)</span></div><div class="chips">${[['auto','자동으로 넘기기'],['btn','버튼으로 넘기기'],['exam','시험처럼 기다리기']].map(([v,n])=>`<button data-ls="${v}" class="${(S.pref.lsil||'auto')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>객관식 보기 순서</b> <span class="note">(답한 뒤에도 풀 때 순서 그대로 두고 책 번호를 함께 보여 줍니다 · 청해는 섞지 않음)</span></div><div class="chips">${[['','섞기'],['1','책 순서 그대로']].map(([v,n])=>`<button data-sf="${v}" class="${(S.pref.noshuf?'1':'')===v?'on':''}">${n}</button>`).join('')}</div>
-   <div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
+   <!--PG:화면--><div><b>글자 크기</b></div><div class="chips">${[['s','작게'],['m','보통'],['l','크게']].map(([v,n])=>`<button data-fs="${v}" class="${(S.pref.fs||'m')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>화면</b></div><div class="chips">${[['','기기 설정대로'],['light','밝게'],['dark','어둡게']].map(([v,n])=>`<button data-th="${v}" class="${(S.pref.theme||'')===v?'on':''}">${n}</button>`).join('')}</div>
    <div><b>배색</b> <span class="note">파스텔</span></div><div class="chips">${PALS.filter(x=>!x[3]).map(([v,n,c])=>`<button data-pl="${v}" class="${(S.pref.pal||'modern')===v?'on':''}"><span class="sw" style="background:linear-gradient(135deg,${c})"></span>${n}</button>`).join('')}</div>
    <div class="note">기본색</div><div class="chips">${PALS.filter(x=>x[3]).map(([v,n,c])=>`<button data-pl="${v}" class="${(S.pref.pal||'modern')===v?'on':''}"><span class="sw" style="background:linear-gradient(135deg,${c})"></span>${n}</button>`).join('')}</div>
    <div><b>배경</b></div><div class="chips">${[['plain','단색'],['glow','은은한 빛'],['dots','점 무늬'],['wash','물감 번짐'],['hanji','한지 결']].map(([v,n])=>`<button data-bgs="${v}" class="${(S.pref.bg||'plain')===v?'on':''}">${n}</button>`).join('')}</div>
-   ${fxUI()}
-   <div><b>공책 글씨</b> <span class="note">(복습 탭의 오답노트·단어장)</span></div><div class="chips">${[['poor','또박또박 손글씨'],['gowun','단정한 글씨'],['melody','동글 손글씨'],['gaegu','자유 손글씨']].map(([v,n])=>`<button data-hd="${v}" class="${(S.pref.hand||'poor')===v?'on':''}" style="font-family:${{poor:'Poor Story',gowun:'Gowun Dodum',melody:'Hi Melody',gaegu:'Gaegu'}[v]}">${n}</button>`).join('')}</div>
-   <div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
+   <!--PG:효과·글씨-->${fxUI()}
+   <div><b>공책 글씨</b> <span class="note">(노트 탭의 오답노트 · 복습 탭의 단어장)</span></div><div class="chips">${[['poor','또박또박 손글씨'],['gowun','단정한 글씨'],['melody','동글 손글씨'],['gaegu','자유 손글씨']].map(([v,n])=>`<button data-hd="${v}" class="${(S.pref.hand||'poor')===v?'on':''}" style="font-family:${{poor:'Poor Story',gowun:'Gowun Dodum',melody:'Hi Melody',gaegu:'Gaegu'}[v]}">${n}</button>`).join('')}</div>
+   <!--PG:메모--><div><b>불편한 점 · 바라는 점 메모</b> <span class="note">(나중에 앱을 고칠 때 근거로 씁니다 · 동기화됨)</span></div>
    <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
    ${S.ux.length?`<details><summary>저장된 메모 보기</summary>${S.ux.slice().reverse().map(u=>`<p class="note"><b>${esc(new Date(u.t).toLocaleDateString('sv'))}</b>${u.key?' ['+esc(u.key)+']':''} ${esc(u.text)}</p>`).join('')}</details>`:''}
-   ${aiSetUI()}${TEST?'':syncUI()+recUI()}
-   ${TEST?`<details class="note"><summary>자료 안내</summary><p>${esc(TEST.about)}</p></details>`:''}${TEST?'':`<details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`}`);
-  lvBind();
+   <!--PG:AI 판정-->${aiSetUI()}<!--PG:기록·동기화-->${TEST?'':syncUI()+recUI()}
+   ${TEST?`<details class="note"><summary>자료 안내</summary><p>${esc(TEST.about)}</p></details>`:''}${TEST?'':`<details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`}`));
+  lvBind();bindPager('set');
   document.querySelectorAll('button[data-sf]').forEach(b=>b.onclick=()=>{S.pref.noshuf=b.dataset.sf==='1';save();render()});
   document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
   document.querySelectorAll('button[data-hd]').forEach(b=>b.onclick=()=>{S.pref.hand=b.dataset.hd;save();applyPref();render()});
@@ -1859,12 +1913,12 @@ function wBind(){document.querySelectorAll('.wrbtn').forEach(b=>b.onclick=()=>{c
     $('#wrc'+i).onclick=()=>{const txt=$('#wrt'+i).value.trim();if(!txt)return;const ok=wNorm(txt)===wNorm(tg.t),df=wDiff(txt,tg.t);cd.classList.remove('hidefix');
       (x.e.rw=x.e.rw||[]).push({d:today(),t:Date.now(),txt,ok});save();
       $('#wrr'+i).innerHTML=`<p class="res ${ok?'ok':'bad'}">${ok?tg.n+' 문장과 같습니다':'아직 다른 곳이 있습니다'}</p>${!ok&&df?`<div class="wl"><span>다시 쓴 답</span><div class="jp">${df.mine}</div></div><div class="wl"><span>${tg.n}</span><div class="jp">${df.fix}</div></div>`:''}`}});
-  document.querySelectorAll('.wbad').forEach(b=>b.onclick=()=>{const x=WLIST[+b.dataset.i],L=x.e.nojd=x.e.nojd||[];if(x.out)x.e.nojd=L.filter(d=>d!==x.d);else L.push(x.d);x.e.u=Date.now();save();writeView()});
+  document.querySelectorAll('.wbad').forEach(b=>b.onclick=()=>{const x=WLIST[+b.dataset.i],L=x.e.nojd=x.e.nojd||[];if(x.out)x.e.nojd=L.filter(d=>d!==x.d);else L.push(x.d);x.e.u=Date.now();save();render()});
   document.querySelectorAll('.wask').forEach(b=>b.onclick=()=>{const i=+b.dataset.i,x=WLIST[i];if(WASK>=0&&$('#wja'+WASK))$('#wja'+WASK).innerHTML='';WASK=i;
     const req=wReq([{key:x.key,k:x.e.k,lines:wItemLines(x)}]);
     if(!x.e.a.some(a=>a.d===today())){const at={...x.at,d:today(),t:Date.now()*100};delete at.ok;x.e.a.push(at);save()}
-    $('#wja'+i).innerHTML=judgeUI(today(),req)+`<div class="row"><button id="wjdone">판정 받았으면 새로 보기</button></div>`;bindJudge(today(),req);if(x.e.k==='art')artChatGo();$('#wjdone').onclick=()=>{WASK=-1;writeView()}});
-  const m=$('#wmore');if(m)m.onclick=()=>{WSHOW+=10;writeView()}}
+    $('#wja'+i).innerHTML=judgeUI(today(),req)+`<div class="row"><button id="wjdone">판정 받았으면 새로 보기</button></div>`;bindJudge(today(),req);if(x.e.k==='art')artChatGo();$('#wjdone').onclick=()=>{WASK=-1;render()}});
+  const m=$('#wmore');if(m)m.onclick=()=>{WSHOW+=10;render()}}
 // ── 2026-11-20 기사 작문: 일본 신문 사설·기사를 읽고 요약 + 내 의견을 일본어로 → AI 전체 평가 ──
 // 기사 원문은 앱에 저장하지 않는다(링크만). 제목 목록(news.json)은 저장소의 GitHub Actions가 아사히·Yahoo!ニュース RSS에서 제목·링크만 모아 둔다
 KN.art='기사 작문';WRK.push('art');
@@ -2018,13 +2072,12 @@ function todayHero(open,done){const d=new Date(),days=new Set(S.log.filter(l=>!l
 function writeView(){const due=srsDue().filter(e=>e.wr),F=fillPick(5),W=wrList(3),pa=paraNext(),cw=cwPick(),g=grpStats();
   const row=(id,title,desc,n,lab)=>`<div class="wrow"><div><b>${title}</b> <span class="note">${desc}</span></div><div class="row"><button class="${n?'pri':''}" id="${id}" ${n?'':'disabled'}>${n?lab:'지금은 낼 것이 없어요'}</button></div></div>`;
   const TS=pickTrans(3);WLIST=wItems();const WJ=WLIST.filter(x=>x.j||x.pend),pend=WLIST.filter(x=>x.pend).length;
-  $('#view').innerHTML=card('작문',`<div><b>내 작문 실력</b> <span class="note">(AI 판정 점수 · 실력 탭에도 나옴)</span></div>${wBoard()}
-   <div class="wrow"><div><b>오늘의 번역 세트</b> <span class="note">책 문장 일→한 1 · 한→일 2 · 다 쓰고 끝 화면에서 「판정 받기」 → 아래 첨삭 노트에 결과가 쌓입니다</span></div><div class="row"><button class="pri" id="w_set" ${TS.length?'':'disabled'}>번역 ${TS.length}문장 쓰기</button></div></div>
-   ${artUI()}
-   ${artWordsUI()}
-   <div><b>첨삭 노트</b> <span class="note">(판정 · 내 답과 교정문의 다른 곳 표시 · 고친 곳 · 고쳐 쓰기${pend?` · 검수 대기 ${pend}문장: 그날 끝 화면에서 판정 받기`:''})</span></div>
-   ${WJ.length?WJ.slice(0,WSHOW).map(x=>wCard(x,WLIST.indexOf(x))).join('')+(WJ.length>WSHOW?`<div class="row"><button id="wmore">더 보기 (${WJ.length-WSHOW})</button></div>`:''):'<p class="note">아직 판정받은 작문이 없습니다.</p>'}
-   <div style="margin-top:8px"><b>더 쓰기</b></div>
+  $('#view').innerHTML=card('작문',pagerize('write',`<!--PG:작문 실력--><div><b>내 작문 실력</b> <span class="note">(AI 판정 점수 · 실력 탭에도 나옴)</span></div>${wBoard()}
+   <div class="row"><button id="w_note">첨삭노트 보기 (${WJ.length})${pend?` · 검수 대기 ${pend}`:''}</button></div>
+   <!--PG:번역 세트--><div class="wrow"><div><b>오늘의 번역 세트</b> <span class="note">책 문장 일→한 1 · 한→일 2 · 다 쓰고 끝 화면에서 「판정 받기」 → 아래 첨삭 노트에 결과가 쌓입니다</span></div><div class="row"><button class="pri" id="w_set" ${TS.length?'':'disabled'}>번역 ${TS.length}문장 쓰기</button></div></div>
+   <!--PG:기사 작문-->${artUI()}
+   <!--PG:기사 단어장-->${artWordsUI()}
+      <!--PG:더 쓰기--><div><b>더 쓰기</b></div>
    <p class="note">객관식으로 알아본 말을 직접 쓰는 계단: 넣기 → 옮기기 → 단락 옮기기 → 조건 작문. 일본어 자판이 없으면 답 칸 아래 「로마자로 치기」를 켜세요.</p>
    <div class="stat"><span>문형: 알아봄 ${g.p.rec} · 쓸 수 있음 ${g.p.can}</span><span>단어: 알아봄 ${g.w.rec} · 쓸 수 있음 ${g.w.can}</span><span>다시 쓰기 대기 ${due.length}</span></div>
    ${row('w_re','다시 쓰기','틀림·어색함 판정을 받은 문장을 3일 뒤 다시',due.length,`다시 쓰기 ${Math.min(due.length,5)}문장`)}
@@ -2032,11 +2085,11 @@ function writeView(){const due=srsDue().filter(e=>e.wr),F=fillPick(5),W=wrList(3
    ${row('w_tr','옮기기 (계단 3)','그 말이 든 책 문장을 한국어 → 일본어 · 책 원문과 비교',W.length,`옮기기 ${W.length}문장`)}
    ${row('w_pa','단락 옮기기','책 독해 지문의 한 문단(2~4문장)을 일본어로 · 문장 사이 흐름까지',pa?1:0,'단락 1개')}
    ${row('w_cw','조건 작문','흔들리는 문형 1개 + 단어장 단어를 넣어 한 문장 · 책 기준 없음(AI 교습)',cw?1:0,cw?`「${esc(cw.gk.slice(2))}」로 쓰기`:'')}
-   <p class="note">끝 화면의 판정 요청문을 AI에게 보내면 판정(틀림·어색함·취향·정확), 교정문, 고친 곳이 오답노트에 들어가고, 고쳐 준 표현은 단어장 「표현」에 모입니다. 쓰다가 떠오르지 않는 말은 돌려서 쓰고 답 칸 아래 「막혔을 때」에 한국어로 적어 두세요.</p>`);
+   <p class="note">끝 화면의 판정 요청문을 AI에게 보내면 판정(틀림·어색함·취향·정확), 교정문, 고친 곳이 오답노트에 들어가고, 고쳐 준 표현은 단어장 「표현」에 모입니다. 쓰다가 떠오르지 않는 말은 돌려서 쓰고 답 칸 아래 「막혔을 때」에 한국어로 적어 두세요.</p>`));
   const go=steps=>startSession({date:today(),steps,next:{},res:[],i:0,custom:true,area:'wr'});
   const on=(id,f)=>{const b=$('#'+id);if(b&&!b.disabled)b.onclick=f};
   on('w_re',()=>go(due.slice(0,5).map(e=>{const key=e.k+'|'+e.id,ag={last:e.last,why:'write'};return e.k==='hanyeok'?{...trStep(TRI.get(e.id)),again:ag,wrOf:key}:{k:e.k,id:e.id,again:ag,wrOf:key}})));
-  on('w_set',()=>{const T=pickTrans(3);if(!T.length)return;startSession({date:today(),steps:T.map((o,k)=>({k:k===0?'ilyeok':'hanyeok',ja:o.t[0],ko:o.t[1],src:o.t[2],tid:o.t[3]})),next:{tr:T[T.length-1].i+1},res:[],i:0,custom:true,area:'wr'})});wBind();artBind();artWordsBind();
+  on('w_set',()=>{const T=pickTrans(3);if(!T.length)return;startSession({date:today(),steps:T.map((o,k)=>({k:k===0?'ilyeok':'hanyeok',ja:o.t[0],ko:o.t[1],src:o.t[2],tid:o.t[3]})),next:{tr:T[T.length-1].i+1},res:[],i:0,custom:true,area:'wr'})});artBind();artWordsBind();bindPager('write');on('w_note',()=>{VIEW='note';NOTE_S='fix';scrollTo(0,0);render()});
   on('w_fill',()=>go(F));on('w_tr',()=>go(W));on('w_pa',()=>go([trStep(TRI.get(pa))]));on('w_cw',()=>go([cw]))}
 function vCw(st,lab){const s=S.cur,r=s.res[s.i]||{},I=cwInfo(st.gk),core=st.gk.slice(2),ws=st.ws||[];
   let h=`<p class="note">아래 문형${ws.length?'과 단어':''}를 넣어 일본어로 한 문장을 쓰세요. 내용은 자유입니다(업무·일상 무엇이든). 책에 기준 문장이 없는 연습이라 판정은 AI 교습으로 받습니다.</p>
@@ -2310,29 +2363,29 @@ function levelView(){const lv=LV_SEL||S.levels[0]||'N1',e=estimate(lv),w=weekly(
   const pass=lv==='N1'?100:lv==='N2'?90:lv==='N3'?95:lv==='N4'?90:80;
   const bar=(sc)=>sc==null?'<span class="note">문항이 더 필요해요</span>':`<b>${sc}</b> / 60 <span class="note">${sc<19?'(과락선 19 미만)':''}</span>`;
   const enough=SEC.filter(([s])=>e[s].n>=10).length;
-  $('#view').innerHTML=card('내 실력',`<div class="chips"><span class="note">레벨</span>${LVS.map(l=>`<button data-lvv="${l}" class="${l===lv?'on':''}">${l}</button>`).join('')}</div>
-   <div><b>지금 내 위치</b> <span class="note">(${lv} · JLPT처럼 영역별 60점 환산 · 앱의 추정, 공식 판정 아님)</span></div>
+  $('#view').innerHTML=card('내 실력',pagerize('level',`<div class="chips"><span class="note">레벨</span>${LVS.map(l=>`<button data-lvv="${l}" class="${l===lv?'on':''}">${l}</button>`).join('')}</div>
+   <!--PG:지금 위치--><div><b>지금 내 위치</b> <span class="note">(${lv} · JLPT처럼 영역별 60점 환산 · 앱의 추정, 공식 판정 아님)</span></div>
    ${lvHero(lv,e,T)}
-   <div><b>능력치</b></div>${lvStats(lv,T)}
-   <div><b>공부 레벨</b> <span class="note">(푼 만큼 오르고 내려가지 않음)</span></div>${lvXp()}
+   <!--PG:능력치--><div><b>능력치</b></div>${lvStats(lv,T)}
+   <!--PG:공부 레벨·업적--><div><b>공부 레벨</b> <span class="note">(푼 만큼 오르고 내려가지 않음)</span></div>${lvXp()}
+   <!--PG:레벨 테스트--><button class="pri start" id="ltest">레벨 테스트 (${lv} · 객관식 약 30 + 쓰기 2)</button>
    <details><summary class="note">영역별 점수판 자세히 (범위 · 과락선 · 최근 레벨 테스트)</summary>
    ${T.length?scoreBoard(T[0].sc,lv,'최근 레벨 테스트 · '+T[0].date+' (테스트를 다시 봐야 바뀝니다)'):''}
    ${scoreBoard({lang:e.lang.sc,read:e.read.sc,listen:e.listen.sc,lang_n:e.lang.n,read_n:e.read.n,listen_n:e.listen.n},lv,'평소 풀이로 본 추정 점수 (최근 60문항씩)')}</details>
    ${enough<3?'<p class="note">영역마다 10문항 이상 풀면 숫자가 안정됩니다. 「레벨 테스트」로 한 번에 기준점을 잡을 수 있어요.</p>':''}
    ${e.read.n<20?`<div class="row"><button id="rbase">독해 기준 잡기 · 약 10문항</button><span class="note">지금 ${lv} 독해 ${e.read.n}문항 · 20문항이 되면 점수가 꽤 또렷해집니다</span></div>`:''}
-   <button class="pri start" id="ltest">레벨 테스트 (${lv} · 객관식 약 30 + 쓰기 2)</button>
-   <div><b>주별 흐름</b></div>${lvWeek(lv,w)}
+   <!--PG:주별 흐름--><div><b>주별 흐름</b></div>${lvWeek(lv,w)}
    ${T.length?`<details><summary>레벨 테스트 기록 ${T.length}</summary>${T.map(t=>`<p class="note"><b>${esc(t.date)}</b> 언어지식 ${t.sc.lang} · 독해 ${t.sc.read} · 청해 ${t.sc.listen} · 합계 ${t.sc.lang+t.sc.read+t.sc.listen}/180</p>`).join('')}</details>`:''}
-   ${wView()}
-   ${(g=>GI.size?`<div><b>묶음 계단</b> <span class="note">(같은 말의 책 문제를 묶은 것 · 알아봄 = 서로 다른 문제로 맞힘 · 쓸 수 있음 = 보기 없이 넣기를 맞힘)</span></div>
+   <!--PG:작문-->${wView()}
+   <!--PG:약점·리포트-->${(g=>GI.size?`<div><b>묶음 계단</b> <span class="note">(같은 말의 책 문제를 묶은 것 · 알아봄 = 서로 다른 문제로 맞힘 · 쓸 수 있음 = 보기 없이 넣기를 맞힘)</span></div>
    <div class="stat"><span>문형 ${g.p.n}개 중 만남 ${g.p.met}</span><span>알아봄 ${g.p.rec}</span><span>쓸 수 있음 ${g.p.can}</span></div>
    <div class="stat"><span>단어 ${g.w.n}개 중 만남 ${g.w.met}</span><span>알아봄 ${g.w.rec}</span><span>쓸 수 있음 ${g.w.can}</span></div>`:'')(grpStats())}
    ${cpView()}
    <div><b>약한 유형</b> <span class="note">(최근 40문항, 3문항 이상)</span></div>
    ${ty.length?ty.slice(0,6).map(t=>`<div class="row" style="justify-content:space-between"><span>${esc(t.t)} <span class="note">${t.n}문항 · 평균 ${Math.round(t.ms/1000)}초</span></span><b>${pct(t.p)}</b></div>`).join(''):'<p class="note">기록이 더 필요해요.</p>'}
    <div class="row"><button class="pri" id="lrep">실력 리포트 복사 (AI에게 분석 받기)</button></div><p class="note" id="lmsg"></p>
-   <details><summary>리포트 내용 보기</summary><pre class="out" id="lout">${esc(levelReport(lv))}</pre></details>`);
-  document.querySelectorAll('[data-lvv]').forEach(b=>b.onclick=()=>{LV_SEL=b.dataset.lvv;levelView()});
+   <details><summary>리포트 내용 보기</summary><pre class="out" id="lout">${esc(levelReport(lv))}</pre></details>`));
+  bindPager('level');document.querySelectorAll('[data-lvv]').forEach(b=>b.onclick=()=>{LV_SEL=b.dataset.lvv;levelView()});
   document.querySelectorAll('[data-lcm]').forEach(b=>b.onclick=()=>{LVCM=b.dataset.lcm;const y=scrollY;levelView();scrollTo(0,y)});
   $('#ltest').onclick=()=>{const steps=buildTest(lv);if(!steps.length)return;startSession({date:today(),steps,next:{},res:[],i:0,custom:true,test:true,lv})};
   cpBind();
