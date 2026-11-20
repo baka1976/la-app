@@ -1,0 +1,22 @@
+# 오늘의 기사 제목 목록(news.json)을 몇 시간마다 새로 만든다(제목·링크만). 앱 작문 탭이 읽음
+name: news
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/news.py news.json
+      - run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@users.noreply.github.com"
+          git add news.json
+          git diff --cached --quiet || (git commit -m "news.json 갱신" && git push)

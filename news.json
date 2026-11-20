@@ -1,0 +1,299 @@
+{
+"at": "11-20 15:43",
+"groups": [
+{
+"name": "主要",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "日経平均 一時3000円以上の下落",
+"link": "https://news.yahoo.co.jp/pickup/6603288"
+},
+{
+"title": "日中会談はなし 難しい関係修復",
+"link": "https://news.yahoo.co.jp/pickup/6603266"
+},
+{
+"title": "3歳死亡 父のスマホに虐待の動画",
+"link": "https://news.yahoo.co.jp/pickup/6603287"
+},
+{
+"title": "ネパールで邦人35人拘束 詐欺疑い",
+"link": "https://news.yahoo.co.jp/pickup/6603293"
+},
+{
+"title": "ホンダ 新型3列SUVを世界初公開",
+"link": "https://news.yahoo.co.jp/pickup/6603281"
+},
+{
+"title": "駅にサンドイッチ自販機 人気理由",
+"link": "https://news.yahoo.co.jp/pickup/6603282"
+},
+{
+"title": "「GTA6」発売 5日休み与えた会社",
+"link": "https://news.yahoo.co.jp/pickup/6603292"
+},
+{
+"title": "神宮大会 馬淵監督が悔やむ0.1秒",
+"link": "https://news.yahoo.co.jp/pickup/6603290"
+}
+]
+},
+{
+"name": "国内",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "日中会談はなし 難しい関係修復",
+"link": "https://news.yahoo.co.jp/pickup/6603266"
+},
+{
+"title": "首相の中国訪問「新ヤルタ」警戒",
+"link": "https://news.yahoo.co.jp/pickup/6603228"
+},
+{
+"title": "米国頼みの高市外交 限界浮き彫り",
+"link": "https://news.yahoo.co.jp/pickup/6603256"
+},
+{
+"title": "麻生氏 アジア大会トラブルに苦言",
+"link": "https://news.yahoo.co.jp/pickup/6603218"
+},
+{
+"title": "MSに再発防止を要請 デジタル相",
+"link": "https://news.yahoo.co.jp/pickup/6603263"
+},
+{
+"title": "法務省とラヴ上等 タイアップ経緯",
+"link": "https://news.yahoo.co.jp/pickup/6603265"
+},
+{
+"title": "大学教員40歳はまだ「若手」背景",
+"link": "https://news.yahoo.co.jp/pickup/6603234"
+},
+{
+"title": "徒競走に順位つけるべきか 論争",
+"link": "https://news.yahoo.co.jp/pickup/6603258"
+}
+]
+},
+{
+"name": "国際",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "ネパールで邦人35人拘束 詐欺疑い",
+"link": "https://news.yahoo.co.jp/pickup/6603293"
+},
+{
+"title": "露 クリミア橋攻撃受け報復宣言",
+"link": "https://news.yahoo.co.jp/pickup/6603235"
+},
+{
+"title": "習氏 台湾問題で米大統領をけん制",
+"link": "https://news.yahoo.co.jp/pickup/6603226"
+},
+{
+"title": "米中露首脳「平和宣言」を発表",
+"link": "https://news.yahoo.co.jp/pickup/6603204"
+},
+{
+"title": "独メルツ首相 米中露会談を批判",
+"link": "https://news.yahoo.co.jp/pickup/6603280"
+},
+{
+"title": "ロヒンギャ巡る判決 内容精査と米",
+"link": "https://news.yahoo.co.jp/pickup/6603242"
+},
+{
+"title": "APECが閉幕 AI活用の推進で一致",
+"link": "https://news.yahoo.co.jp/pickup/6603210"
+},
+{
+"title": "高市首相を「冷遇」? 中国が反論",
+"link": "https://news.yahoo.co.jp/pickup/6603208"
+}
+]
+},
+{
+"name": "経済",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "日経平均 一時3000円以上の下落",
+"link": "https://news.yahoo.co.jp/pickup/6603288"
+},
+{
+"title": "27年卒大学生の内定率73% 高水準",
+"link": "https://news.yahoo.co.jp/pickup/6603291"
+},
+{
+"title": "東海道新幹線 1日で最多504本運行",
+"link": "https://news.yahoo.co.jp/pickup/6603269"
+},
+{
+"title": "楽天証券へ訴訟準備 1.5万人登録",
+"link": "https://news.yahoo.co.jp/pickup/6603257"
+},
+{
+"title": "ホンダ 新型3列SUVを世界初公開",
+"link": "https://news.yahoo.co.jp/pickup/6603281"
+},
+{
+"title": "空港で靴磨き 航空会社の元社長",
+"link": "https://news.yahoo.co.jp/pickup/6603252"
+},
+{
+"title": "駅にサンドイッチ自販機 人気理由",
+"link": "https://news.yahoo.co.jp/pickup/6603282"
+},
+{
+"title": "「GTA6」発売 5日休み与えた会社",
+"link": "https://news.yahoo.co.jp/pickup/6603292"
+}
+]
+},
+{
+"name": "IT",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "アンソロピック 米ナスダック上場",
+"link": "https://news.yahoo.co.jp/pickup/6603220"
+},
+{
+"title": "六花亭 セキュリティコード流出か",
+"link": "https://news.yahoo.co.jp/pickup/6603168"
+},
+{
+"title": "街に広がるAI画像 どこまで許容?",
+"link": "https://news.yahoo.co.jp/pickup/6603166"
+},
+{
+"title": "サーバーソフト「nginx」に脆弱性",
+"link": "https://news.yahoo.co.jp/pickup/6603112"
+},
+{
+"title": "DHC 顧客氏名など1911万件漏えい",
+"link": "https://news.yahoo.co.jp/pickup/6603058"
+},
+{
+"title": "Anthropic IPO公開価格は83ドル",
+"link": "https://news.yahoo.co.jp/pickup/6603117"
+},
+{
+"title": "顧客情報漏えいか 楽天証券が説明",
+"link": "https://news.yahoo.co.jp/pickup/6603062"
+},
+{
+"title": "ネット繋がらない新機種 開発経緯",
+"link": "https://news.yahoo.co.jp/pickup/6603060"
+}
+]
+},
+{
+"name": "科学",
+"src": "Yahoo!ニュース",
+"items": [
+{
+"title": "H3ロケット打ち上げを民間移管",
+"link": "https://news.yahoo.co.jp/pickup/6603289"
+},
+{
+"title": "人気の米のカバ死ぬ ニット帽誤飲",
+"link": "https://news.yahoo.co.jp/pickup/6603251"
+},
+{
+"title": "カビなど原因「加湿器肺炎」とは",
+"link": "https://news.yahoo.co.jp/pickup/6603232"
+},
+{
+"title": "体調不良でAI相談 回答うのみ注意",
+"link": "https://news.yahoo.co.jp/pickup/6603231"
+},
+{
+"title": "太田裕美さん死去 乳がんを解説",
+"link": "https://news.yahoo.co.jp/pickup/6603215"
+},
+{
+"title": "「気嵐」いつ現れる 発生条件検証",
+"link": "https://news.yahoo.co.jp/pickup/6603196"
+},
+{
+"title": "育休とった男性の心身不調 症状は",
+"link": "https://news.yahoo.co.jp/pickup/6603193"
+},
+{
+"title": "植物と動物の細胞融合 どう活用",
+"link": "https://news.yahoo.co.jp/pickup/6603156"
+}
+]
+},
+{
+"name": "朝日 速報",
+"src": "朝日新聞",
+"items": [
+{
+"title": "証拠品の女児の裸の動画、コピーした疑い　巡査部長を書類送検　愛知",
+"link": "http://www.asahi.com/articles/ASVCN1S30VCNOIPE002M.html?ref=rss"
+},
+{
+"title": "障害児支援施設の児童へのわいせつ動画提供か、男逮捕「覚えてない」",
+"link": "http://www.asahi.com/articles/ASVCN1J7MVCNUTIL00DM.html?ref=rss"
+},
+{
+"title": "3700万円「自腹」、市教委が未納者を督促へ　納付分は校長に返金",
+"link": "http://www.asahi.com/articles/ASVCN0SLLVCNPLZB00DM.html?ref=rss"
+},
+{
+"title": "3歳娘への当日の暴行映り込む動画、容疑の父のスマホに　大阪虐待死",
+"link": "http://www.asahi.com/articles/ASVCN0QF1VCNPTIL01HM.html?ref=rss"
+},
+{
+"title": "愛子さま、シンガポールでフクギ植樹　上皇ご夫妻のソテツつなぐ友好",
+"link": "http://www.asahi.com/articles/ASVCN1F1KVCNUTIL02CM.html?ref=rss"
+},
+{
+"title": "住所や氏名などの個人情報漏洩か　住民基本台帳など、北海道2市1町",
+"link": "http://www.asahi.com/articles/ASVCN12QWVCNIIPE001M.html?ref=rss"
+},
+{
+"title": "「新しい経験に満ちた実り多い滞在」　愛子さま報道陣の取材に応じる",
+"link": "http://www.asahi.com/articles/ASVCN0H2SVCNUTIL007M.html?ref=rss"
+},
+{
+"title": "岐阜の陸自発砲3人死傷事件、被告側が責任能力争い無罪主張　初公判",
+"link": "http://www.asahi.com/articles/ASVCM123LVCMOIPE003M.html?ref=rss"
+},
+{
+"title": "札幌で積雪12センチ　道東道で16時間通行止め、130台が滞留",
+"link": "http://www.asahi.com/articles/ASVCN0GNWVCNIIPE002M.html?ref=rss"
+},
+{
+"title": "ご当地ナンバー「足利」「港」「草加」名乗り　導入カギは「民意」",
+"link": "http://www.asahi.com/articles/ASVCJ4515VCJUUHB001M.html?ref=rss"
+},
+{
+"title": "FIFA会長選出馬の田嶋氏が会見　三つどもえの争い「撤退しない」",
+"link": "http://www.asahi.com/articles/ASVCN1GX3VCNUTQP00ZM.html?ref=rss"
+},
+{
+"title": "色紙を手に神宮球場控室に無断侵入　共同通信職員、取材証を不正利用",
+"link": "http://www.asahi.com/articles/ASVCM3H0DVCMOXIE044M.html?ref=rss"
+},
+{
+"title": "田嶋幸三氏と現職らの三つどもえに　FIFA会長選、立候補締め切り",
+"link": "http://www.asahi.com/articles/ASVCM20FXVCMUTQP014M.html?ref=rss"
+},
+{
+"title": "スポーツの八百長対策の新法案、超党派の議連で了承　背景や効果は？",
+"link": "http://www.asahi.com/articles/ASVCK2D0KVCKUQIP022M.html?ref=rss"
+},
+{
+"title": "「今はハマチだけどブリに」鮮ど市場の菅原選手がオリックスと仮契約",
+"link": "http://www.asahi.com/articles/ASVCL3PSDVCLTLVB007M.html?ref=rss"
+}
+]
+}
+]
+}
