@@ -532,6 +532,46 @@ a.chip:hover{border-color:var(--accent)}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;transition:opacity .6s}
 body:has(#quit) #sky{opacity:.45}
 @media print{#sky{display:none}}
+/* 2026-11-20 처음 안내(투어): 화면을 어둡게 하고 한 곳만 밝게, 눌러 보면 다음 단계 · 설정 「도움말」 장 */
+#tour{position:fixed;inset:0;z-index:9000;display:none;-webkit-tap-highlight-color:transparent}
+#tour.on{display:block}
+#tour .th{position:fixed;border-radius:16px;box-shadow:0 0 0 200vmax rgba(8,10,20,.66);transition:all .42s cubic-bezier(.16,1,.3,1);pointer-events:none}
+#tour .th::after{content:"";position:absolute;inset:-6px;border-radius:20px;border:2px solid #ffd43b;animation:trg 1.6s infinite}
+#tour.nr .th::after{display:none}
+@keyframes trg{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.1)}}
+#tour .tp{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(255,212,59,.35);border:2px solid #ffd43b;pointer-events:none;animation:ttp 1.4s infinite;transition:left .42s,top .42s}
+@keyframes ttp{0%{transform:scale(.6);opacity:0}30%{opacity:1}100%{transform:scale(1.4);opacity:0}}
+#tour .tt{position:fixed;width:min(330px,calc(100vw - 32px));background:var(--card);color:var(--fg);border-radius:18px;padding:14px 16px 12px;box-shadow:0 18px 40px rgba(0,0,0,.35);transition:top .42s cubic-bezier(.16,1,.3,1),left .42s cubic-bezier(.16,1,.3,1);font-family:var(--ui)}
+#tour .tt .k{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--accent)}
+#tour .tt h4{margin:2px 0 4px;font-size:17px;letter-spacing:-.03em}
+#tour .tt p{margin:0;font-size:14px;line-height:1.55;color:var(--mute)}
+#tour .tt .do{margin-top:8px;display:inline-block;font-size:13px;font-weight:800;color:#8a6200;background:rgba(255,212,59,.3);border-radius:99px;padding:4px 10px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #tour .tt .do{color:#ffd43b}}
+:root[data-theme="dark"] #tour .tt .do{color:#ffd43b}
+#tour .tt .ft{display:flex;align-items:center;gap:6px;margin-top:12px}
+#tour .dts{display:flex;gap:4px;margin-right:auto}#tour .dts i{width:6px;height:6px;border-radius:3px;background:var(--line)}#tour .dts i.on{width:16px;background:var(--accent)}
+#tour .tt button{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:99px;padding:5px 12px;font-size:12.5px;font-weight:700;min-height:0;margin:0}
+#tour .tt button.p{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#tour .tt button.g{border:0;color:var(--mute);background:none}
+#tour .tt.c{left:50%!important;top:50%!important;transform:translate(-50%,-50%);text-align:center;padding:22px 20px 16px}
+#tour .tt.c .ft{justify-content:center}#tour .tt.c .dts{display:none}
+body.touring .wbtip{z-index:9100}
+@media (prefers-reduced-motion:reduce){#tour *{animation:none!important;transition:none!important}}
+.hsr{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:6px 12px;margin:6px 0 10px}
+.hsr input{border:0!important;background:none!important;outline:none;flex:1;font-size:14px;padding:4px 0!important;margin:0!important;box-shadow:none!important}
+.hidx{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px;margin-bottom:6px}
+.hidx button{display:flex;gap:6px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 10px;font-size:13px;font-weight:700;margin:0;min-height:0}
+.hidx button small{margin-left:auto;color:var(--mute);font-weight:600}
+.hit{border-top:1px solid var(--line);padding:12px 2px}
+.hit h4{margin:0 0 2px;font-size:16px;display:flex;gap:8px;align-items:center}
+.hit h4 .n{width:22px;height:22px;border-radius:7px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:900;flex:none}
+.hit ul{margin:4px 0 0;padding-left:18px;font-size:14px}.hit li{margin:2px 0}
+.hit .hm{display:none;margin-top:8px;font-size:13px;color:var(--mute);background:var(--bg);border-radius:12px;padding:10px 12px}
+.hit.open .hm{display:block}
+.hit .ha{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.hit .ha button{font-size:12px;padding:4px 11px;min-height:0;margin:0}
+.hit.hide{display:none}
+.hit.hl{animation:hfl 1.3s}
+@keyframes hfl{0%,40%{background:color-mix(in srgb,var(--accent) 14%,transparent)}100%{background:transparent}}
 </style></head><body>
 <div class="wrap">
   <header>
@@ -1678,7 +1718,7 @@ function bindPager(id){const R=$('#pgr_'+id);if(!R)return;const T=R.querySelecto
   let cur=Math.min(PGI[id]||0,P.length-1);const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
   const fit=()=>{const h=P[cur]&&P[cur].offsetHeight;T.style.height=h?h+'px':'auto'};
   const nm=[...ch].map(b=>b.textContent),fb=R.querySelectorAll('.pgr-fb'),hb=R.querySelectorAll('.pgr-b');
-  const mark=i=>{cur=i;PGI[id]=i;no.textContent=i+1;fb[0].textContent=i?'‹ '+nm[i-1]:'';fb[0].disabled=!i;fb[1].textContent=i<P.length-1?nm[i+1]+' ›':'';fb[1].disabled=i>=P.length-1;hb[0].disabled=!i;hb[1].disabled=i>=P.length-1;ch.forEach((b,k)=>b.classList.toggle('on',k===i));dots.forEach((d,k)=>d.classList.toggle('on',k===i));L.disabled=i===0;Rb.disabled=i===P.length-1;P.forEach((pg,k)=>pg.classList.toggle('cur',k===i));fit();
+  const mark=i=>{cur=i;PGI[id]=i;no.textContent=i+1;fb[0].textContent=i?'‹ '+nm[i-1]:'';fb[0].disabled=!i;fb[1].textContent=i<P.length-1?nm[i+1]+' ›':'';fb[1].disabled=i>=P.length-1;hb[0].disabled=!i;hb[1].disabled=i>=P.length-1;ch.forEach((b,k)=>b.classList.toggle('on',k===i));dots.forEach((d,k)=>d.classList.toggle('on',k===i));L.disabled=i===0;Rb.disabled=i===P.length-1;P.forEach((pg,k)=>pg.classList.toggle('cur',k===i));fit();try{tourAuto()}catch(e){}
     const cb=ch[i];if(cb){const c=cb.parentNode;c.scrollTo({left:cb.offsetLeft-c.offsetLeft-c.clientWidth/2+cb.offsetWidth/2,behavior:still?'auto':'smooth'})}};
   let tgt=-1,tgtT=0;   // 버튼·칩으로 넘길 때는 미끄러지는 동안의 중간 위치로 번호를 바꾸지 않는다
   const go=i=>{i=Math.max(0,Math.min(P.length-1,i));tgt=i;clearTimeout(tgtT);tgtT=setTimeout(()=>{tgt=-1},1500);T.scrollTo({left:i*T.clientWidth,behavior:still?'auto':'smooth'});mark(i)};
@@ -1740,8 +1780,8 @@ function setView(){
    <textarea id="uxt" placeholder="예: 독해 지문이 길어 스크롤이 불편함"></textarea><div class="row"><button id="uxs">메모 저장</button><span class="note" id="uxm">${S.ux.length?'저장된 메모 '+S.ux.length+'개':''}</span></div>
    ${S.ux.length?`<details><summary>저장된 메모 보기</summary>${S.ux.slice().reverse().map(u=>`<p class="note"><b>${esc(new Date(u.t).toLocaleDateString('sv'))}</b>${u.key?' ['+esc(u.key)+']':''} ${esc(u.text)}</p>`).join('')}</details>`:''}
    <!--PG:AI 판정-->${aiSetUI()}<!--PG:${TEST?'자료 안내':'기록·동기화'}-->${TEST?'':syncUI()+recUI()}
-   ${TEST?`<details class="note" open><summary>자료 안내</summary><p>${esc(TEST.about)}</p></details>`:''}${TEST?'':`<details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`}`));
-  lvBind();bindPager('set');
+   ${TEST?`<details class="note" open><summary>자료 안내</summary><p>${esc(TEST.about)}</p></details>`:''}${TEST?'':`<details class="note"><summary>자료 안내</summary><p>어휘·문법·글의 문법은 실전모의고사 N1·N2 문제입니다. 독해는 급소공략 N1 독해·콕콕 N1 독해 지문입니다. 어휘 카드는 필수어휘 5000(800급)·적중기출어휘 N1~N3·한권 N1 단어연습장·보카 쪽지시험 N1~N3·비즈니스 이메일 주요어휘, 문형 카드는 일본어문형 630의 N1·N2 문형입니다.</p><p>문제 팩: ${esc(D.built||'')}</p></details>`}<!--PG:도움말-->${helpUI()}`));
+  lvBind();bindPager('set');helpBind();
   document.querySelectorAll('button[data-sf]').forEach(b=>b.onclick=()=>{S.pref.noshuf=b.dataset.sf==='1';save();render()});
   document.querySelectorAll('button[data-fs]').forEach(b=>b.onclick=()=>{S.pref.fs=b.dataset.fs;save();applyPref();render()});
   document.querySelectorAll('button[data-hd]').forEach(b=>b.onclick=()=>{S.pref.hand=b.dataset.hd;save();applyPref();render()});
@@ -1764,8 +1804,8 @@ function introView(){
     <li>기록은 이 기기의 이 브라우저에만 저장됩니다. 어디로도 보내지 않습니다(브라우저 기록을 지우면 함께 지워집니다).</li>
     <li>결과 화면에서 원하는 AI(ChatGPT·Gemini·Claude 등, 무료도 됨)에게 판정을 받을 수 있습니다. 하지 않아도 됩니다.</li>
     <li>며칠 써 보신 뒤 <b>「피드백」 탭 → 「피드백 복사」</b>를 눌러 보내 주세요.</li></ul>
-   <button class="pri start" id="intro">시작하기</button>`);
-  $('#intro').onclick=()=>{S.intro=Date.now();save();render()}}
+   ${slideBtn('intro','밀어서 시작하기')}`);
+  slideBind('intro',()=>{S.intro=Date.now();save();render()})}
 const FBQ=()=>[['lv','문제 난이도는 내 수준에 맞았나요?',['너무 쉬움','조금 쉬움','맞음','조금 어려움','너무 어려움']],
   ['ui','화면 디자인(모던 배색·글씨)은 보기 좋았나요?',['좋음','보통','별로']],
   ['pg','작문·실력·설정을 옆으로 넘기는 방식(장 넘김)은 편했나요?',['편함','보통','불편함','안 써 봄']],
@@ -2665,6 +2705,122 @@ function fxUI(){const p=S.pref.fx||'auto',c=S.pref.fxcity||'seoul',n=fxNow(),nm=
    <div><b>풀이 효과음</b> <span class="note">(정답·오답 때 짧은 소리 · 진동과 화면 효과는 늘 켜짐, 기기의 「동작 줄이기」를 켜면 꺼짐)</span></div><div class="chips">${[['','끔'],['1','켬']].map(([v,n])=>`<button data-sfx="${v}" class="${(S.pref.sfx?'1':'')===v?'on':''}">${n}</button>`).join('')}</div>`}
 function fxBind(){document.querySelectorAll('button[data-sfx]').forEach(b=>b.onclick=()=>{S.pref.sfx=b.dataset.sfx==='1';save();render()});document.querySelectorAll('button[data-fx]').forEach(b=>b.onclick=()=>{S.pref.fx=b.dataset.fx;save();applyFx();render()});
   document.querySelectorAll('button[data-fxc]').forEach(b=>b.onclick=()=>{S.pref.fxcity=b.dataset.fxc;save();applyFx();render();fxWeather().then(()=>{applyFx();if(VIEW==='set')render()})})}
+
+// ── 2026-11-20 처음 안내(투어) · 설정 「도움말」 장 ──
+// 게임처럼: 화면이 어두워지고 한 곳만 밝게. 'tap' 단계는 그 자리를 직접 눌러야 넘어가고, 'next' 단계는 「다음」으로. 앱 밖으로 나가는 버튼은 누르게 하지 않는다.
+// 안내는 화면마다 처음 한 번만(S.pref.tours), 설정 → 도움말에서 다시 보기·모두 끄기.
+// 단계: [대상 선택자 | null(가운데 카드), 작은 제목, 제목, 설명, 방식('start'|'tap'|'next'|'end'), 들어가기 전에 할 일]
+const TOURS={
+ home:[[null,'처음 안내 · 1분','앱 둘러보기','중요한 곳 몇 군데만 직접 눌러 보며 익혀요. 언제든 건너뛸 수 있고, 설정 → 도움말에서 다시 볼 수 있어요.','start'],
+  ['#tabs','1 · 탭','위의 탭이 메뉴예요',`오늘(매일 학습) · 복습(단어장·골라 풀기) · 노트 · 작문 · 실력${TEST?' · 피드백':''} · 설정.`,'next'],
+  ['#tabs [data-tab="note"]','2 · 노트','「노트」를 눌러 보세요','틀린 문제와 AI 첨삭이 모이는 곳이에요.','tap'],
+  ['#view .nseg','3 · 노트','오답노트 · 첨삭노트','여기서 바꿔요. 오답노트는 「아직」 묶음부터 5개 정도씩, 첨삭노트는 「고쳐 쓰기」로 다시 써 보면 돼요.','next'],
+  ['#tabs [data-tab="set"]','4 · 설정','「설정」을 눌러 보세요','글자 크기 · 배색 · 효과 · AI 판정 방법을 바꾸는 곳이에요.','tap'],
+  ['#pgr_set .pgr-ch','5 · 장 넘기기','설정 · 작문 · 실력은 여러 장','장 이름을 누르거나 화면을 옆으로 밀어 넘겨요. 맨 끝 「도움말」 장에 사용법과 이 안내 다시 보기가 있어요.','next'],
+  ['#tabs [data-tab="today"]','6 · 오늘','「오늘」로 돌아가 볼까요?','매일 여기서 시작해요.','tap'],
+  ['#view .slide','7 · 시작','준비되면 손잡이를 끝까지 밀어요','그냥 눌러도 시작돼요. 첫 문제에서 짧은 안내가 한 번 더 나와요.','next'],
+  [null,'끝','준비 끝!','다시 보려면 설정 → 맨 끝 「도움말」 장 → 「처음 안내 다시 보기」.','end']],
+ sess:[[null,'문제 화면 안내 · 30초','첫 문제예요','풀면서 쓰는 곳 몇 군데만 볼게요.','start'],
+  ['#view .card .wbw','1 · 별 표시','별 붙은 말을 눌러 보세요','내 단어장에 있는 말이에요. 별 수 = 틀린 횟수(최대 3). 뜻은 답한 뒤에 보여요.','tap'],
+  ['#view .card .opts','2 · 답하기','답을 하나 골라 보세요','바로 맞음·틀림이 나오고, 틀린 문제는 노트와 다시 볼 문제로 가요.','tap'],
+  ['#wlook','3 · 단어 찾기','모르는 말은 여기서','읽기·뜻·발음을 보고 「모르는 단어로 저장」하면 단어장에 들어가요.','next'],
+  ['#view .card details.src','4 · 이상해요','문제가 이상하면 여기','「정답이 이상해요」 등을 누르거나 질문을 적어 두면 판정 요청문과 노트에 들어가요.','next'],
+  ['#next','5 · 다음','다음 문제로',`중간에 그만둬도 「오늘」에서 이어서 할 수 있어요.${isPC()?' PC는 1~4로 보기 고르기, Enter로 다음.':''}`,'next']],
+ end:[['#jgo','끝 화면 · 1','AI 판정 받기','누르면 요청문이 복사되고 AI 창이 열려요. 붙여 넣어 보내고, AI 답 전체를 복사해 이 화면으로 돌아오세요. 안 받아도 돼요.','next'],
+  ['#jclip','2 · 저장','돌아오면 저장할지 물어요','안 물으면 이 버튼. 오답 해설은 오답노트, 작문 첨삭은 첨삭노트, AI가 정리한 말은 단어장으로 들어가요.','next'],
+  ['#view .jbox details','3 · 그래도 안 되면','직접 붙여 넣기','브라우저가 붙여넣기 읽기를 막으면 여기를 펼쳐 칸에 붙여 넣고 「판정 저장」.','next']],
+ art:[[null,'기사 작문 안내 · 30초','기사 작문은 이렇게 해요','기사 하나 읽고 → 일본어로 요약 3문장 + 의견 → AI 평가. 몇 단계만 보고 갈게요.','start'],
+  ['#pgr_write .pgr-p.cur .artbox>.chips','1 · 기사 고르기','신문 바로가기','누르면 그 신문 사설 목록이 열려요. 처음에는 NHK처럼 무료로 다 보이는 기사가 좋아요. 유료 기사는 AI도 못 읽어요.','next'],
+  ['#newsbox[data-ok]','2 · 오늘의 제목','제목 옆 「쓰기」','기사가 열리고 아래 제목·주소 칸이 자동으로 채워져요.','next'],
+  ['#a_u','3 · 주소','읽을 기사의 주소를 여기에','PC는 주소창 주소 복사, 휴대폰은 「공유 → 링크 복사」. 기사 본문은 붙여 넣지 않아요(AI가 주소를 열어 읽어요).','next'],
+  ['#a_s','4 · 쓰기','요약 3문장 + 의견 3~5문장','처음에는 요약만 정확히 써도 충분해요. 앱을 닫아도 쓴 글은 남아요.','next'],
+  ['#pgr_write .pgr-p.cur .row:has([data-aip])','5 · AI 고르기','주소를 열 수 있는 AI로','「기사 확인 못 함」이 나오면 첨삭노트 카드의 「다른 AI에 다시 묻기」로 다른 AI에 물어요.','next'],
+  ['#a_go','6 · 제출','이 버튼 하나로 복사 + AI 창 열기','붙여 넣고 → 답 복사 → 돌아와 「판정 저장」. 어휘·문형은 기사 단어장으로 자동으로 들어가요.','next']],
+ level:[['#pgr_level .pgr-p.cur','실력 탭 · 1','지금 내 위치',`평소 푼 문제로 낸 JLPT식 추정이에요(공식 판정 아님). 10문항 미만 영역은 「잠정」 — 처음 2~3주는 빈칸이 많은 게 정상이에요.`,'next'],
+  ['#pgr_level .pgr-ch','2 · 다른 장','능력치 · 공부 레벨 · 업적 · 레벨 테스트','옆으로 넘겨 보세요. 레벨 테스트는 2~4주에 한 번이면 충분해요.','next']]
+};
+let TR=null,TRi=0,TRseq=0;
+const trDone=()=>(S.pref.tours=S.pref.tours||{});
+function tourStart(k){if(!TOURS[k]||TR)return;trDone()[k]=1;save();TR=TOURS[k];TRi=0;let el=$('#tour');
+  if(!el){el=document.createElement('div');el.id='tour';el.innerHTML='<div class="th"></div><div class="tp"></div><div class="tt" role="dialog" aria-live="polite"></div>';document.body.appendChild(el);el.addEventListener('click',tourTap)}
+  el.classList.add('on');document.body.classList.add('touring');tourShow()}
+function tourEnd(){TRseq++;TR=null;const el=$('#tour');if(el)el.classList.remove('on');document.body.classList.remove('touring')}
+function tourShow(){const st=TR[TRi];if(st[5])st[5]();const my=++TRseq;let n=0;
+  const tryP=()=>{if(my!==TRseq||!TR)return;if(!st[0]||$(st[0]))return tourPlace(st);if(++n<8)return setTimeout(tryP,150);tourNx()};   // 대상이 없으면(별이 없는 문제 등) 그 단계는 건너뜀
+  setTimeout(tryP,80)}
+function tourPlace(st){const [sel,k,h,p,mode]=st,R=$('#tour'),hole=R.querySelector('.th'),tip=R.querySelector('.tt'),tap=R.querySelector('.tp');
+  const real=TR.filter(s=>s[4]==='tap'||s[4]==='next'),idx=TR.slice(0,TRi+1).filter(s=>s[4]==='tap'||s[4]==='next').length;
+  let b='';if(mode==='start')b=`<button class="g" data-tr="x">건너뛰기</button><button class="p" data-tr="n">시작</button>`;
+  else if(mode==='end')b=`<button class="p" data-tr="x">닫기</button>`;
+  else b=`<button class="g" data-tr="x">${TRi===TR.length-1?'':'건너뛰기'}</button>${mode==='next'?`<button class="p" data-tr="n">${TRi===TR.length-1?'알겠어요':'다음'}</button>`:''}`;
+  tip.innerHTML=`<div class="k">${esc(k)}</div><h4>${esc(h)}</h4><p>${esc(p)}</p>${mode==='tap'?'<div class="do">밝은 곳을 직접 눌러 보세요</div>':''}<div class="ft"><span class="dts">${real.length>1?real.map((_,i)=>`<i class="${i<idx?'on':''}"></i>`).join(''):''}</span>${b}</div>`;
+  tip.querySelectorAll('[data-tr]').forEach(x=>x.onclick=e=>{e.stopPropagation();x.dataset.tr==='n'?tourNx():tourEnd()});
+  R.classList.toggle('nr',mode!=='tap');
+  if(!sel){hole.style.cssText='left:50%;top:50%;width:0;height:0';tip.className='tt c';tip.style.cssText='';tap.style.display='none';return}
+  const el=$(sel);el.scrollIntoView({block:'center',inline:'nearest',behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'});const my=TRseq;
+  setTimeout(()=>{if(my===TRseq&&TR)trPos(el,mode)},60);setTimeout(()=>{if(my===TRseq&&TR)trPos(el,mode)},420)}
+function trPos(el,mode){const R=$('#tour'),hole=R.querySelector('.th'),tip=R.querySelector('.tt'),tap=R.querySelector('.tp');{const r=el.getBoundingClientRect(),pad=8;
+   hole.style.cssText=`left:${r.left-pad}px;top:${r.top-pad}px;width:${r.width+pad*2}px;height:${r.height+pad*2}px`;
+   tip.className='tt';const tw=Math.min(330,innerWidth-32),th=tip.offsetHeight||170,below=r.bottom+pad+12+th<innerHeight;
+   tip.style.left=Math.max(16,Math.min(r.left+r.width/2-tw/2,innerWidth-tw-16))+'px';
+   tip.style.top=(below?r.bottom+pad+12:Math.max(12,r.top-pad-12-th))+'px';
+   tap.style.display=mode==='tap'?'block':'none';tap.style.left=(r.left+r.width/2)+'px';tap.style.top=(r.top+Math.min(r.height/2,40))+'px'}}
+let trRaf=0;addEventListener('scroll',()=>{if(!TR||trRaf)return;trRaf=requestAnimationFrame(()=>{trRaf=0;const st=TR&&TR[TRi];if(st&&st[0]&&$(st[0])&&!$('#tour .tt').classList.contains('c'))trPos($(st[0]),st[4])})},{capture:true,passive:true});
+function tourNx(){if(!TR)return;TRi++;if(TRi>=TR.length)return tourEnd();tourShow()}
+// 화면 전체를 막고, 밝은 곳 안의 버튼을 누르면 그 버튼을 대신 눌러 준다
+function tourTap(e){if(!TR||e.target.closest('.tt'))return;const st=TR[TRi];if(st[4]!=='tap')return;const el=$(st[0]);if(!el)return;const r=el.getBoundingClientRect();
+  if(e.clientX<r.left-8||e.clientX>r.right+8||e.clientY<r.top-8||e.clientY>r.bottom+8)return;
+  const R=$('#tour');R.style.pointerEvents='none';const hit=document.elementFromPoint(e.clientX,e.clientY);R.style.pointerEvents='';
+  const t=hit&&el.contains(hit)?(hit.closest('button,.wbw,[role=button]')||hit):el;if(!el.contains(t)||(t===el&&!el.matches('button,.wbw,[role=button]')))return;
+  const ok=t.closest('button,.wbw,[role=button]');if(!ok)return;ok.click();TRseq++;setTimeout(tourNx,520)}
+addEventListener('resize',()=>{if(TR&&$('#tour .tt'))tourPlace(TR[TRi])});
+document.addEventListener('keydown',e=>{if(!TR)return;if(e.key==='Escape'){e.preventDefault();tourEnd()}else if((e.key==='Enter'||e.key==='ArrowRight')&&TR[TRi][4]!=='tap'){e.preventDefault();e.stopImmediatePropagation();tourNx()}},true);
+// 화면을 그린 뒤: 그 화면의 안내를 아직 안 봤으면 한 번 띄운다
+function tourAuto(){if(TR||SELFTEST||S.pref.tourOff||$('#sheet'))return;const D=trDone();
+  const pg=id=>{const b=document.querySelector('#pgr_'+id+' .pgr-ch button.on');return b?b.textContent:''};
+  let k=null;
+  if(VIEW==='today'&&!D.home&&!(TEST&&!S.intro)&&$('#view .slide'))k='home';
+  else if(VIEW==='sess'&&S.cur){const s=S.cur,st=s.steps[s.i];
+    if(s.i>=s.steps.length){if(!D.end&&$('#jgo'))k='end'}
+    else if(!D.sess&&st&&st.k!=='listen'&&!s.res[s.i]&&document.querySelector('#view .card .opts button.opt'))k='sess'}
+  else if(VIEW==='write'&&!D.art&&pg('write')==='기사 작문')k='art';
+  else if(VIEW==='level'&&!D.level&&pg('level')==='지금 위치')k='level';
+  if(k){const kk=k;setTimeout(()=>{if(!TR&&!trDone()[kk])tourStart(kk)},450)}}
+{const _r=render;render=function(){_r();try{tourAuto()}catch(e){console.error(e)}}}
+// 도움말에서 다시 보기: 그 화면으로 가서 시작(문제·끝 화면 안내는 다음 풀이 때)
+function tourGo(k){const D=trDone();delete D[k];S.pref.tourOff=false;save();
+  if(k==='sess'||k==='end')return;
+  const chip=(id,nm)=>{const b=[...document.querySelectorAll('#pgr_'+id+' .pgr-ch button')].find(x=>x.textContent===nm);if(b)b.click()};
+  D[k]=1;VIEW={home:'today',art:'write',level:'level'}[k];render();scrollTo(0,0);
+  if(k==='art')chip('write','기사 작문');if(k==='level')chip('level','지금 위치');
+  setTimeout(()=>{delete trDone()[k];tourStart(k)},k==='home'?300:700)}
+const HELP=[
+ ['start','시작하기',['「오늘」 탭에서 손잡이를 끝까지 밀면 시작(그냥 눌러도 됨).','중간에 그만둬도 「오늘」에서 이어서 할 수 있어요.','약 20분, 영역이 골고루 섞여 나와요.'],'틀린 문제는 1·3·7일 간격으로 「다시 볼 문제」로 돌아와요. 하던 복습·골라 풀기가 있으면 「오늘」에 이어서 버튼이 나와요.','home'],
+ ['ai','AI 판정 받기',['끝 화면 「판정 받기」 → 요청문 복사 + AI 창 열림.','AI 창에 붙여 넣어 보내고, 답 전체를 복사.','앱으로 돌아오면 「판정 저장」.'],'안 물으면 「복사해 둔 AI 답 저장」, 그래도 안 되면 「판정 직접 붙여넣기」에 붙여 넣기. 어느 AI를 열지는 설정 → AI 판정 장. 작문 점수는 AI마다 습관이 달라, 점수를 비교하려면 AI 하나로 정해 두세요. 「머리표가 맞지 않습니다」가 나오면 예전 대화의 답을 복사한 것이니 이번 답을 다시 복사하세요.','end'],
+ ['art','기사 작문',['작문 탭 「기사 작문」 장 → 신문 바로가기로 기사 열기.','주소를 「기사 주소」 칸에 붙여 넣고 요약 3문장 + 의견.','「제출하고 AI 평가 받기」 → 판정 저장과 같은 방법.'],`기사 본문은 붙여 넣지 않아요(AI가 주소를 열어 읽음). 「기사 확인 못 함」이면 노트 → 첨삭노트 카드의 「다른 AI에 다시 묻기」로 AI를 바꿔 물어요. 유료 기사는 AI도 못 읽어요. 정리된 어휘·문형은 작문 탭 「기사 단어장」과 단어장으로 들어가요.${TEST?' (시험판 파일에서는 「오늘의 제목」 목록이 나오지 않아요.)':''}`,'art'],
+ ['note','노트',['오답노트: 틀린 객관식, 「아직」 묶음부터.','첨삭노트: AI 판정 받은 작문, 빨간 취소선 = 고칠 글자.','「고쳐 쓰기」로 정답을 가리고 다시 써 보기.'],'「판정이 이상함」을 누르면 그 문장은 작문 점수에서 빠져요(다시 누르면 되돌림). 「다른 AI에 다시 묻기」로 그 문장만 다시 판정받을 수 있어요. 목록은 15개씩 쪽으로 나뉘어요.',''],
+ ['wb','별 · 단어 찾기',['문제 글 속 별 = 내 단어장 말, 별 수 = 틀린 횟수(최대 3).','풀 때는 뜻이 안 보이고, 답한 뒤에 보여요.','답한 뒤 「이 문제의 단어」로 읽기·뜻 보기, 모르는 말 저장.'],'보기·복습 문제·전에 푼 문제·청해는 답한 뒤에만 별이 붙어요(답의 힌트가 되지 않게). 사전에 없는 말은 단어 창 아래 「직접 등록」. 방해되면 설정 → 학습 장 「문제 속 내 단어장 표시」에서 「답한 뒤에만」이나 「끄기」.','sess'],
+ ['wbk','단어장 복습',['복습 탭 「단어장」에 모든 말이 모여요.','1단계 뜻 → 2단계 읽기 → 3단계 그 말로 작문.','다 외운 말은 「외움 표시」.'],'순서: 최근순 · 오래된순 · 아이우에오순 · 가나다순. 철자가 조금 달라도 같은 말이면 「같은 말 — 맞았다」.',''],
+ ['ls','청해',['음성의 문제 번호 안내는 건너뛰고 바로 시작.','보기 읽는 시간 같은 조용한 구간은 자동으로 넘어가요.','답하면 풀이 시간, 음원이 끝나고 30초 넘게 걸리면 주황색 알림.'],'설정 → 학습 장 「청해 조용한 구간」: 자동으로 넘기기(기본) · 버튼으로 넘기기 · 시험처럼 기다리기. 말이 잘린 것 같으면 그 문제의 「이상해요」에 적어 주세요.',''],
+ ['lv','실력 탭',['지금 위치: 평소 푼 문제로 낸 JLPT식 추정(공식 아님).','10문항 미만 영역은 「잠정」, 처음 2~3주는 빈칸이 정상.','레벨 테스트는 2~4주에 한 번이면 충분.'],'능력치 S(90 이상)~D(60 미만), 세로선은 레벨 테스트 때 값. 공부 레벨(XP)은 내려가지 않고, 업적은 동·은·금 훈장. 독해 기록이 적으면 「독해 기준 잡기」(약 10문항).','level'],
+ ['pg','장 · 쪽 넘기기',['작문 · 실력 · 설정은 옆으로 밀거나 ‹ ›로 장 넘기기.','위의 장 이름을 누르면 바로 그 장으로.','목록은 15개씩 쪽, 「바로 가기」 칩으로 묶음 이동.'],'PC는 키보드 ← →도 돼요. 맨 아래 「다음 장 이름 ›」 버튼으로도 넘어가요.',''],
+ ['fix','이럴 때는',['AI 창이 안 열림 → 요청문은 이미 복사됨, AI 채팅을 직접 열어 붙여 넣기.','화면이 예전 모양 → 새로고침, 배색은 설정 → 화면 → 모던.',`불편한 점 → ${TEST?'「피드백」 탭':'설정 → 메모 장'}.`],'효과 · 진동 · 별이 방해되면 설정 → 학습 · 효과·글씨 장에서 끄기. 문제가 이상하면 문제 아래 「⋯ 이상해요」.','']
+];
+const TRN={home:'처음 안내',sess:'문제 화면 안내',end:'끝 화면 안내',art:'기사 작문 안내',level:'실력 탭 안내'};
+function helpUI(){return `<div><b>도움말</b> <span class="note">(색인을 누르면 그 항목으로 · 「자세히」를 눌러야 길게 펼쳐짐)</span></div>
+  <div class="hsr">${ic('book')}<input id="hq" placeholder="찾기: 별, 판정, 주소, 넘기기 …" aria-label="도움말 찾기"></div>
+  <div class="hidx">${HELP.map((h,i)=>`<button data-hj="${h[0]}">${esc(h[1])}<small>${i+1}</small></button>`).join('')}</div>
+  <div id="hlist">${HELP.map((h,i)=>`<div class="hit" id="h_${h[0]}"><h4><span class="n">${i+1}</span>${esc(h[1])}</h4><ul>${h[2].map(x=>`<li>${esc(x)}</li>`).join('')}</ul><div class="hm">${esc(h[3])}</div>
+   <div class="ha"><button data-hm>자세히</button>${h[4]?`<button data-tg="${h[4]}">${['sess','end'].includes(h[4])?TRN[h[4]]+' 다음 풀이 때 다시':TRN[h[4]]+' 다시 보기'}</button>`:''}</div></div>`).join('')}</div>
+  <div class="row" style="margin-top:8px"><button class="pri" data-tg="home">처음 안내 다시 보기</button><button id="tro">${S.pref.tourOff?'안내 다시 켜기':'안내 모두 끄기'}</button><button id="trr">모든 안내 처음부터</button></div><p class="note" id="trm"></p>`}
+function helpBind(){const L=$('#hlist');if(!L)return;
+  document.querySelectorAll('[data-hj]').forEach(b=>b.onclick=()=>{const el=$('#h_'+b.dataset.hj);$('#hq').value='';L.querySelectorAll('.hit').forEach(x=>x.classList.remove('hide'));scrollTo({top:el.getBoundingClientRect().top+scrollY-90,behavior:'smooth'});el.classList.remove('hl');void el.offsetWidth;el.classList.add('hl')});
+  L.querySelectorAll('[data-hm]').forEach(b=>b.onclick=()=>{const it=b.closest('.hit');it.classList.toggle('open');b.textContent=it.classList.contains('open')?'접기':'자세히'});
+  $('#hq').oninput=e=>{const q=e.target.value.trim();HELP.forEach(h=>{const el=$('#h_'+h[0]),hit=!q||(h[1]+h[2].join('')+h[3]).includes(q);el.classList.toggle('hide',!hit);el.classList.toggle('open',!!q&&hit&&!(h[1]+h[2].join('')).includes(q))})};
+  document.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{const k=b.dataset.tg;tourGo(k);if(k==='sess'||k==='end')$('#trm').textContent=TRN[k]+'는 다음 풀이 때 다시 나와요.'});
+  $('#tro').onclick=()=>{S.pref.tourOff=!S.pref.tourOff;save();$('#tro').textContent=S.pref.tourOff?'안내 다시 켜기':'안내 모두 끄기';$('#trm').textContent=S.pref.tourOff?'처음 안내가 더는 저절로 뜨지 않아요.':'아직 안 본 안내는 그 화면에서 다시 떠요.'};
+  $('#trr').onclick=()=>{S.pref.tours={};S.pref.tourOff=false;save();$('#tro').textContent='안내 모두 끄기';$('#trm').textContent='모든 안내를 처음부터 다시 봐요. 각 화면을 처음 열 때 나와요.'}}
+
 applyFx();fxWeather().then(applyFx);setInterval(()=>fxWeather().then(applyFx),3600e3);
 
 if(SELFTEST){render();setTimeout(selfTest,300)}
