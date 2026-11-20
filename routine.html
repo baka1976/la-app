@@ -396,6 +396,18 @@ body.pres .onum{display:none}
 .nseg{display:flex;padding:4px;border-radius:99px;background:var(--soft,var(--bg));margin:0 0 10px}
 .nseg button{flex:1;border:0;background:none;border-radius:99px;padding:9px 6px;font-weight:800;color:var(--mute);min-height:0}.nseg button.on{background:var(--fg);color:var(--bg)}
 .nseg em{font-style:normal;font-size:12px;margin-left:4px;opacity:.75}
+.pgr-ctl{display:flex;align-items:center;gap:6px;flex:none}
+.pgr-b{width:34px;height:34px;min-height:0;padding:0;border-radius:50%!important;border:0!important;background:var(--accent)!important;color:var(--accent-ink,#fff)!important;font-size:20px;font-weight:900;line-height:1;display:grid;place-items:center;box-shadow:0 4px 12px -4px var(--accent)}
+.pgr-b:disabled{background:var(--line)!important;color:var(--mute)!important;box-shadow:none;opacity:.6}
+.pgr-f{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+.pgr-fb{flex:0 1 auto;max-width:48%;min-height:0;padding:10px 16px;border-radius:99px!important;border:0!important;background:var(--fg)!important;color:var(--bg)!important;font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pgr-fb.r{margin-left:auto;background:var(--accent)!important;color:var(--accent-ink,#fff)!important}
+.pgr-fb:disabled{visibility:hidden}
+.pgr-a{background:var(--accent)!important;color:var(--accent-ink,#fff)!important;border:0!important;width:46px;height:46px;font-size:26px;font-weight:900}
+.lpnav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0}
+.lpb{min-height:0;padding:9px 14px;border-radius:99px!important;border:0!important;background:var(--accent)!important;color:var(--accent-ink,#fff)!important;font-weight:800;font-size:14px}
+.lpb:disabled{background:var(--line)!important;color:var(--mute)!important;opacity:.6}
+.lpno{font-size:13px;color:var(--mute);white-space:nowrap}.lpno b{font-size:17px;color:var(--fg);font-weight:900}
 /* 청해 재생 상태 */
 .ltime.warn{color:#c98a1a;font-weight:700}
 .pstat{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--mute);margin:2px 0 6px}
@@ -1251,8 +1263,8 @@ const x=['moji','gram','tg'].includes(e.k)?find('mock',e.id):OBJ.includes(e.k)?f
   return{t:e.id||'(문항)',h:''}}
 let NF='todo',RV='words',WF='todo',NP=null,WP=null;   // NP·WP = 지금 펼친 오답노트·단어장 낱장
 // 낱장에서 좌우로 밀면 이전·다음(휴대폰)
-let SWX=null;document.addEventListener('touchstart',e=>{SWX=(VIEW==='review'||VIEW==='note')&&(NP||WP)&&!$('#sheet')?[e.touches[0].clientX,e.touches[0].clientY]:null},{passive:true});
-document.addEventListener('touchend',e=>{if(!SWX)return;const dx=e.changedTouches[0].clientX-SWX[0],dy=e.changedTouches[0].clientY-SWX[1];SWX=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*2&&!String(getSelection())){const b=$(dx<0?'#pnext':'#pprev');if(b&&!b.disabled)b.click()}},{passive:true});
+let SWX=null;document.addEventListener('touchstart',e=>{SWX=(VIEW==='review'||VIEW==='note')&&!$('#sheet')&&!(e.target.closest&&e.target.closest('.chips,input,textarea,.pgr,.nseg'))&&((NP||WP)||$('.lpnav'))?[e.touches[0].clientX,e.touches[0].clientY]:null},{passive:true});
+document.addEventListener('touchend',e=>{if(!SWX)return;const dx=e.changedTouches[0].clientX-SWX[0],dy=e.changedTouches[0].clientY-SWX[1];SWX=null;if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*2&&!String(getSelection())){const b=(NP||WP)?$(dx<0?'#pnext':'#pprev'):document.querySelector(`.lpnav [data-lpd="${dx<0?1:-1}"]`);if(b&&!b.disabled)b.click()}},{passive:true});
 // 복습 탭: 오답노트 / 단어장 두 공책
 const openNotes=()=>Object.entries(S.notes).filter(([k,e])=>NG.todo.includes(noteStat(e,k))).length;
 const rvSwitch=()=>{if(VIEW==='note')return noteSeg();const nw=Object.values(S.words).filter(w=>!w.del&&w.st!=='done').length;
@@ -1267,14 +1279,25 @@ const kanaI=s=>{const c=kanaN(s).charAt(0);return c>='ぁ'&&c<='ん'?['お','ご
 const kanaRow=s=>{const i=kanaI(s);return i>9?'그 밖':'あかさたなはまやらわ'[i]+'행'};
 const rvGrp=arr=>{const gs=[];arr.forEach(x=>{const l=gs[gs.length-1];if(l&&l[0]===x.g)l[1]++;else gs.push([x.g,1])});return gs};
 const pageWrap=h=>`<div class="page ${PGD>0?'flipN':PGD<0?'flipP':''}">${h}</div>`;
+// ── 2026-11-20 목록 쪽 나눔(단어장·오답노트·첨삭노트): 한 쪽 15개, 위·아래에 「‹ 이전 · n / N쪽 · 다음 ›」, 바로 가기는 그 쪽으로. 옆으로 밀어도 넘어감
+const LPER=15,LPG={notes:0,words:0,fix:0};
+const choOf=s=>{const c=String(s||'').trim().charCodeAt(0);if(c>=0xAC00&&c<=0xD7A3)return 'ㄱㄱㄴㄷㄷㄹㅁㅂㅂㅅㅅㅇㅈㅈㅊㅋㅌㅍㅎ'[Math.floor((c-0xAC00)/588)];return '그 밖'};
+const lpNav=(key,p,n,tot)=>n>1?`<div class="lpnav"><button class="lpb" data-lp="${key}" data-lpd="-1" ${p?'':'disabled'}>‹ 이전 쪽</button><span class="lpno"><b>${p+1}</b> / ${n}쪽 <span class="note">· ${tot}개</span></span><button class="lpb" data-lp="${key}" data-lpd="1" ${p<n-1?'':'disabled'}>다음 쪽 ›</button></div>`:'';
+// items: [{g, html}] (g = 묶음 이름). 그 쪽의 항목만 그리고 묶음 제목을 붙인다
+function lpPage(key,items){const n=Math.max(1,Math.ceil(items.length/LPER)),p=Math.min(Math.max(0,LPG[key]||0),n-1);LPG[key]=p;
+  let h=lpNav(key,p,n,items.length),lastG=null;for(const it of items.slice(p*LPER,(p+1)*LPER)){if(it.g!==lastG){h+=`<h3>${esc(it.g)}${lastG===null&&p&&items[p*LPER-1]&&items[p*LPER-1].g===it.g?' <span class="note">(앞 쪽에서 이어짐)</span>':''}</h3>`;lastG=it.g}h+=it.html}
+  return h+lpNav(key,p,n,items.length)}
+// 바로 가기 칩 i번째 묶음이 있는 쪽
+const lpTocPage=(gs,i)=>Math.floor(gs.slice(0,i).reduce((s,g)=>s+g[1],0)/LPER);
+function bindLp(re){document.querySelectorAll('[data-lp]').forEach(b=>b.onclick=()=>{const k=b.dataset.lp;LPG[k]=(LPG[k]||0)+(+b.dataset.lpd);re();const v=$('.lpnav');if(v)v.scrollIntoView({block:'start',behavior:'smooth'})})}
 const rvTools=(ph,sorts,gs,bm)=>`<div class="row"><input id="rvq" value="${esc(RVQ)}" placeholder="${ph}" style="flex:1;min-width:140px"><button id="rvqb">찾기</button>${RVQ?'<button id="rvqx">찾기 지우기</button>':''}</div>
    <div class="chips"><span class="note">차례 순서</span>${sorts.map(([k,n])=>`<button data-rvs="${k}" class="${RVS[RV]===k?'on':''}">${n}</button>`).join('')}</div>
    ${gs.length>1?`<div class="chips"><span class="note">바로 가기</span>${gs.map(([g,c],i)=>`<button data-toc="${i}">${esc(g)} <span class="note">${c}</span></button>`).join('')}</div>`:''}
    ${bm?`<button class="idx" id="rvbm"><span class="rp">책갈피</span> 보던 곳 이어 보기 · <span class="jp">${esc(bm)}</span></button>`:''}`;
-const bindTools=(re,goBm)=>{const q=$('#rvq');if(q){const f=()=>{RVQ=q.value.trim();re()};$('#rvqb').onclick=f;q.onkeydown=e=>{if(e.key==='Enter')f()}}
-  ($('#rvqx')||{}).onclick=()=>{RVQ='';re()};($('#rvbm')||{}).onclick=goBm;
-  document.querySelectorAll('[data-rvs]').forEach(b=>b.onclick=()=>{RVS[RV]=b.dataset.rvs;re()});
-  document.querySelectorAll('[data-toc]').forEach(b=>b.onclick=()=>{const t=$('#toc'+b.dataset.toc);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})})};
+const bindTools=(re,goBm)=>{const q=$('#rvq');if(q){const f=()=>{RVQ=q.value.trim();LPG[RV]=0;re()};$('#rvqb').onclick=f;q.onkeydown=e=>{if(e.key==='Enter')f()}}
+  ($('#rvqx')||{}).onclick=()=>{RVQ='';LPG[RV]=0;re()};($('#rvbm')||{}).onclick=goBm;
+  document.querySelectorAll('[data-rvs]').forEach(b=>b.onclick=()=>{RVS[RV]=b.dataset.rvs;LPG[RV]=0;re()});bindLp(re);
+  document.querySelectorAll('[data-toc]').forEach(b=>b.onclick=()=>{const gs=window.__TOCGS,k=window.__TOCK;if(gs&&k){LPG[k]=lpTocPage(gs,+b.dataset.toc);re();const v=$('.lpnav')||$('#rvq');if(v)v.scrollIntoView({block:'start',behavior:'smooth'});return}const t=$('#toc'+b.dataset.toc);if(t)t.scrollIntoView({behavior:'smooth',block:'start'})})};
 const bindPg=(i,n,goI)=>{const on=(id,f)=>{const b=$('#'+id);if(b)b.onclick=f};on('pidx',()=>goI(-1));on('pprev',()=>{PGD=-1;goI(i-1)});on('pnext',()=>{PGD=1;goI(i+1)});
   const r=$('#pgr'),m=$('#pgn'),j=v=>{v=Math.max(1,Math.min(n,+v||1))-1;if(v!==i){PGD=v>i?1:-1;goI(v)}};
   if(r){r.oninput=()=>{m.value=r.value};r.onchange=()=>j(r.value);on('pgg',()=>j(m.value));m.onkeydown=e=>{if(e.key==='Enter')j(m.value)}}};
@@ -1312,13 +1335,14 @@ function notesView(){
       ${sibs.length?`<p class="note"><b>묶음 「${esc(sibs[0].key.slice(2))}」</b> 같은 말이 나오는 다른 책 문제 ${sibs.length}개 · 푼 것 ${sdone.length}${sbad.length?' · 틀린 것 '+sbad.length:''}</p>`:''}
       <div class="row">${sibs.length?`<button data-ng="${esc(n.key)}">묶음으로 풀기</button>`:''}${stepText(e.k,e.id,{ja:(e.a[e.a.length-1]||{}).q})?`<button data-nw="${esc(n.key)}">${ic('book')} 단어 찾기</button>`:''}<button data-nd="${esc(n.key)}">${n.st==='done'?'해결 취소':'해결로 표시'}</button></div>`})}
   if(RVQ)IT=IT.filter(x=>x.txt.includes(RVQ.toLowerCase()));
+  if(RVS.notes==='old')IT.reverse();
   if(RVS.notes==='kind')IT.sort((a,b)=>a.kn.localeCompare(b.kn,'ko'));
   IT.forEach(x=>x.g=RVS.notes==='kind'?x.kn:x.d);
   const pi=NP?IT.findIndex(x=>x.key===NP):-1;
   if(pi>=0){const it=IT[pi];bmSet('notes',it.key);h=`${rvSwitch()}${pgNav(pi,IT.length,esc(it.g))}${pageWrap(`<div class="nitem" style="padding:6px 0">${it.sum}</div>${it.body}`)}`}
-  else{NP=null;const gs=rvGrp(IT),bm=IT.find(x=>x.key===BM.notes);h+=rvTools('찾기 (문제 글·단어·뜻)',[['date','날짜별'],['kind','영역별']],gs,bm?bm.txt.slice(0,28):'');
+  else{NP=null;const gs=rvGrp(IT),bm=IT.find(x=>x.key===BM.notes);window.__TOCGS=gs;window.__TOCK='notes';h+=rvTools('찾기 (문제 글·단어·뜻)',[['date','최근순'],['old','오래된순'],['kind','영역별 (가나다)']],gs,bm?bm.txt.slice(0,28):'');
     if(!IT.length)h+='<p class="note">해당하는 항목이 없습니다.</p>';
-    let lastG=null,gi=0;for(const it of IT){if(it.g!==lastG){h+=`<h3 id="toc${gi++}">${esc(it.g)}</h3>`;lastG=it.g}h+=`<button class="idx" data-np="${esc(it.key)}">${it.sum}</button>`}h+=judgeUI(jd)}
+    h+=lpPage('notes',IT.map(it=>({g:it.g,html:`<button class="idx" data-np="${esc(it.key)}">${it.sum}</button>`})))+judgeUI(jd)}
   $('#view').innerHTML=nbCard('노트 · 오답노트',h);PGD=0;bindRv();
   document.querySelectorAll('[data-nf]').forEach(b=>b.onclick=()=>{NF=b.dataset.nf;NP=null;notesView()});
   document.querySelectorAll('[data-np]').forEach(b=>b.onclick=()=>{NP=b.dataset.np;notesView();scrollTo(0,0)});
@@ -1336,8 +1360,10 @@ function wordsView(){
   const L0=Object.values(S.words).filter(w=>!w.del).sort((a,b)=>b.t-a.t),L=L0.filter(w=>WK==='all'||(w.kind||'')===WK),inW=(w,f)=>f==='all'||(f==='done')===(w.st==='done');
   let list=L.filter(w=>inW(w,WF));const todo=L.filter(w=>w.st!=='done').sort((a,b)=>(wLv(a)-wLv(b))||(a.u-b.u));
   if(RVQ){const q=RVQ.toLowerCase();list=list.filter(w=>(w.w+' '+(w.r||'')+' '+(w.ko||'')).toLowerCase().includes(q))}
-  const kana=RVS.words==='kana',wk=w=>kanaN(w.r||w.w),gOf=w=>kana?kanaRow(w.r||w.w):new Date(w.t).toLocaleDateString('sv');
+  const so=RVS.words,kana=so==='kana',wk=w=>kanaN(w.r||w.w),gOf=w=>kana?kanaRow(w.r||w.w):so==='ko'?choOf(w.ko):new Date(w.t).toLocaleDateString('sv');
   if(kana)list=list.slice().sort((a,b)=>(kanaI(wk(a))-kanaI(wk(b)))||(wk(a)<wk(b)?-1:wk(a)>wk(b)?1:0));
+  if(so==='ko')list=list.slice().sort((a,b)=>(choOf(a.ko)==='그 밖'?1:0)-(choOf(b.ko)==='그 밖'?1:0)||String(a.ko||'').localeCompare(String(b.ko||''),'ko'));
+  if(so==='old')list=list.slice().reverse();
   let h=`${rvSwitch()}<button class="pri start" id="wrev" ${todo.length?'':'disabled'}>${todo.length?`단어장 복습 (${Math.min(todo.length,10)}개)`:'외울 단어가 없어요'}</button>
    <div class="chips">${[['todo','외울 것'],['done','외움'],['all','전체']].map(([k,n])=>`<button data-wf="${k}" class="${WF===k?'on':''}">${n} ${L.filter(x=>inW(x,k)).length}</button>`).join('')}<button id="wfind">${ic('book')} 단어 찾기 · 직접 등록</button></div>
    <div class="chips"><span class="note">종류</span>${[['all','전체'],['','단어'],['p','문형'],['x','표현']].map(([k,n])=>`<button data-wkd="${k}" class="${WK===k?'on':''}">${n} ${L0.filter(x=>k==='all'||(x.kind||'')===k).length}</button>`).join('')}</div>
@@ -1353,9 +1379,9 @@ function wordsView(){
      <details><summary class="note">읽기·뜻 고치기</summary><div class="row"><input data-wer="${esc(w.w)}" value="${esc(w.r||'')}" placeholder="읽기(히라가나)" style="flex:1;min-width:120px"><input data-wek="${esc(w.w)}" value="${esc(w.ko||'')}" placeholder="뜻" style="flex:2;min-width:160px"><button data-wes="${esc(w.w)}">저장</button></div></details></div>`;
   const wi=WP?list.findIndex(w=>w.w===WP):-1;
   if(wi>=0){bmSet('words',list[wi].w);h=`${rvSwitch()}${pgNav(wi,list.length,esc(gOf(list[wi])))}${pageWrap(cardOf(list[wi]))}`}
-  else{WP=null;const gl=list.map(w=>({g:gOf(w),w})),gs=rvGrp(gl);h+=rvTools('찾기 (단어·읽기·뜻)',[['date','날짜별'],['kana','가나순 색인']],gs,list.some(w=>w.w===BM.words)?BM.words:'');
+  else{WP=null;const gl=list.map(w=>({g:gOf(w),w})),gs=rvGrp(gl);window.__TOCGS=gs;window.__TOCK='words';h+=rvTools('찾기 (단어·읽기·뜻)',[['date','최근순'],['old','오래된순'],['kana','아이우에오순'],['ko','가나다순 (뜻)']],gs,list.some(w=>w.w===BM.words)?BM.words:'');
     if(!list.length)h+='<p class="note">해당하는 단어가 없습니다.</p>';
-    let at=0;gs.forEach(([g,c],gi)=>{const ws=list.slice(at,at+c);at+=c;h+=`<h3 id="toc${gi}">${esc(g)} <span class="note">${ws.length}</span></h3>`+ws.map(w=>`<button class="idx" data-wp="${esc(w.w)}">${w.kind?`<span class="tag">${KINDN[w.kind]}</span> `:''}<span class="jp" style="font-size:18px">${esc(w.w)}</span>${w.r?` <span class="rp">${esc(w.r)}</span>`:''} <span class="m2">${esc((w.ko||'뜻 없음').slice(0,26))}</span><br><span class="note">${WLN[w.st==='done'?3:wLv(w)]}</span></button>`).join('')})}
+    h+=lpPage('words',list.map(w=>({g:gOf(w),html:`<button class="idx" data-wp="${esc(w.w)}">${w.kind?`<span class="tag">${KINDN[w.kind]}</span> `:''}<span class="jp" style="font-size:18px">${esc(w.w)}</span>${w.r?` <span class="rp">${esc(w.r)}</span>`:''} <span class="m2">${esc((w.ko||'뜻 없음').slice(0,26))}</span><br><span class="note">${WLN[w.st==='done'?3:wLv(w)]}</span></button>`})))}
   $('#view').innerHTML=nbCard('복습 · 단어장',h);PGD=0;bindRv();
   const up=(w,f)=>{f(S.words[w]);S.words[w].u=Date.now();save();wordsView();syncNow()};
   document.querySelectorAll('[data-wf]').forEach(b=>b.onclick=()=>{WF=b.dataset.wf;WP=null;wordsView()});
@@ -1599,18 +1625,20 @@ function pickSteps(a,n){const pool=PICK.find(p=>p[0]===a)[2](),age=x=>{const v=S
 const PGI={};
 function pagerize(id,html){const parts=html.split(/<!--PG:(.*?)-->/),head=parts[0],pages=[];for(let k=1;k<parts.length;k+=2)if(parts[k+1]&&parts[k+1].trim())pages.push({t:parts[k],h:parts[k+1]});
   if(!pages.length)return html;const i=Math.min(PGI[id]||0,pages.length-1);
-  return `${head}<div class="pgr" id="pgr_${id}"><div class="pgr-h"><div class="chips pgr-ch">${pages.map((pg,k)=>`<button data-pk="${k}" class="${k===i?'on':''}">${esc(pg.t)}</button>`).join('')}</div><span class="pgr-no"><b>${i+1}</b> / ${pages.length}</span></div>
+  return `${head}<div class="pgr" id="pgr_${id}"><div class="pgr-h"><div class="chips pgr-ch">${pages.map((pg,k)=>`<button data-pk="${k}" class="${k===i?'on':''}">${esc(pg.t)}</button>`).join('')}</div><span class="pgr-ctl"><button class="pgr-b" data-pd="-1" aria-label="이전 장">‹</button><span class="pgr-no"><b>${i+1}</b> / ${pages.length}</span><button class="pgr-b" data-pd="1" aria-label="다음 장">›</button></span></div>
    <div class="pgr-w"><button class="pgr-a l" aria-label="이전 장">‹</button><button class="pgr-a r" aria-label="다음 장">›</button><div class="pgr-t">${pages.map((pg,k)=>`<section class="pgr-p${k===i?' cur':''}">${pg.h}</section>`).join('')}</div></div>
-   <div class="pgr-d">${pages.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div><p class="note pgr-hint">옆으로 밀어서 넘기기${isPC()?' · ‹ › 또는 ← → 키':''}</p></div>`}
+   <div class="pgr-d">${pages.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div>
+   <div class="pgr-f"><button class="pgr-fb" data-pd="-1"></button><button class="pgr-fb r" data-pd="1"></button></div><p class="note pgr-hint">옆으로 밀어도 넘어갑니다${isPC()?' · ← → 키':''}</p></div>`}
 function bindPager(id){const R=$('#pgr_'+id);if(!R)return;const T=R.querySelector('.pgr-t'),P=[...T.children],ch=R.querySelectorAll('.pgr-ch button'),dots=R.querySelectorAll('.pgr-d i'),no=R.querySelector('.pgr-no b'),L=R.querySelector('.pgr-a.l'),Rb=R.querySelector('.pgr-a.r');
   let cur=Math.min(PGI[id]||0,P.length-1);const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
   const fit=()=>{const h=P[cur]&&P[cur].offsetHeight;T.style.height=h?h+'px':'auto'};
-  const mark=i=>{cur=i;PGI[id]=i;no.textContent=i+1;ch.forEach((b,k)=>b.classList.toggle('on',k===i));dots.forEach((d,k)=>d.classList.toggle('on',k===i));L.disabled=i===0;Rb.disabled=i===P.length-1;P.forEach((pg,k)=>pg.classList.toggle('cur',k===i));fit();
+  const nm=[...ch].map(b=>b.textContent),fb=R.querySelectorAll('.pgr-fb'),hb=R.querySelectorAll('.pgr-b');
+  const mark=i=>{cur=i;PGI[id]=i;no.textContent=i+1;fb[0].textContent=i?'‹ '+nm[i-1]:'';fb[0].disabled=!i;fb[1].textContent=i<P.length-1?nm[i+1]+' ›':'';fb[1].disabled=i>=P.length-1;hb[0].disabled=!i;hb[1].disabled=i>=P.length-1;ch.forEach((b,k)=>b.classList.toggle('on',k===i));dots.forEach((d,k)=>d.classList.toggle('on',k===i));L.disabled=i===0;Rb.disabled=i===P.length-1;P.forEach((pg,k)=>pg.classList.toggle('cur',k===i));fit();
     const cb=ch[i];if(cb){const c=cb.parentNode;c.scrollTo({left:cb.offsetLeft-c.offsetLeft-c.clientWidth/2+cb.offsetWidth/2,behavior:still?'auto':'smooth'})}};
   const go=i=>{i=Math.max(0,Math.min(P.length-1,i));T.scrollTo({left:i*T.clientWidth,behavior:still?'auto':'smooth'});mark(i)};
   T.scrollLeft=cur*T.clientWidth;mark(cur);
   let tm=0;T.addEventListener('scroll',()=>{clearTimeout(tm);tm=setTimeout(()=>{const i=Math.round(T.scrollLeft/Math.max(1,T.clientWidth));if(i!==cur)mark(i)},90)},{passive:true});
-  ch.forEach(b=>b.onclick=()=>go(+b.dataset.pk));L.onclick=()=>go(cur-1);Rb.onclick=()=>go(cur+1);R.__go=d=>go(cur+d);
+  ch.forEach(b=>b.onclick=()=>go(+b.dataset.pk));L.onclick=()=>go(cur-1);Rb.onclick=()=>go(cur+1);R.__go=d=>go(cur+d);R.querySelectorAll('[data-pd]').forEach(b=>b.onclick=()=>go(cur+(+b.dataset.pd)));
   if(window.ResizeObserver){const ro=new ResizeObserver(()=>fit());P.forEach(pg=>ro.observe(pg))}}
 document.addEventListener('keydown',e=>{if(VIEW==='sess'||$('#sheet')||/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;const R=document.querySelector('.pgr');if(!R||!R.__go)return;
   if(e.key==='ArrowRight'){e.preventDefault();R.__go(1)}else if(e.key==='ArrowLeft'){e.preventDefault();R.__go(-1)}});
@@ -1621,13 +1649,17 @@ const noteSeg=()=>{const mis=Object.entries(S.notes).filter(([k,e])=>!WRK.includ
 const bindNoteSeg=()=>document.querySelectorAll('[data-ns]').forEach(b=>b.onclick=()=>{NOTE_S=b.dataset.ns;NP=null;scrollTo(0,0);render()});
 function fixView(){WLIST=wItems();const st=x=>x.pend?'pend':x.j&&!x.out&&WV.indexOf(x.j.v)<2?'pass':'todo';
   const KF=[['all','전부'],['tr','번역'],['art','기사'],['cw','조건 작문'],['etc','그 밖']],kOf=x=>['ilyeok','hanyeok'].includes(x.e.k)?'tr':x.e.k==='art'?'art':x.e.k==='cw'?'cw':'etc';
-  const L=WLIST.filter(x=>(x.j||x.pend)&&(FXF==='all'||(FXF==='todo'?st(x)!=='pass':st(x)==='pass'))&&(FXKF==='all'||kOf(x)===FXKF));
+  let L=WLIST.filter(x=>(x.j||x.pend)&&(FXF==='all'||(FXF==='todo'?st(x)!=='pass':st(x)==='pass'))&&(FXKF==='all'||kOf(x)===FXKF));
+  const so=RVS.fix||'date';if(so==='old')L=L.slice().reverse();if(so==='kind')L=L.slice().sort((a,b)=>(KN[a.e.k]||'').localeCompare(KN[b.e.k]||'','ko'));
+  const gOf=x=>so==='kind'?(KN[x.e.k]||x.e.k):(x.d||'');
   $('#view').innerHTML=card('노트 · 첨삭노트',`${noteSeg()}
    <div class="chips">${[['todo','고칠 곳·검수 대기'],['pass','통과'],['all','전부']].map(([k,n])=>`<button data-ff="${k}" class="${FXF===k?'on':''}">${n}</button>`).join('')}</div>
    <div class="chips">${KF.map(([k,n])=>`<button data-fk="${k}" class="${FXKF===k?'on':''}">${n}</button>`).join('')}</div>
    <p class="note">AI 판정을 받은 작문이 모입니다(번역 세트·기사 작문·조건 작문·루틴의 번역). 틀린 글자는 빨간 취소선, 고친 글자는 초록. 「고쳐 쓰기」는 기준 문장을 가리고 다시 쓰기, 「판정이 이상함」은 점수에서 빼고 다른 AI에 다시 묻기.</p>
-   ${L.length?L.slice(0,WSHOW).map(x=>wCard(x,WLIST.indexOf(x))).join('')+(L.length>WSHOW?`<div class="row"><button id="wmore">더 보기 (${L.length-WSHOW})</button></div>`:''):'<p class="note">해당하는 작문이 없습니다. 작문 탭에서 번역 세트나 기사 작문을 쓰고 판정을 받으면 여기 쌓입니다.</p>'}`);
-  bindNoteSeg();document.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{FXF=b.dataset.ff;fixView()});document.querySelectorAll('[data-fk]').forEach(b=>b.onclick=()=>{FXKF=b.dataset.fk;fixView()});wBind()}
+   <div class="chips"><span class="note">순서</span>${[['date','최근순'],['old','오래된순'],['kind','종류별 (가나다)']].map(([k,n])=>`<button data-fso="${k}" class="${so===k?'on':''}">${n}</button>`).join('')}</div>
+   ${L.length?lpPage('fix',L.map(x=>({g:gOf(x),html:wCard(x,WLIST.indexOf(x))}))):'<p class="note">해당하는 작문이 없습니다. 작문 탭에서 번역 세트나 기사 작문을 쓰고 판정을 받으면 여기 쌓입니다.</p>'}`);
+  bindNoteSeg();document.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{FXF=b.dataset.ff;LPG.fix=0;fixView()});document.querySelectorAll('[data-fk]').forEach(b=>b.onclick=()=>{FXKF=b.dataset.fk;LPG.fix=0;fixView()});
+  document.querySelectorAll('[data-fso]').forEach(b=>b.onclick=()=>{RVS.fix=b.dataset.fso;LPG.fix=0;fixView()});bindLp(fixView);wBind()}
 function noteView(){if(NOTE_S==='fix')return fixView();RV='notes';notesView()}
 // 복습 탭: 단어장 · 골라 풀기
 function reviewView(){if(RV==='notes')RV='words';if(RV==='pick'){pickView();const c=$('#view .card');if(c){const k=c.querySelector('.kind');(k||c).insertAdjacentHTML(k?'afterend':'afterbegin',rvSwitch());bindRv()}return}notesView()}
